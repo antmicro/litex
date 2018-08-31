@@ -25,7 +25,9 @@ static void __attribute__((noreturn)) boot(unsigned int r1, unsigned int r2, uns
 	uart_sync();
 	irq_setmask(0);
 	irq_setie(0);
+#ifndef __vexriscv__
 	flush_cpu_icache();
+#endif
 	flush_cpu_dcache();
 #ifdef L2_SIZE
 	flush_l2_cache();
