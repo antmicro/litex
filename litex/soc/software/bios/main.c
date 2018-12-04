@@ -11,12 +11,27 @@
 #include <generated/csr.h>
 #include <generated/mem.h>
 
+#ifdef CSR_SPI_BASE
+#include <spi.h>
+#endif
+
+#ifdef CSR_I2C_BASE
+#include <i2c.h>
+#endif
+#ifdef CSR_GPIO_BASE
+#include <gpio.h>
+#endif
+
 #ifdef CSR_ETHMAC_BASE
 #include <net/microudp.h>
 #endif
 
 #include "sdram.h"
 #include "boot.h"
+
+#ifdef CSR_I2C_BASE
+I2C i2c_ctl;
+#endif
 
 /* General address space functions */
 
@@ -119,6 +134,73 @@ static void mw(char *addr, char *value, char *count)
 	}
 	for (i=0;i<count2;i++) *addr2++ = value2;
 }
+
+#ifdef CSR_SPI_BASE
+static void spi(char *mosi)
+{
+	unsigned int data;
+
+	if((*mosi) == 0){
+		printf("spi <data>\n");
+		return;
+	}
+
+	data = strtoul(mosi, 0, 0);
+
+	printf("transmitted: %08x\n", data);
+
+	spi_ss(1);
+
+	data = spi_xfer(data);
+
+	spi_ss(0);
+
+	printf("received: %08x\n", data);
+
+}
+#endif
+
+#ifdef CSR_I2C_BASE
+static void i2c(char *d)
+{
+	unsigned int data;
+	if((*d) == 0){
+		printf("i2c <data>\n");
+		return;
+	}
+
+	data = strtoul(d, 0, 0);
+
+	printf("transmitted: %02x\n", data);
+
+	i2c_start_cond(&i2c_ctl);
+
+	i2c_write(&i2c_ctl, 0x20);
+
+	data = i2c_write(&i2c_ctl, data);
+
+	i2c_stop_cond(&i2c_ctl);
+
+	printf("ack: %02x\n", data);
+}
+#endif
+
+#ifdef CSR_GPIO_BASE
+static void gpio(char *d)
+{
+	unsigned int data;
+	if((*d) == 0){
+		printf("gpio <data>\n");
+		return;
+	}
+
+	data = strtoul(d, 0, 0);
+
+	printf("set: %08x\n", data);
+
+	gpio_write(data);
+}
+#endif
 
 static void mc(char *dstaddr, char *srcaddr, char *count)
 {
@@ -309,6 +391,15 @@ static void help(void)
 	puts("mc         - copy address space");
 	puts("crc        - compute CRC32 of a part of the address space");
 	puts("ident      - display identifier");
+#ifdef CSR_SPI_BASE
+	puts("spi        - perform SPI transfer");
+#endif
+#ifdef CSR_I2C_BASE
+	puts("i2c        - perform I2C write");
+#endif
+#ifdef CSR_GPIO_BASE
+	puts("gpio       - perform GPIO write");
+#endif
 #ifdef __lm32__
 	puts("rcsr       - read processor CSR");
 	puts("wcsr       - write processor CSR");
@@ -365,6 +456,15 @@ static void do_command(char *c)
 	else if(strcmp(token, "mc") == 0) mc(get_token(&c), get_token(&c), get_token(&c));
 	else if(strcmp(token, "crc") == 0) crc(get_token(&c), get_token(&c));
 	else if(strcmp(token, "ident") == 0) ident();
+#ifdef CSR_SPI_BASE
+	else if(strcmp(token, "spi") == 0) spi(get_token(&c));
+#endif
+#ifdef CSR_I2C_BASE
+	else if(strcmp(token, "i2c") == 0) i2c(get_token(&c));
+#endif
+#ifdef CSR_GPIO_BASE
+	else if(strcmp(token, "gpio") == 0) gpio(get_token(&c));
+#endif
 
 #ifdef L2_SIZE
 	else if(strcmp(token, "flushl2") == 0) flush_l2_cache();
@@ -509,6 +609,19 @@ int main(int i, char **c)
 	irq_setmask(0);
 	irq_setie(1);
 	uart_init();
+
+#ifdef CSR_SPI_BASE
+	spi_init();
+#endif
+#ifdef CSR_I2C_BASE
+	i2c_ctl.w_read = i2c_w_read;
+	i2c_ctl.w_write = i2c_w_write;
+	i2c_ctl.r_read = i2c_r_read;
+	i2c_init(&i2c_ctl);
+#endif
+#ifdef CSR_GPIO_BASE
+	gpio_init();
+#endif
 	printf("\n");
 	printf("\e[1m        __   _ __      _  __\e[0m\n");
 	printf("\e[1m       / /  (_) /____ | |/_/\e[0m\n");

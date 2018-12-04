@@ -14,7 +14,7 @@ class VexRiscv(Module, AutoCSR):
     linker_output_format = "elf32-littleriscv"
 
     def __init__(self, platform, cpu_reset_address, variant=None):
-        assert variant in (None, "debug"), "Unsupported variant %s" % variant
+        assert variant in (None, "debug", "jtag"), "Unsupported variant %s" % variant
         self.reset = Signal()
         self.ibus = i = wishbone.Interface()
         self.dbus = d = wishbone.Interface()
@@ -111,6 +111,24 @@ class VexRiscv(Module, AutoCSR):
                 "o_debug_bus_cmd_ready": self.o_cmd_ready,
                 "o_debug_bus_rsp_data": self.o_rsp_data,
                 "o_debug_resetOut": self.o_resetOut
+            })
+
+        elif variant == "jtag":
+
+            cpu_reset = ResetSignal()
+            cpu_args = {}
+            cpu_filename = "VexRiscv.v"
+
+            self.jtag_tdo = Signal()
+            self.jtag_tdi = Signal()
+            self.jtag_tms = Signal()
+            self.jtag_tck = Signal()
+
+            cpu_args.update({
+                "i_jtag_tdi": self.jtag_tdi,
+                "o_jtag_tdo": self.jtag_tdo,
+                "i_jtag_tms": self.jtag_tms,
+                "i_jtag_tck": self.jtag_tck
             })
 
         self.comb += [
