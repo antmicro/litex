@@ -173,6 +173,9 @@ class SoCCore(Module):
         if with_ctrl:
             self.submodules.ctrl = SoCController()
 
+        if reserve_nmi_interrupt:
+            self.soc_interrupt_map["nmi"] = 0 # Reserve zero for "non-maskable interrupt"
+
         if cpu_type is not None:
             if cpu_type == "lm32":
                 self.add_cpu(lm32.LM32(platform, self.cpu_reset_address, self.cpu_variant))
@@ -180,6 +183,18 @@ class SoCCore(Module):
                 self.add_cpu(mor1kx.MOR1KX(platform, self.cpu_reset_address, self.cpu_variant))
             elif cpu_type == "picorv32":
                 self.add_cpu(picorv32.PicoRV32(platform, self.cpu_reset_address, self.cpu_variant))
+                
+                # there are internal interupt sources in PicoRV32:
+                # 0: Timer Interrupt
+                # 1: EBREAK/ECALL or Illegal Instruction
+                # 2: BUS Error (Unalign Memory Access)
+                # ---
+                # soc interrupts are shifted to avoid overlapping
+                
+                if reserve_nmi_interrupt:
+                    self.soc_interrupt_map["nmi"] = 3
+                self.soc_interrupt_map["timer0"] = 4
+                self.soc_interrupt_map["uart"] = 5
             elif cpu_type == "vexriscv":
                 self.add_cpu(vexriscv.VexRiscv(platform, self.cpu_reset_address, self.cpu_variant))
             elif cpu_type == "minerva":
@@ -212,9 +227,6 @@ class SoCCore(Module):
         self.config["CSR_DATA_WIDTH"] = csr_data_width
         self.add_constant("CSR_DATA_WIDTH", csr_data_width)
         self.register_mem("csr", self.mem_map["csr"], self.wishbone2csr.wishbone)
-
-        if reserve_nmi_interrupt:
-            self.soc_interrupt_map["nmi"] = 0 # Reserve zero for "non-maskable interrupt"
 
         if with_uart:
             if uart_stub:
