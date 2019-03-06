@@ -18,29 +18,42 @@ _start:
 
 .org 0x00000010 # IRQ
 _irq_vector:
-  addi sp, sp, -16
-  sw t0, 4(sp)
-  sw ra, 8(sp)
   /* By convention, q2 holds true IRQ vector, but remains caller-save.
   We rely on the assumption that compiler-generated code will never touch
   the QREGs. q3 is truly scratch/caller-save. */
+
+  /* save t0 in q3, so it can be later recovered */
+  picorv32_setq_insn(q3, t0)
+  /* read true IRQ vector */
   picorv32_getq_insn(t0, q2)
-  sw t0, 12(sp)
+  /* save ra in q2 (overwrite it), so it can be later recovered */
+  picorv32_setq_insn(q2, ra)
 
-  jalr t0 // Call the true IRQ vector.
+  /* Call the true IRQ vector. */
+  jalr t0 
+  /* IRQ handler calling `picorv32_retirq_insn` directly won't return here, but some simpler code might */
 
-  lw t0, 12(sp)
-  picorv32_setq_insn(q2, t0) // Restore the true IRQ vector.
-  lw ra, 8(sp)
-  lw t0, 4(sp)
-  addi sp, sp, 16
-  picorv32_retirq_insn() // return from interrupt
+  /* restore state */
+  picorv32_getq_insn(ra, q2)
+  picorv32_setq_insn(q2, t0)
+  picorv32_getq_insn(t0, q3)
 
+  /* return from interrupt */
+  picorv32_retirq_insn() 
 
 /*
  * IRQ handler, branched to from the vector.
  */
 _irq:
+  /* store q2/q3 on the stack */
+  addi sp, sp, -8 
+  sw t0, -4(sp)
+  picorv32_getq_insn(t0, q2)
+  sw t0, 0(sp)
+  picorv32_getq_insn(t0, q3)
+  sw t0, 4(sp)
+  lw t0, -4(sp)
+
   /* save x1/x2 to q1/q2 */
   picorv32_setq_insn(q2, x1)
   picorv32_setq_insn(q3, x2)
@@ -98,6 +111,7 @@ _irq:
   /* prepare C handler stack */
   lui sp, %hi(_irq_stack)
   addi sp, sp, %lo(_irq_stack)
+  // TODO: what about restoring the stack after returning from `isr`?
 
   /* call C handler */
   jal ra, isr
@@ -148,6 +162,16 @@ _irq:
   /* restore x1 - x2 from q registers */
   picorv32_getq_insn(x1, q1)
   picorv32_getq_insn(x2, q2)
+
+  /* restore q2/q3 from the stack */
+  sw t0, -4(sp)
+  lw t0, 0(sp)
+  picorv32_setq_insn(q2, t0)
+  lw t0, 4(sp)
+  picorv32_setq_insn(q3, t0)
+  lw t0, -4(sp)
+  addi sp, sp, 8
+
   ret
 
 /*
