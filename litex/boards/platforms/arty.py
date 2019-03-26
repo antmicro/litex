@@ -59,6 +59,13 @@ _io = [
         Subsignal("tx", Pins("D10")),
         Subsignal("rx", Pins("A9")),
         IOStandard("LVCMOS33")),
+    ("jtag", 0,
+        Subsignal("tdo", Pins("D4")),
+        Subsignal("tdi", Pins("E2")),
+        Subsignal("tms", Pins("D2")),
+        Subsignal("tck", Pins("F4")),
+        IOStandard("LVCMOS33"),
+    ),
 
     ("spi", 0,
         Subsignal("clk", Pins("F1")),
