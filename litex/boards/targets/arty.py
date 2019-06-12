@@ -105,12 +105,13 @@ def main():
     soc_sdram_args(parser)
     parser.add_argument("--with-ethernet", action="store_true",
                         help="enable Ethernet support")
+    parser.add_argument("--synth-mode", action="store", default="vivado",
+                        help="Choose synthesis tool (yosys/vivado)")
     args = parser.parse_args()
-
     cls = EthernetSoC if args.with_ethernet else BaseSoC
     soc = cls(**soc_sdram_argdict(args))
     builder = Builder(soc, **builder_argdict(args))
-    builder.build()
+    builder.build(synth_mode=args.synth_mode)
 
 
 if __name__ == "__main__":
