@@ -26,19 +26,19 @@ class _CRG(Module):
 
         self.reset = Signal()
 
-        f0 = int(25e6)
+        f0 = int(125e6)
 
-        clk25 = platform.request(platform.default_clk_name)
-        clk25a = Signal()
+        clk125 = platform.request(platform.default_clk_name)
+        clk125a = Signal()
 
-        self.specials += Instance("IBUFG", i_I=clk25, o_O=clk25a)
+        self.specials += Instance("IBUFG", i_I=clk125, o_O=clk125a)
 
-        clk25b = Signal()
+        clk125b = Signal()
 
         self.specials += Instance(
             "BUFIO2", p_DIVIDE=1,
             p_DIVIDE_BYPASS="TRUE", p_I_INVERT="FALSE",
-            i_I=clk25a, o_DIVCLK=clk25b)
+            i_I=clk125a, o_DIVCLK=clk125b)
 
         unbuf_sdram_full = Signal()
         unbuf_sdram_half_a = Signal()
@@ -57,33 +57,33 @@ class _CRG(Module):
             p_REF_JITTER=.01,
             i_DADDR=0, i_DCLK=0, i_DEN=0, i_DI=0, i_DWE=0, i_RST=0, i_REL=0,
             p_DIVCLK_DIVIDE=1,
-            # Input Clocks (25MHz)
-            i_CLKIN1=clk25b,
+            # Input Clocks (125MHz)
+            i_CLKIN1=clk125b,
             p_CLKIN1_PERIOD=1e9/f0,
             i_CLKIN2=0,
             p_CLKIN2_PERIOD=0.,
             i_CLKINSEL=1,
             # Feedback
-            # (600MHz) vco
+            # (500MHz) vco
             i_CLKFBIN=pll_fb, o_CLKFBOUT=pll_fb, o_LOCKED=pll_lckd,
             p_CLK_FEEDBACK="CLKFBOUT",
-            p_CLKFBOUT_MULT=24, p_CLKFBOUT_PHASE=0.,
-            # (300MHz) sdram wr rd
+            p_CLKFBOUT_MULT=4, p_CLKFBOUT_PHASE=0.,
+            # (250MHz) sdram wr rd
             o_CLKOUT0=unbuf_sdram_full, p_CLKOUT0_DUTY_CYCLE=.5,
             p_CLKOUT0_PHASE=0., p_CLKOUT0_DIVIDE=2,
-            # ( 66MHz) encoder
+            # ( 50MHz) unused
             o_CLKOUT1=unbuf_encoder, p_CLKOUT1_DUTY_CYCLE=.5,
             p_CLKOUT1_PHASE=0., p_CLKOUT1_DIVIDE=9,
-            # (150MHz) sdram_half - sdram dqs adr ctrl
+            # (125MHz) sdram_half - sdram dqs adr ctrl
             o_CLKOUT2=unbuf_sdram_half_a, p_CLKOUT2_DUTY_CYCLE=.5,
             p_CLKOUT2_PHASE=270., p_CLKOUT2_DIVIDE=4,
-            # (150MHz) off-chip ddr
+            # (125MHz) off-chip ddr
             o_CLKOUT3=unbuf_sdram_half_b, p_CLKOUT3_DUTY_CYCLE=.5,
-            p_CLKOUT3_PHASE=250., p_CLKOUT3_DIVIDE=4,
-            # ( 50MHz) unused? - Was peripheral
+            p_CLKOUT3_PHASE=230., p_CLKOUT3_DIVIDE=4,
+            # ( 50MHz) unused
             o_CLKOUT4=unbuf_unused, p_CLKOUT4_DUTY_CYCLE=.5,
-            p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=12,
-            # ( 75MHz) sysclk
+            p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=10,
+            # ( 62MHz) sysclk
             o_CLKOUT5=unbuf_sys, p_CLKOUT5_DUTY_CYCLE=.5,
             p_CLKOUT5_PHASE=0., p_CLKOUT5_DIVIDE=8,
         )
@@ -95,7 +95,7 @@ class _CRG(Module):
         self.sync.por += If(por != 0, por.eq(por - 1))
         self.specials += AsyncResetSynchronizer(self.cd_por, reset)
 
-        # System clock - 75MHz
+        # System clock - 62.5MHz
         self.specials += Instance("BUFG", name="sys_bufg", i_I=unbuf_sys, o_O=self.cd_sys.clk)
         self.comb += self.cd_por.clk.eq(self.cd_sys.clk)
         self.specials += AsyncResetSynchronizer(self.cd_sys, ~pll_lckd | (por > 0))
@@ -122,7 +122,7 @@ class _CRG(Module):
         self.specials += Instance("BUFG", name="sdram_half_b_bufpll", i_I=unbuf_sdram_half_b, o_O=clk_sdram_half_shifted)
 
         output_clk = Signal()
-        clk = platform.request("sdram_clock")
+        clk = platform.request("ddram_clock_b")
         self.specials += Instance("ODDR2", p_DDR_ALIGNMENT="NONE",
                                   p_INIT=0, p_SRTYPE="SYNC",
                                   i_D0=1, i_D1=0, i_S=0, i_R=0, i_CE=1,
@@ -135,7 +135,7 @@ class BaseSoC(SoCSDRAM):
     def __init__(self, integrated_rom_size=0x8000, **kwargs):
         platform = pano_logic_g2.Platform()
 
-        clk_freq = int(75e6)
+        clk_freq = int(62.5e6)
 
         SoCSDRAM.__init__(self, platform, clk_freq=clk_freq,
                 integrated_rom_size=integrated_rom_size,
@@ -149,13 +149,13 @@ class BaseSoC(SoCSDRAM):
         gmii_rst_n = platform.request("gmii_rst_n")
 
         self.comb += [
-            gmii_rst_n.eq(0)
+            gmii_rst_n.eq(1)
         ]
 
         sdram_module = MT47H32M16(self.clk_freq, "1:2")
 
         self.submodules.ddrphy = s6ddrphy.S6HalfRateDDRPHY(
-            platform.request("sdram"),
+            platform.request("ddram_b"),
             sdram_module.memtype,
             rd_bitslip=0,
             wr_bitslip=4,
