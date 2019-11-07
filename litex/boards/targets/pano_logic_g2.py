@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-from fractions import Fraction
 
 import argparse
-import importlib
 
 from migen import *
-from migen.genlib.io import CRG
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.boards.platforms import pano_logic_g2
@@ -64,28 +61,28 @@ class _CRG(Module):
             p_CLKIN2_PERIOD=0.,
             i_CLKINSEL=1,
             # Feedback
-            # (500MHz) vco
+            # (1000MHz) vco
             i_CLKFBIN=pll_fb, o_CLKFBOUT=pll_fb, o_LOCKED=pll_lckd,
             p_CLK_FEEDBACK="CLKFBOUT",
-            p_CLKFBOUT_MULT=4, p_CLKFBOUT_PHASE=0.,
-            # (250MHz) sdram wr rd
+            p_CLKFBOUT_MULT=8, p_CLKFBOUT_PHASE=0.,
+            # (200MHz) sdram wr rd
             o_CLKOUT0=unbuf_sdram_full, p_CLKOUT0_DUTY_CYCLE=.5,
-            p_CLKOUT0_PHASE=0., p_CLKOUT0_DIVIDE=2,
-            # ( 50MHz) unused
+            p_CLKOUT0_PHASE=0., p_CLKOUT0_DIVIDE=5,
+            # (100MHz) unused
             o_CLKOUT1=unbuf_encoder, p_CLKOUT1_DUTY_CYCLE=.5,
-            p_CLKOUT1_PHASE=0., p_CLKOUT1_DIVIDE=9,
-            # (125MHz) sdram_half - sdram dqs adr ctrl
+            p_CLKOUT1_PHASE=0., p_CLKOUT1_DIVIDE=10,
+            # (100MHz) sdram_half - sdram dqs adr ctrl
             o_CLKOUT2=unbuf_sdram_half_a, p_CLKOUT2_DUTY_CYCLE=.5,
-            p_CLKOUT2_PHASE=270., p_CLKOUT2_DIVIDE=4,
-            # (125MHz) off-chip ddr
+            p_CLKOUT2_PHASE=270., p_CLKOUT2_DIVIDE=10,
+            # (100MHz) off-chip ddr
             o_CLKOUT3=unbuf_sdram_half_b, p_CLKOUT3_DUTY_CYCLE=.5,
-            p_CLKOUT3_PHASE=230., p_CLKOUT3_DIVIDE=4,
-            # ( 50MHz) unused
+            p_CLKOUT3_PHASE=250., p_CLKOUT3_DIVIDE=10,
+            # (100MHz) unused
             o_CLKOUT4=unbuf_unused, p_CLKOUT4_DUTY_CYCLE=.5,
             p_CLKOUT4_PHASE=0., p_CLKOUT4_DIVIDE=10,
-            # ( 62MHz) sysclk
+            # ( 50MHz) sysclk
             o_CLKOUT5=unbuf_sys, p_CLKOUT5_DUTY_CYCLE=.5,
-            p_CLKOUT5_PHASE=0., p_CLKOUT5_DIVIDE=8,
+            p_CLKOUT5_PHASE=0., p_CLKOUT5_DIVIDE=20,
         )
 
         # power on reset?
@@ -95,7 +92,7 @@ class _CRG(Module):
         self.sync.por += If(por != 0, por.eq(por - 1))
         self.specials += AsyncResetSynchronizer(self.cd_por, reset)
 
-        # System clock - 62.5MHz
+        # System clock - 50MHz
         self.specials += Instance("BUFG", name="sys_bufg", i_I=unbuf_sys, o_O=self.cd_sys.clk)
         self.comb += self.cd_por.clk.eq(self.cd_sys.clk)
         self.specials += AsyncResetSynchronizer(self.cd_sys, ~pll_lckd | (por > 0))
@@ -135,13 +132,12 @@ class BaseSoC(SoCSDRAM):
     def __init__(self, integrated_rom_size=0x8000, **kwargs):
         platform = pano_logic_g2.Platform()
 
-        clk_freq = int(62.5e6)
+        clk_freq = int(50e6)
 
         SoCSDRAM.__init__(self, platform, clk_freq=clk_freq,
                 integrated_rom_size=integrated_rom_size,
                 integrated_sram_size=0x8000,
                 **kwargs)
-
 
         self.submodules.crg = _CRG(platform)
         self.platform.add_period_constraint(self.crg.cd_sys.clk, 1e9/clk_freq)
@@ -160,15 +156,19 @@ class BaseSoC(SoCSDRAM):
             rd_bitslip=0,
             wr_bitslip=4,
             dqs_ddr_alignment="C0")
+
         controller_settings = ControllerSettings(with_bandwidth=True)
+
         self.register_sdram(self.ddrphy,
                             sdram_module.geom_settings,
                             sdram_module.timing_settings,
                             controller_settings=controller_settings)
+
         self.comb += [
             self.ddrphy.clk4x_wr_strb.eq(self.crg.clk4x_wr_strb),
             self.ddrphy.clk4x_rd_strb.eq(self.crg.clk4x_rd_strb),
         ]
+
 
 def main():
     parser = argparse.ArgumentParser(description="Pano Logic G2 LiteX SoC")
