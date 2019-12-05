@@ -15,7 +15,7 @@
 	url = https://github.com/enjoy-digital/tapcfg
 [submodule "litex/soc/cores/cpu/vexriscv/verilog"]
 	path = litex/soc/cores/cpu/vexriscv/verilog
-	url = https://github.com/enjoy-digital/VexRiscv-verilog.git
+	url = https://github.com/antmicro/VexRiscv-verilog.git
 [submodule "litex/soc/cores/cpu/minerva/verilog"]
 	path = litex/soc/cores/cpu/minerva/verilog
 	url = https://github.com/lambdaconcept/minerva
