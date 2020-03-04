@@ -7,27 +7,27 @@ from collections import OrderedDict
 
 current_path = os.path.dirname(os.path.realpath(__file__))
 
-# name,  (url, recursive clone, develop)
+# name,  (url, branch, recursive clone, develop)
 repos = [
     # HDL
-    ("migen",      ("https://github.com/m-labs/",        True,  True)),
+    ("migen",        ("https://github.com/m-labs/",        "master",                        True,  True)),
 
     # LiteX SoC builder
-    ("litex",      ("https://github.com/enjoy-digital/", True,  True)),
+    ("litex",        ("https://github.com/antmicro/",      "mglb/multiple-sdrams-support",  True,  True)),
 
     # LiteX cores ecosystem
-    ("liteeth",      ("https://github.com/enjoy-digital/", False, True)),
-    ("litedram",     ("https://github.com/enjoy-digital/", False, True)),
-    ("litepcie",     ("https://github.com/enjoy-digital/", False, True)),
-    ("litesata",     ("https://github.com/enjoy-digital/", False, True)),
-    ("litesdcard",   ("https://github.com/enjoy-digital/", False, True)),
-    ("liteiclink",   ("https://github.com/enjoy-digital/", False, True)),
-    ("litevideo",    ("https://github.com/enjoy-digital/", False, True)),
-    ("litescope",    ("https://github.com/enjoy-digital/", False, True)),
-    ("litejesd204b", ("https://github.com/enjoy-digital/", False, True)),
+    ("liteeth",      ("https://github.com/enjoy-digital/", "master",                        False, True)),
+    ("litedram",     ("https://github.com/antmicro/",      "mglb/multiple-sdrams-support",  False, True)),
+    ("litepcie",     ("https://github.com/enjoy-digital/", "master",                        False, True)),
+    ("litesata",     ("https://github.com/enjoy-digital/", "master",                        False, True)),
+    ("litesdcard",   ("https://github.com/enjoy-digital/", "master",                        False, True)),
+    ("liteiclink",   ("https://github.com/enjoy-digital/", "master",                        False, True)),
+    ("litevideo",    ("https://github.com/enjoy-digital/", "master",                        False, True)),
+    ("litescope",    ("https://github.com/enjoy-digital/", "master",                        False, True)),
+    ("litejesd204b", ("https://github.com/enjoy-digital/", "master",                        False, True)),
 
     # LiteX boards support
-    ("litex-boards",   ("https://github.com/litex-hub/", False, True)),
+    ("litex-boards", ("https://github.com/litex-hub/",     "master",                        False, True)),
 ]
 repos = OrderedDict(repos)
 
@@ -40,16 +40,16 @@ if len(sys.argv) < 2:
 
 if "init" in sys.argv[1:]:
     for name in repos.keys():
-        url, need_recursive, need_develop = repos[name]
+        url, branch, need_recursive, need_develop = repos[name]
         # clone repo (recursive if needed)
         print("[cloning " + name + "]...")
         full_url = url + name
         opts = "--recursive" if need_recursive else ""
-        os.system("git clone " + full_url + " " + opts)
+        os.system(f"git clone -b {branch} {full_url} {opts}")
 
 if "install" in sys.argv[1:]:
     for name in repos.keys():
-        url, need_recursive, need_develop = repos[name]
+        url, branch, need_recursive, need_develop = repos[name]
         # develop if needed
         print("[installing " + name + "]...")
         if need_develop:
