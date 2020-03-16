@@ -30,6 +30,7 @@ from liteeth.core.udp import LiteEthUDP
 from liteeth.core.icmp import LiteEthICMP
 from liteeth.core import LiteEthUDPIPCore
 from liteeth.frontend.etherbone import LiteEthEtherbone
+from liteeth.frontend.rtp import LiteEthRTP
 from liteeth.common import *
 
 from litescope import LiteScopeAnalyzer
@@ -149,6 +150,27 @@ def get_sdram_phy_settings(memtype, data_width, clk_freq):
 
 # Simulation SoC -----------------------------------------------------------------------------------
 
+class FrameGen(Module):
+    def __init__(self, width=1024, height=512, bpp=2):
+        self.source = source = stream.Endpoint([("data", 8)])
+        cnt = Signal(32)
+        dst = width*height*bpp
+        data = Signal(8)
+
+        self.comb += [
+            source.valid.eq(1),
+            source.first.eq(0),
+            source.data.eq(data),
+            source.last.eq(cnt == dst-1),
+        ]
+
+        self.sync += [
+            If(source.valid & source.ready,
+                If(cnt == dst-1, cnt.eq(0)).Else(cnt.eq(cnt+1))
+            ),
+            If(source.last, data.eq(data+16)),
+        ]
+
 class SimSoC(SoCSDRAM):
     mem_map = {
         "ethmac": 0xb0000000,
@@ -237,6 +259,23 @@ class SimSoC(SoCSDRAM):
             # Etherbone
             self.submodules.etherbone = LiteEthEtherbone(self.udp, 1234, mode="master")
             self.add_wb_master(self.etherbone.wishbone.bus)
+
+            # RTP TX @ 9000
+            self.submodules.rtp = rtp = LiteEthRTP(self.udp, pkt_size=1024)
+            self.submodules.gen = gen = FrameGen(1280, 720, 2)
+
+            self.comb += gen.source.connect(rtp.sink)
+
+            """
+            cnt = Signal(16)
+
+            self.comb += rtp.sink.valid.eq(1)
+            self.comb += rtp.sink.data.eq(cnt)
+
+            self.sync += [
+                If(rtp.sink.ready & rtp.sink.valid, cnt.eq(cnt+1)),
+            ]
+            """
 
         # Ethernet ---------------------------------------------------------------------------------
         elif with_ethernet:
