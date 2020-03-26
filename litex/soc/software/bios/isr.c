@@ -8,7 +8,8 @@
 #include <uart.h>
 #include <stdio.h>
 
- 
+#define UART_POLLING
+
 #if defined(__blackparrot__) /*TODO: Update this function for BP*/ //
 
 void isr(void);
@@ -43,9 +44,11 @@ void isr(void)
 
 	while ((claim = *((unsigned int *)PLIC_CLAIM))) {
 		switch (claim - 1) {
+#ifndef UART_POLLING
 		case UART_INTERRUPT:
 			uart_isr();
 			break;
+#endif
 		default:
 			printf("## PLIC: Unhandled claim: %d\n", claim);
 			printf("# plic_enabled:    %08x\n", irq_getmask());

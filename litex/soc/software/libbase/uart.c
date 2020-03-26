@@ -8,7 +8,7 @@
  * with logical AND.
  */
 
-//#define UART_POLLING
+#define UART_POLLING
 
 #ifndef UART_POLLING
 

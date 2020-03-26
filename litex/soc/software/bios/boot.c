@@ -31,6 +31,8 @@
 #include "sfl.h"
 #include "boot.h"
 
+void __stack_chk_fail(void) {}
+
 extern void boot_helper(unsigned long r1, unsigned long r2, unsigned long r3, unsigned long addr);
 
 static void __attribute__((noreturn)) boot(unsigned long r1, unsigned long r2, unsigned long r3, unsigned long addr)

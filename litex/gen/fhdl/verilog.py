@@ -380,7 +380,8 @@ def convert(f, ios=None, name="top",
   reg_initialization=True,
   dummy_signal=True,
   blocking_assign=False,
-  regular_comb=True):
+  regular_comb=True,
+  **kwargs):
     r = ConvOutput()
     if not isinstance(f, _Fragment):
         f = f.get_fragment()
