@@ -1,0 +1,26 @@
+From a76887c46e6caa9317bb9745b6a11e570cb7496e Mon Sep 17 00:00:00 2001
+From: Jan Kowalewski <jkowalewski@antmicro.com>
+Date: Mon, 30 Mar 2020 12:06:36 +0200
+Subject: [PATCH] Unify spi-nor chip nomenclature
+
+Signed-off-by: Jan Kowalewski <jkowalewski@antmicro.com>
+---
+ drivers/mtd/spi-nor/spi-nor.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index 4fc632ec1..694f44c66 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -2636,7 +2636,7 @@ static const struct flash_info spi_nor_ids[] = {
+ 	},
+ 	{ "w25x32", INFO(0xef3016, 0, 64 * 1024,  64, SECT_4K) },
+ 	{
+-		"w25q16jv-im/jm", INFO(0xef7015, 0, 64 * 1024,  32,
++		"w25q16jv-im/w25q16jv-jm", INFO(0xef7015, 0, 64 * 1024,  32,
+ 			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
+ 			SPI_NOR_HAS_LOCK | SPI_NOR_HAS_TB)
+ 	},
+-- 
+2.22.0
+
