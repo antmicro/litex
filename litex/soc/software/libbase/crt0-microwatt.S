@@ -44,6 +44,14 @@
 .global _start
 _start:
 	FIXUP_ENDIAN
+	/* turn on led */
+	lis	9,0xc000
+	ori	9,9,0x4000
+	lis	10,0xffff
+	ori	10,10,0xffff
+	rldicl	9,9,0,32
+	rldicl	10,10,0,32
+	std	10,0(9)
 
 	/* setup stack */
 	LOAD_IMM64(%r1, _fstack)
