@@ -46,7 +46,7 @@ _start:
 	FIXUP_ENDIAN
 
 	/* setup stack */
-	LOAD_IMM64(%r1, STACK_TOP - 0x100)
+	LOAD_IMM64(%r1, _fstack)
 	LOAD_IMM64(%r12, main)
 	mtctr	%r12,
 	bctrl
