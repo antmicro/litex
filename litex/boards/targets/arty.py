@@ -11,6 +11,7 @@ from litex.boards.platforms import arty
 from litex.build.xilinx.vivado import vivado_build_args, vivado_build_argdict
 
 from litex.soc.cores.clock import *
+from litex.soc.cores.gpio import GPIOOut
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.soc_sdram import *
 from litex.soc.integration.builder import *
@@ -92,6 +93,16 @@ class BaseSoC(SoCCore):
                 pads       = self.platform.request("eth"))
             self.add_csr("ethphy")
             self.add_etherbone(phy=self.ethphy)
+
+        # LEDs
+        self.submodules.rgb_led_0 = GPIOOut(platform.request("rgb_led", 0).raw_bits())
+        self.add_csr("rgb_led_0")
+        self.submodules.rgb_led_1 = GPIOOut(platform.request("rgb_led", 1).raw_bits())
+        self.add_csr("rgb_led_1")
+        self.submodules.rgb_led_2 = GPIOOut(platform.request("rgb_led", 2).raw_bits())
+        self.add_csr("rgb_led_2")
+        self.submodules.rgb_led_3 = GPIOOut(platform.request("rgb_led", 3).raw_bits())
+        self.add_csr("rgb_led_3")
 
 # Build --------------------------------------------------------------------------------------------
 
