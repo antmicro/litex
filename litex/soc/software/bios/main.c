@@ -605,6 +605,15 @@ static void boot_sequence(void)
 
 int main(int i, char **c)
 {
+	unsigned cnt = 0;
+	while(1) {
+		rgb_led_0_out_write((cnt >> 16));
+		rgb_led_1_out_write((cnt >> 19));
+		rgb_led_2_out_write((cnt >> 22));
+		rgb_led_3_out_write((cnt >> 25));
+		cnt++;
+	}
+
 	char buffer[64];
 	int sdr_ok;
 
