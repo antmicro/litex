@@ -306,7 +306,6 @@ static int try_get_kernel_rootfs_dtb_emulator(unsigned int ip, unsigned short tf
 	size = tftp_get_v(ip, tftp_port, "rootfs.cpio", (void *)tftp_dst_addr);
 	if(size <= 0) {
 		printf("No rootfs.cpio found\n");
-		return 0;
 	}
 
 	tftp_dst_addr = MAIN_RAM_BASE + DEVICE_TREE_IMAGE_RAM_OFFSET;

@@ -10,6 +10,7 @@
 // This file is Copyright (c) 2018 Jean-François Nguyen <jf@lambdaconcept.fr>
 // This file is Copyright (c) 2018 Sergiusz Bazanski <q3k@q3k.org>
 // This file is Copyright (c) 2016 Tim 'mithro' Ansell <mithro@mithis.com>
+// This file is Copyright (c) 2020 Antmicro <www.antmicro.com>
 
 // License: BSD
 
@@ -386,6 +387,8 @@ static void help(void)
 #ifdef CSR_SDCORE_BASE
 	puts("sdclk <freq>   - SDCard set clk frequency (Mhz)");
 	puts("sdinit         - SDCard initialization");
+	puts("sdtestread <blk> - SDCard read data from <blk>");
+	puts("sdtestwrite <blk> <data> - SDCard write <data> to <blk>");
 	puts("sdtest <loops> - SDCard test");
 #endif
 #ifdef USDDRPHY_DEBUG
@@ -487,6 +490,8 @@ static void do_command(char *c)
 #ifdef CSR_SDCORE_BASE
 	else if(strcmp(token, "sdclk") == 0) sdclk_set_clk(atoi(get_token(&c)));
 	else if(strcmp(token, "sdinit") == 0) sdcard_init();
+	else if(strcmp(token, "sdtestread") == 0) sdcard_test_read(atoi(get_token(&c)));
+	else if(strcmp(token, "sdtestwrite") == 0) sdcard_test_write(atoi(get_token(&c)), c);
 	else if(strcmp(token, "sdtest") == 0) sdcard_test(atoi(get_token(&c)));
 #endif
 #ifdef USDDRPHY_DEBUG
