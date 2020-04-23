@@ -18,6 +18,11 @@ from litex.soc.integration.soc_sdram import *
 from litex.soc.integration.builder import *
 from litex.soc.integration.soc import *
 
+from litespi import LiteSPI
+from litespi.phy.model import LiteSPIPHYModel
+from litespi.phy.generic import LiteSPIPHY
+from litespi.core.master import LiteSPIMaster
+
 from litedram import modules as litedram_modules
 from litedram.common import *
 from litedram.phy.model import SDRAMPHYModel
@@ -31,6 +36,12 @@ from liteeth.core.icmp import LiteEthICMP
 from liteeth.core import LiteEthUDPIPCore
 from liteeth.frontend.etherbone import LiteEthEtherbone
 from liteeth.common import *
+
+from litespi import LiteSPI
+from litespi.core.master import LiteSPIMaster
+from litespi.phy.generic import LiteSPIPHY
+from litespi.opcodes import SpiNorFlashOpCodes
+from litespi.modules import *
 
 from litescope import LiteScopeAnalyzer
 
@@ -61,6 +72,11 @@ _io = [
         Subsignal("sink_ready",   Pins(1)),
         Subsignal("sink_data",    Pins(8)),
     ),
+    ("spiflash", 0,
+        Subsignal("clk",  Pins(1)),
+        Subsignal("cs_n", Pins(1)),
+        Subsignal("dq",   Pins(8)),
+    )
 ]
 
 # Platform -----------------------------------------------------------------------------------------
@@ -177,6 +193,16 @@ class SimSoC(SoCSDRAM):
             **kwargs)
         # CRG --------------------------------------------------------------------------------------
         self.submodules.crg = CRG(platform.request("sys_clk"))
+
+        with_spi=True
+        # SPI --------------------------------------------------------------------------------------
+        if with_spi:
+            spi_xip_size = 1024*1024*8
+            self.submodules.spiphy = spiphy = LiteSPIPHY(platform.request("spiflash"), A25L05PT(SpiNorFlashOpCodes.READ_1_1_1))
+            self.submodules.spi    = spi    = LiteSPI(phy=spiphy, mmap_endianness=self.cpu.endianness)
+            self.add_csr("spi")
+            spi_xip_region = SoCRegion(origin=self.mem_map.get("spixip", None), size=spi_xip_size, cached=False)
+            self.bus.add_slave(name="spixip", slave=self.spi.bus, region=spi_xip_region)
 
         # SDRAM ------------------------------------------------------------------------------------
         if with_sdram:

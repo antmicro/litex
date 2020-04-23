@@ -330,6 +330,43 @@ static void crc(char *startaddr, char *len)
 	printf("CRC32: %08x\n", crc32((unsigned char *)addr, length));
 }
 
+static void spi_mux(char *data)
+{
+    char *c;
+    unsigned char mux = strtoul(data, &c, 0);
+    spi_cfg_write(mux);
+}
+
+static void spi_cs(char *data)
+{
+    char *c;
+    unsigned char cs = strtoul(data, &c, 0);
+    spi_master_cs_write(cs);
+}
+
+static void spi_xfer(char *data)
+{
+    char *c;
+    unsigned int tx = strtoul(data, &c, 0);
+
+    if(*c != 0) {
+        return;
+    }
+
+    spi_master_phyconfig_write(0x00010108);
+
+    spi_master_rxtx_write(tx);
+
+    while(!(spi_master_status_read() & 0x2));
+
+    printf("tx: %08x, rx: %08x\n", tx, spi_master_rxtx_read());
+}
+
+static void spi_status(void)
+{
+    printf("spi_status: %08x\n", spi_master_status_read());
+}
+
 static void ident(void)
 {
 	char buffer[IDENT_SIZE];
@@ -440,6 +477,12 @@ static void do_command(char *c)
 	else if(strcmp(token, "mdiow") == 0) mdiow(get_token(&c), get_token(&c), get_token(&c));
 	else if(strcmp(token, "mdior") == 0) mdior(get_token(&c), get_token(&c));
 	else if(strcmp(token, "mdiod") == 0) mdiod(get_token(&c), get_token(&c));
+#endif
+#ifdef CSR_SPI_BASE
+    else if(strcmp(token, "spi_cs") == 0) spi_cs(get_token(&c));
+    else if(strcmp(token, "spi_mux") == 0) spi_mux(get_token(&c));
+    else if(strcmp(token, "spi_xfer") == 0) spi_xfer(get_token(&c));
+    else if(strcmp(token, "spi_status") == 0) spi_status();
 #endif
 	else if(strcmp(token, "crc") == 0) crc(get_token(&c), get_token(&c));
 	else if(strcmp(token, "ident") == 0) ident();

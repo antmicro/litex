@@ -20,6 +20,12 @@ from litedram.phy import s7ddrphy
 
 from liteeth.phy.rmii import LiteEthPHYRMII
 
+from litespi import LiteSPI
+from litespi.core.master import LiteSPIMaster
+from litespi.phy.generic import LiteSPIPHY
+from litespi.opcodes import SpiNorFlashOpCodes
+from litespi.modules import *
+
 # CRG ----------------------------------------------------------------------------------------------
 
 class _CRG(Module):
@@ -47,7 +53,7 @@ class _CRG(Module):
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class BaseSoC(SoCCore):
-    def __init__(self, sys_clk_freq=int(100e6), with_ethernet=False, with_spi_xip=False, **kwargs):
+    def __init__(self, sys_clk_freq=int(100e6), with_ethernet=False, with_spi_xip=False, with_spi=True, **kwargs):
         platform = netv2.Platform()
 
         # SoCCore ----------------------------------------------------------------------------------
@@ -73,15 +79,15 @@ class BaseSoC(SoCCore):
                 l2_cache_reverse        = True
             )
 
-        # SPI XIP ----------------------------------------------------------------------------------
-        if with_spi_xip:
-            from litespi import LiteSPI
-            from litespi.phy.generic import LiteSPIPHY
+        # SPI --------------------------------------------------------------------------------------
+        if with_spi:
             spi_xip_size = 1024*1024*8
-            self.submodules.spiphy = LiteSPIPHY(platform.request("spiflash4x"))
-            self.submodules.spictl = LiteSPI(phy=self.spiphy, endianness=self.cpu.endianness)
+            self.submodules.spiphy = spiphy = LiteSPIPHY(platform.request("flash"), AT25DF041A(SpiNorFlashOpCodes.READ_1_1_1))
+            #self.submodules.spiphy = spiphy = LiteSPIPHY(platform.request("spiflash4x"))
+            self.submodules.spi    = spi    = LiteSPI(phy=spiphy, mmap_endianness=self.cpu.endianness)
+            self.add_csr("spi")
             spi_xip_region = SoCRegion(origin=self.mem_map.get("spixip", None), size=spi_xip_size, cached=False)
-            self.bus.add_slave(name="spixip", slave=self.spictl.bus, region=spi_xip_region)
+            self.bus.add_slave(name="spixip", slave=self.spi.bus, region=spi_xip_region)
 
         # Ethernet ---------------------------------------------------------------------------------
         if with_ethernet:
