@@ -1013,8 +1013,9 @@ int memtest(void)
 
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 
-static void read_leveling(void)
+static int read_leveling(void)
 {
+    int ok = 1;
 	int module;
 	int bitslip;
 	int score;
@@ -1050,7 +1051,12 @@ static void read_leveling(void)
 		/* re-do leveling on best read window*/
 		read_level(module);
 		printf("\n");
+
+        if (score == 0)
+            ok = 0;
 	}
+
+    return ok;
 }
 
 int _write_level_cdly_scan = 1;
@@ -1058,6 +1064,7 @@ int _write_level_cdly_scan = 1;
 int sdrlevel(void)
 {
 	int module;
+    int ok;
 	sdrsw();
 
 	for(module=0; module<SDRAM_PHY_MODULES; module++) {
@@ -1071,22 +1078,41 @@ int sdrlevel(void)
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
 	printf("Write leveling:\n");
 	if (_write_level_cdly_scan) {
-		write_level();
+		ok = write_level();
 	} else {
 		/* use only the current cdly */
 		int delays[SDRAM_PHY_MODULES];
-		write_level_scan(delays, 128, 1);
+		ok = write_level_scan(delays, 128, 1);
 	}
 #endif
 
 #ifdef SDRAM_PHY_READ_LEVELING_CAPABLE
 	printf("Read leveling:\n");
-	read_leveling();
+	ok = read_leveling() && ok;
 #endif
 
-	return 1;
+	return ok;
 }
 #endif
+
+static int do_sdrlevel(void) {
+    /* if PHY supports dynamic cmd_latency, then scan different values */
+#if defined(CSR_DDRPHY_CMD_LATENCY_ADDR)
+    const int cmd_latency_rst = ddrphy_cmd_latency_read();
+    int cmd_latency;
+
+    /* check possible cmd_latency values starting from reset value, stop on first success */
+    do {
+        cmd_latency = ddrphy_cmd_latency_read();
+        printf("Trying cmd_latency=%d:\n", cmd_latency);
+        if (sdrlevel())
+            break;
+        ddrphy_cmd_latency_write(cmd_latency + 1);
+    } while (ddrphy_cmd_latency_read() != cmd_latency_rst);
+#else
+    sdrlevel();
+#endif
+}
 
 int sdrinit(void)
 {
@@ -1106,7 +1132,7 @@ int sdrinit(void)
 	ddrphy_en_vtc_write(0);
 #endif
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
-	sdrlevel();
+    do_sdrlevel();
 #endif
 #if CSR_DDRPHY_EN_VTC_ADDR
 	ddrphy_en_vtc_write(1);
@@ -1212,6 +1238,12 @@ void sdr_cdly_scan(int enabled)
 {
 	printf("Turning cdly scan %s\n", enabled ? "ON" : "OFF");
 	_write_level_cdly_scan = enabled;
+}
+
+void sdr_cmd_latency(int value)
+{
+	printf("Changing cmd_latency from %d to %d\n", ddrphy_cmd_latency_read(), value);
+	ddrphy_cmd_latency_write(value);
 }
 
 #endif

@@ -30,6 +30,7 @@ void sdrcal(void);
 void sdrmrwr(char reg, int value);
 void sdrmpr(void);
 void sdr_cdly_scan(int enabled);
+void sdr_cmd_latency(int value);
 #endif
 
 #endif /* __SDRAM_H */

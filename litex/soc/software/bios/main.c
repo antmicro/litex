@@ -395,6 +395,7 @@ static void help(void)
 	puts("sdram_mpr                       - read SDRAM MPR");
 	puts("sdram_mrwr reg value            - write SDRAM mode registers");
 	puts("sdram_cdly_scan enabled         - enable/disable cdly scan");
+	puts("sdram_cmd_latency value         - set SDRAM cmd_latency");
 #endif
 #ifdef CSR_SPISDCARD_BASE
         puts("spisdcardboot   - boot from SDCard via SPI hardware bitbang");
@@ -511,6 +512,10 @@ static void do_command(char *c)
 		unsigned int enabled;
 		enabled = atoi(get_token(&c));
 		sdr_cdly_scan(enabled);
+	}
+	else if(strcmp(token, "sdram_cmd_latency") == 0) {
+		unsigned int value = atoi(get_token(&c));
+		sdr_cmd_latency(value);
 	}
 #endif
 #ifdef CSR_SPISDCARD_BASE
