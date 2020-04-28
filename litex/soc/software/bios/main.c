@@ -41,7 +41,17 @@
 
 #include "sdram.h"
 #include "sdcard.h"
+#include "spi.h"
 #include "boot.h"
+
+/* 8-bit lengths */
+#define SPI_PHY_1_1 {8, 1, 1}
+#define SPI_PHY_2_1 {8, 2, 1}
+#define SPI_PHY_2_2 {8, 2, 2}
+#define SPI_PHY_4_1 {8, 4, 1}
+#define SPI_PHY_4_4 {8, 4, 4}
+#define SPI_PHY_8_1 {8, 8, 1}
+#define SPI_PHY_8_8 {8, 8, 8}
 
 /* General address space functions */
 
@@ -330,6 +340,60 @@ static void crc(char *startaddr, char *len)
 	printf("CRC32: %08x\n", crc32((unsigned char *)addr, length));
 }
 
+static void spi_xfer(char *cmd_str, char *bytes_str)
+{
+        char *c;
+        unsigned char cmd = strtoul(cmd_str, &c, 0);
+        unsigned long bytes = strtoul(bytes_str, &c, 0);
+
+	printf("CMD: 0x%x, bytes: %d\n\r", cmd, bytes);
+	uint8_t buffer[bytes];
+	spi_transfer_config cfg = {
+		.rdata = buffer,
+		.cmd = cmd,
+		.rbytes = bytes,
+		.phy_cfg = SPI_PHY_1_1,
+	};
+	spi_set_mode(SPI_MODE_MASTER);
+	spi_transfer(&cfg);
+	for(unsigned long i = 0; i < bytes; i++) {
+		printf("[0x%02x]\n\r", buffer[i]);
+	}
+	spi_set_mode(SPI_MODE_MMAP);
+}
+
+//static void spi_mux(char *data)
+//{
+//    char *c;
+//    unsigned char mux = strtoul(data, &c, 0);
+//    spi_cfg_write(mux);
+//}
+//
+//static void spi_cs(char *data)
+//{
+//    char *c;
+//    unsigned char cs = strtoul(data, &c, 0);
+//    spi_master_cs_write(cs);
+//}
+//
+//static void spi_xfer(char *data)
+//{
+//    char *c;
+//    unsigned int tx = strtoul(data, &c, 0);
+//
+//    if(*c != 0) {
+//        return;
+//    }
+//
+//    spi_master_phyconfig_write(0x00010108);
+//
+//    spi_master_rxtx_write(tx);
+//
+//    while(!(spi_master_status_read() & 0x2));
+//
+//    printf("tx: %08x, rx: %08x\n", tx, spi_master_rxtx_read());
+//}
+
 static void ident(void)
 {
 	char buffer[IDENT_SIZE];
@@ -441,6 +505,9 @@ static void do_command(char *c)
 	else if(strcmp(token, "mdiow") == 0) mdiow(get_token(&c), get_token(&c), get_token(&c));
 	else if(strcmp(token, "mdior") == 0) mdior(get_token(&c), get_token(&c));
 	else if(strcmp(token, "mdiod") == 0) mdiod(get_token(&c), get_token(&c));
+#endif
+#ifdef CSR_SPI_BASE
+	else if(strcmp(token, "spi_xfer") == 0) spi_xfer(get_token(&c), get_token(&c));
 #endif
 	else if(strcmp(token, "crc") == 0) crc(get_token(&c), get_token(&c));
 	else if(strcmp(token, "ident") == 0) ident();
