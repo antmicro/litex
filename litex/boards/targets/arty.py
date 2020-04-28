@@ -14,11 +14,18 @@ from litex.soc.cores.clock import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.soc_sdram import *
 from litex.soc.integration.builder import *
+from litex.soc.integration.soc import *
 
 from litedram.modules import MT41K128M16
 from litedram.phy import s7ddrphy
 
 from liteeth.phy.mii import LiteEthPHYMII
+
+from litespi import LiteSPI
+from litespi.core.master import LiteSPIMaster
+from litespi.phy.generic import LiteSPIPHY
+from litespi.opcodes import SpiNorFlashOpCodes as Codes
+from litespi.modules import *
 
 # CRG ----------------------------------------------------------------------------------------------
 
@@ -84,6 +91,16 @@ class BaseSoC(SoCCore):
                 pads       = self.platform.request("eth"))
             self.add_csr("ethphy")
             self.add_ethernet(phy=self.ethphy)
+
+        # SPI --------------------------------------------------------------------------------------
+        with_spi=True
+        if with_spi:
+            spi_xip_size = 1024*1024*16
+            self.submodules.spiphy = spiphy = LiteSPIPHY(platform.request("spiflash"), S25FL128S(Codes.READ_1_1_1))
+            self.submodules.spi    = spi    = LiteSPI(spiphy, sys_clk_freq, mmap_endianness=self.cpu.endianness)
+            self.add_csr("spi")
+            spi_xip_region = SoCRegion(origin=self.mem_map.get("spixip", None), size=spi_xip_size, cached=False)
+            self.bus.add_slave(name="spixip", slave=self.spi.bus, region=spi_xip_region)
 
         # Etherbone --------------------------------------------------------------------------------
         if with_etherbone:
