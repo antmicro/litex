@@ -41,6 +41,7 @@
 
 #include "sdram.h"
 #include "sdcard.h"
+#include "spi.h"
 #include "boot.h"
 
 /* General address space functions */
@@ -399,6 +400,9 @@ static void help(void)
 #ifdef CSR_SPISDCARD_BASE
         puts("spisdcardboot   - boot from SDCard via SPI hardware bitbang");
 #endif
+#ifdef CSR_SPI_BASE
+        puts("spi_frequency_test - determine maximum operating SPI frequency for LiteSPI core.");
+#endif
 }
 
 static char *get_token(char **str)
@@ -441,6 +445,9 @@ static void do_command(char *c)
 	else if(strcmp(token, "mdiow") == 0) mdiow(get_token(&c), get_token(&c), get_token(&c));
 	else if(strcmp(token, "mdior") == 0) mdior(get_token(&c), get_token(&c));
 	else if(strcmp(token, "mdiod") == 0) mdiod(get_token(&c), get_token(&c));
+#endif
+#ifdef CSR_SPI_BASE
+	else if(strcmp(token, "spi_frequency_test") == 0) spi_frequency_test();
 #endif
 	else if(strcmp(token, "crc") == 0) crc(get_token(&c), get_token(&c));
 	else if(strcmp(token, "ident") == 0) ident();
