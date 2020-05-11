@@ -60,11 +60,12 @@ class Timer(Module, AutoCSR, ModuleDoc):
             A write to this register latches the current countdown value to ``value`` register.""")
         self._value = CSRStatus(width, description="""Latched countdown value.
             This value is updated by writing to ``update_value``.""")
-
+            
         self.submodules.ev = EventManager()
         self.ev.zero       = EventSourceProcess()
         self.ev.finalize()
 
+        self._total_cycles = CSRStatus(64, description="""Total number of cycles since boot""")        
         # # #
 
         value = Signal(width)
@@ -81,4 +82,5 @@ class Timer(Module, AutoCSR, ModuleDoc):
             ),
             If(self._update_value.re, self._value.status.eq(value))
         ]
+        self.sync += self._total_cycles.status.eq(self._total_cycles.status + 1)
         self.comb += self.ev.zero.trigger.eq(value != 0)
