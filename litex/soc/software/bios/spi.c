@@ -22,7 +22,7 @@ static void spi_set_mode(spi_mode mode)
 	spi_cfg_write((unsigned char)mode);
 }
 
-void spi_frequency_test(void)
+unsigned int spi_frequency_test(void)
 {
 	unsigned int lowest_div = spi_clk_divisor_read();
 	unsigned int crc = crc32((unsigned char *)SPIXIP_BASE, SPI_FLASH_BLOCK_SIZE);
@@ -50,5 +50,13 @@ void spi_frequency_test(void)
 		printf("[DIV: %d] %08x\n\r", i, crc_test);
 #endif
 	}
+	lowest_div++;
 	printf("Approx maximum available frequency: %d Hz\n\r", (spi_sys_clk_freq_read()/(2*(1 + lowest_div))));
+
+	return lowest_div;
+}
+
+void spi_autoconfig(void)
+{
+	spi_clk_divisor_write((uint32_t)spi_frequency_test());
 }

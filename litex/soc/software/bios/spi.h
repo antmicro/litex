@@ -11,6 +11,7 @@ typedef enum {
 	SPI_MODE_MASTER = 1,
 } spi_mode;
 
-void spi_frequency_test(void);
+unsigned int spi_frequency_test(void);
+void spi_autoconfig(void);
 
 #endif /* __SPI_H */
