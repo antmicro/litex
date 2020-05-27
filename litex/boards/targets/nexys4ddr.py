@@ -142,14 +142,6 @@ class BaseSoC(SoCCore):
         self.add_csr("sddatawriter")
         self.comb += self.sddatawriter.source.connect(self.sdcore.sink),
 
-        self.submodules.bist_generator = BISTBlockGenerator(random=True)
-        self.submodules.bist_checker = BISTBlockChecker(random=True)
-        self.add_csr("bist_generator")
-        self.add_csr("bist_checker")
-        self.comb += [
-            self.sdcore.source.connect(self.bist_checker.sink),
-            self.bist_generator.source.connect(self.sdcore.sink)
-        ]
         self.platform.add_period_constraint(self.sdclk.cd_sd.clk, period_ns(self.sys_clk_freq))
         self.platform.add_period_constraint(self.sdclk.cd_sd_fb.clk, period_ns(self.sys_clk_freq))
         self.platform.add_false_path_constraints(
