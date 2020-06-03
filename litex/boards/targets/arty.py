@@ -36,7 +36,7 @@ class _CRG(Module):
 
         # # #
 
-        if toolchain == "vivado":
+        if toolchain in ["vivado", "edalize"]:
             self.submodules.pll = pll = S7PLL(speedgrade=-1)
             self.comb += pll.reset.eq(~platform.request("cpu_reset"))
             pll.register_clkin(platform.request("clk100"), 100e6)
@@ -133,7 +133,7 @@ def main():
     soc = BaseSoC(args.toolchain, with_ethernet=args.with_ethernet, with_etherbone=args.with_etherbone,
         **soc_sdram_argdict(args))
     builder = Builder(soc, **builder_argdict(args))
-    builder_kwargs = vivado_build_argdict(args) if args.toolchain == "vivado" else {}
+    builder_kwargs = vivado_build_argdict(args) if args.toolchain in ["vivado", "edalize"] else {}
     builder.build(**builder_kwargs, run=args.build)
 
     if args.load:

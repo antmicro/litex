@@ -5,7 +5,7 @@
 import os
 
 from litex.build.generic_platform import GenericPlatform
-from litex.build.xilinx import common, vivado, ise, symbiflow
+from litex.build.xilinx import common, vivado, ise, symbiflow, edalize
 
 # XilinxPlatform -----------------------------------------------------------------------------------
 
@@ -22,6 +22,8 @@ class XilinxPlatform(GenericPlatform):
             self.toolchain = vivado.XilinxVivadoToolchain()
         elif toolchain == "symbiflow":
             self.toolchain = symbiflow.SymbiflowToolchain()
+        elif toolchain == "edalize":
+            self.toolchain = edalize.EdalizeToolchain()
         else:
             raise ValueError("Unknown toolchain")
 
