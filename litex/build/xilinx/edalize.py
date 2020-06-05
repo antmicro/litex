@@ -203,7 +203,7 @@ class EdalizeToolchain:
 
         # Run
         if run:
-            backend.run()
+            backend.build()
 
         return v_output.ns
 
