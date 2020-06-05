@@ -7,6 +7,8 @@ import os
 from litex.build.generic_platform import GenericPlatform
 from litex.build.xilinx import common, vivado, ise, symbiflow, edalize
 
+from migen.fhdl.structure import _Fragment
+
 # XilinxPlatform -----------------------------------------------------------------------------------
 
 class XilinxPlatform(GenericPlatform):
@@ -48,8 +50,25 @@ class XilinxPlatform(GenericPlatform):
     def get_edif(self, fragment, **kwargs):
         return GenericPlatform.get_edif(self, fragment, "UNISIMS", "Xilinx", self.device, **kwargs)
 
-    def build(self, *args, **kwargs):
-        return self.toolchain.build(self, *args, **kwargs)
+    def build(self, fragment, build_dir="build", build_name="top", run=True, **kwargs):
+        # Create build directory
+        os.makedirs(build_dir, exist_ok=True)
+        cwd = os.getcwd()
+        os.chdir(build_dir)
+
+        # Finalize design
+        if not isinstance(fragment, _Fragment):
+            fragment = fragment.get_fragment()
+        self.finalize(fragment)
+        
+        # Run toolchain
+        vns = None
+        try:
+            vns = self.toolchain.build(self, fragment, build_dir, build_name, run, **kwargs)
+        finally:
+            os.chdir(cwd)
+
+        return vns
 
     def add_period_constraint(self, clk, period):
         if clk is None: return

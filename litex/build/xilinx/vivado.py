@@ -293,23 +293,10 @@ class XilinxVivadoToolchain:
         )
 
 
-    def build(self, platform, fragment,
-        build_dir  = "build",
-        build_name = "top",
-        run        = True,
+    def build(self, platform, fragment, build_dir, build_name, run,
         synth_mode = "vivado",
         enable_xpm = False,
         **kwargs):
-
-        # Create build directory
-        os.makedirs(build_dir, exist_ok=True)
-        cwd = os.getcwd()
-        os.chdir(build_dir)
-
-        # Finalize design
-        if not isinstance(fragment, _Fragment):
-            fragment = fragment.get_fragment()
-        platform.finalize(fragment)
 
         # Generate timing constraints
         self._build_clock_constraints(platform)
@@ -339,8 +326,6 @@ class XilinxVivadoToolchain:
                 common._run_yosys(platform.device, platform.sources, platform.verilog_include_paths, build_name)
             script = _build_script(build_name)
             _run_script(script)
-
-        os.chdir(cwd)
 
         return v_output.ns
 

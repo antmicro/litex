@@ -163,23 +163,10 @@ class EdalizeToolchain:
         )
 
 
-    def build(self, platform, fragment,
-        build_dir  = "build",
-        build_name = "top",
-        run        = True,
+    def build(self, platform, fragment, build_dir, build_name, run,
         synth_mode = "vivado",
         enable_xpm = False,
         **kwargs):
-
-        # Create build directory
-        os.makedirs(build_dir, exist_ok=True)
-        cwd = os.getcwd()
-        os.chdir(build_dir)
-
-        # Finalize design
-        if not isinstance(fragment, _Fragment):
-            fragment = fragment.get_fragment()
-        platform.finalize(fragment)
 
         # Generate timing constraints
         self._build_clock_constraints(platform)
@@ -243,8 +230,6 @@ class EdalizeToolchain:
         # Run
         if run:
             backend.run()
-
-        os.chdir(cwd)
 
         return v_output.ns
 

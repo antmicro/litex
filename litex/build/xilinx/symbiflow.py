@@ -204,10 +204,7 @@ class SymbiflowToolchain:
                 if isinstance(item, Instance.Parameter) and re.fullmatch("CLKOUT[0-9]_(PHASE|DUTY_CYCLE)", item.name):
                     item.value = wrap(math.floor(_unwrap(item.value) * 1000))
 
-    def build(self, platform, fragment,
-        build_dir  = "build",
-        build_name = "top",
-        run        = True,
+    def build(self, platform, fragment, build_dir, build_name, run,
         enable_xpm = False,
         **kwargs):
 
