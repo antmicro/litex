@@ -330,7 +330,6 @@ class XilinxVivadoToolchain:
         return v_output.ns
 
     def add_period_constraint(self, platform, clk, period):
-        clk.attr.add("keep")
         period = math.floor(period*1e3)/1e3 # round to lowest picosecond
         if clk in self.clocks:
             if period != self.clocks[clk]:
@@ -339,8 +338,6 @@ class XilinxVivadoToolchain:
         self.clocks[clk] = period
 
     def add_false_path_constraint(self, platform, from_, to):
-        from_.attr.add("keep")
-        to.attr.add("keep")
         if (to, from_) not in self.false_paths:
             self.false_paths.add((from_, to))
 
