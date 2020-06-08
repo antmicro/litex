@@ -25,7 +25,7 @@ class XilinxPlatform(GenericPlatform):
         elif toolchain == "symbiflow":
             self.toolchain = symbiflow.SymbiflowToolchain()
         elif toolchain == "edalize":
-            self.toolchain = edalize.EdalizeToolchain()
+            self.toolchain = edalize.VivadoEdalizeToolchain()
         else:
             raise ValueError("Unknown toolchain")
 

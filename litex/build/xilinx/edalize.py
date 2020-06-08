@@ -70,16 +70,6 @@ def _build_xdc(named_sc, named_pc):
 # XilinxVivadoToolchain ----------------------------------------------------------------------------
 
 class EdalizeToolchain:
-    attr_translate = {
-        "keep":            ("dont_touch", "true"),
-        "no_retiming":     ("dont_touch", "true"),
-        "async_reg":       ("async_reg",  "true"),
-        "mr_ff":           ("mr_ff",      "true"), # user-defined attribute
-        "ars_ff1":         ("ars_ff1",    "true"), # user-defined attribute
-        "ars_ff2":         ("ars_ff2",    "true"), # user-defined attribute
-        "no_shreg_extract": None
-    }
-
     def __init__(self):
         self.bitstream_commands                   = []
         self.additional_commands                  = []
@@ -228,3 +218,19 @@ def edalize_build_args(parser):
 
 def edalize_build_argdict(args):
     return {"synth_mode": args.synth_mode}
+
+
+#------------------------------------------------
+
+class VivadoEdalizeToolchain(EdalizeToolchain):
+    attr_translate = {
+        "keep":            ("dont_touch", "true"),
+        "no_retiming":     ("dont_touch", "true"),
+        "async_reg":       ("async_reg",  "true"),
+        "mr_ff":           ("mr_ff",      "true"), # user-defined attribute
+        "ars_ff1":         ("ars_ff1",    "true"), # user-defined attribute
+        "ars_ff2":         ("ars_ff2",    "true"), # user-defined attribute
+        "no_shreg_extract": None
+    }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
