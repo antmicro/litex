@@ -36,7 +36,7 @@ class _CRG(Module):
 
         # # #
 
-        if toolchain in ["vivado", "edalize"]:
+        if toolchain in ["vivado", "edalize", "ise"]:
             self.submodules.pll = pll = S7PLL(speedgrade=-1)
             self.comb += pll.reset.eq(~platform.request("cpu_reset"))
             pll.register_clkin(platform.request("clk100"), 100e6)
