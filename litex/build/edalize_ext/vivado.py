@@ -1,3 +1,6 @@
+# This file is Copyright (c) 2020 Antmicro <www.antmicro.com>
+# License: BSD
+
 import os
 from litex.build import tools # FIXME: do not use this
 

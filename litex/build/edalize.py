@@ -1,23 +1,13 @@
-# This file is Copyright (c) 2014-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# This file is Copyright (c) 2020 Antmicro <www.antmicro.com>
 # License: BSD
 
-import os
-import subprocess
-import sys
 import math
-
 import edalize
 
-from migen.fhdl.structure import _Fragment
-
-from litex.build.generic_platform import *
+from litex.build.generic_platform import IOStandard, Drive, Misc, Inverted
 from litex.build import edalize_ext
-from litex.build.xilinx import common
 
-from pprint import pprint
-
-
-# XilinxVivadoToolchain ----------------------------------------------------------------------------
+# EdalizeToolchain ---------------------------------------------------------------------------------
 
 class EdalizeToolchain:
     def __init__(self):
@@ -172,6 +162,7 @@ def edalize_build_argdict(args):
 
 #------------------------------------------------
 
+# FIXME: get rid of this
 class VivadoEdalizeToolchain(EdalizeToolchain):
     attr_translate = {
         "keep":            ("dont_touch", "true"),
