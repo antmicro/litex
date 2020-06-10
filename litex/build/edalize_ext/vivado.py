@@ -55,38 +55,41 @@ class Vivado:
     def __init__(self, edam=None, work_root=None):
         self._edam = edam
         self._work_root = work_root
-        self.io = []
-        self.constraints = []
 
     def configure(self):
-        # Process constraints
+        io = self._edam.get("constraints", {}).get("io", [])
         period_constraints = self._edam.get("constraints", {}).get("period", {})
         false_paths = self._edam.get("constraints", {}).get("false_path", {})
-        self.constraints.append("\n" + _xdc_separator("Clock constraints"))
+        custom_constraints = self._edam.get("constraints", {}).get("custom", [])
+
+        constraints = custom_constraints[:]
+
+        # Process constraints
+        constraints.append("\n" + _xdc_separator("Clock constraints"))
         for clk, period in period_constraints.items():
-            self.constraints.append(
+            constraints.append(
                 f"create_clock -name {clk} -period {str(period)} [get_nets {clk}]")
         for from_, to in false_paths:
-            self.constraints.append(
+            constraints.append(
                 "set_clock_groups "
                 f"-group [get_clocks -include_generated_clocks -of [get_nets {from_}]] "
                 f"-group [get_clocks -include_generated_clocks -of [get_nets {to}]] "
                 "-asynchronous")
 
-        self.constraints.append("\n" + _xdc_separator("False path constraints"))
+        constraints.append("\n" + _xdc_separator("False path constraints"))
         # The asynchronous input to a MultiReg is a false path
-        self.constraints.append(
+        constraints.append(
             "set_false_path -quiet "
             "-through [get_nets -hierarchical -filter {mr_ff == TRUE}]"
         )
         # The asychronous reset input to the AsyncResetSynchronizer is a false path
-        self.constraints.append(
+        constraints.append(
             "set_false_path -quiet "
             "-to [get_pins -filter {REF_PIN_NAME == PRE} "
                 "-of_objects [get_cells -hierarchical -filter {ars_ff1 == TRUE || ars_ff2 == TRUE}]]"
         )
         # clock_period-2ns to resolve metastability on the wire between the AsyncResetSynchronizer FFs
-        self.constraints.append(
+        constraints.append(
             "set_max_delay 2 -quiet "
             "-from [get_pins -filter {REF_PIN_NAME == C} "
                 "-of_objects [get_cells -hierarchical -filter {ars_ff1 == TRUE}]] "
@@ -98,4 +101,4 @@ class Vivado:
         xdc = os.path.join(self._work_root, self._edam.get("name", "top") + ".xdc")
         self._edam["files"].append({ "name": xdc, "file_type": "xdc" })
         # FIXME: replace with edalize-friendly generic writing
-        tools.write_to_file(xdc, _build_xdc(self.io, self.constraints))
+        tools.write_to_file(xdc, _build_xdc(io, constraints))

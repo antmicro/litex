@@ -44,9 +44,32 @@ class EdalizeToolchain:
 
         # Generate verilog
         v_output = platform.get_verilog(fragment, name=build_name, **kwargs)
+        named_sc, named_pc = platform.resolve_signals(v_output.ns)
         v_file = build_name + ".v"
         v_output.write(v_file)
         platform.add_source(v_file)
+
+        # Translate IO information
+        io = []
+        for sig, pins, properties, _ in named_sc:
+            # Translate properties from Litex classes to generic tuples
+            io_properties = []
+            for p in properties:
+                if isinstance(p, IOStandard):
+                    io_properties.append(("iostandard", p.name))
+                elif isinstance(p, Drive):
+                    io_properties.append(("drive", str(p.strength)))
+                elif isinstance(p, Inverted):
+                    io_properties.append(("inverted"))
+                elif isinstance(p, Misc):
+                    io_properties.append(("custom", str(p.misc)))
+                else:
+                    raise ValueError(f"unknown constraint {p}")
+            io.append({
+                "signal": sig,
+                "pins": pins,
+                "properties": io_properties
+            })
 
         # Resolve signals in constraints
         period_constraints = dict()
@@ -83,6 +106,8 @@ class EdalizeToolchain:
             "constraints": {
                 "period":     period_constraints,
                 "false_path": false_paths,
+                "io":         io,
+                "custom":     named_pc
             }
         }
 
@@ -110,32 +135,7 @@ class EdalizeToolchain:
             # name and file_type are not used, but documentation marks them as mandatory.
             edam["files"].append({ "name": "", "file_type": "", "is_include_file": True, "include_path": path })
 
-        named_sc, named_pc = platform.resolve_signals(v_output.ns)
-
-        io = []
-        for sig, pins, properties, _ in named_sc:
-            # Translate properties from Litex classes to generic tuples
-            io_properties = []
-            for p in properties:
-                if isinstance(p, IOStandard):
-                    io_properties.append(("iostandard", p.name))
-                elif isinstance(p, Drive):
-                    io_properties.append(("drive", str(p.strength)))
-                elif isinstance(p, Inverted):
-                    io_properties.append(("inverted"))
-                elif isinstance(p, Misc):
-                    io_properties.append(("custom", str(p.misc)))
-                else:
-                    raise ValueError(f"unknown constraint {p}")
-            io.append({
-                "signal": sig,
-                "pins": pins,
-                "properties": io_properties
-            })
-
         backend_ext = edalize_ext.get_edatool(toolchain)(edam=edam, work_root=build_dir)
-        backend_ext.io.extend(io)
-        backend_ext.constraints.extend(named_pc)
         backend_ext.configure()
 
         # NOTE: backend_ext.configure() modifies edam, so call it before this
