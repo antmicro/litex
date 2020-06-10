@@ -15,20 +15,22 @@ from migen.fhdl.structure import _Fragment
 class XilinxPlatform(GenericPlatform):
     bitstream_ext = ".bit"
 
-    def __init__(self, *args, toolchain="ise", **kwargs):
+    def __init__(self, *args, toolchain="ise", use_edalize=False, **kwargs):
         GenericPlatform.__init__(self, *args, **kwargs)
         self.edifs = set()
         self.ips   = {}
-        if toolchain == "ise":
-            self.toolchain = ise.XilinxISEToolchain()
-        elif toolchain == "vivado":
-            self.toolchain = vivado.XilinxVivadoToolchain()
-        elif toolchain == "symbiflow":
-            self.toolchain = symbiflow.SymbiflowToolchain()
-        elif toolchain == "edalize":
-            self.toolchain = edalize.VivadoEdalizeToolchain()
+
+        if use_edalize:
+            self.toolchain = edalize.VivadoEdalizeToolchain(toolchain=toolchain)
         else:
-            raise ValueError("Unknown toolchain")
+            if toolchain == "ise":
+                self.toolchain = ise.XilinxISEToolchain()
+            elif toolchain == "vivado":
+                self.toolchain = vivado.XilinxVivadoToolchain()
+            elif toolchain == "symbiflow":
+                self.toolchain = symbiflow.SymbiflowToolchain()
+            else:
+                raise ValueError("Unknown toolchain")
 
     def add_edif(self, filename):
         self.edifs.add((os.path.abspath(filename)))

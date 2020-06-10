@@ -10,7 +10,7 @@ from litex.build import edalize_ext
 # EdalizeToolchain ---------------------------------------------------------------------------------
 
 class EdalizeToolchain:
-    def __init__(self):
+    def __init__(self, toolchain):
         # FIXME: pass to edalize as custom commands
         self.bitstream_commands                   = []
         self.additional_commands                  = []
@@ -24,8 +24,11 @@ class EdalizeToolchain:
         self.vivado_post_place_phys_opt_directive = None
         self.vivado_route_directive               = "default"
         self.vivado_post_route_phys_opt_directive = "default"
+
         self.clocks      = dict()
         self.false_paths = set()
+
+        self._toolchain = toolchain
 
     def build(self, platform, fragment, build_dir, build_name, run,
         synth_mode = "vivado",
@@ -77,7 +80,6 @@ class EdalizeToolchain:
         del self.false_paths
 
         # Edalize
-        toolchain = "vivado"
         edam = {
             "files":        [],
             "hooks":        [],
@@ -125,11 +127,11 @@ class EdalizeToolchain:
             # name and file_type are not used, but documentation marks them as mandatory.
             edam["files"].append({ "name": "", "file_type": "", "is_include_file": True, "include_path": path })
 
-        backend_ext = edalize_ext.get_edatool(toolchain)(edam=edam, work_root=build_dir)
+        backend_ext = edalize_ext.get_edatool(self._toolchain)(edam=edam, work_root=build_dir)
         backend_ext.configure()
 
         # NOTE: backend_ext.configure() modifies edam, so call it before this
-        backend = edalize.get_edatool(toolchain)(edam=edam, work_root=build_dir)
+        backend = edalize.get_edatool(self._toolchain)(edam=edam, work_root=build_dir)
         backend.configure()
 
         # Run
@@ -152,13 +154,11 @@ class EdalizeToolchain:
         if (to, from_) not in self.false_paths:
             self.false_paths.add((from_, to))
 
-def edalize_build_args(parser):
-    parser.add_argument("--synth-mode", default="vivado", help="synthesis mode (vivado or yosys, default=vivado)")
+def edalize_args(parser):
+    parser.add_argument("--use-edalize", action="store_true", help="Use Edalize toolchain backend")
 
-
-def edalize_build_argdict(args):
-    return {"synth_mode": args.synth_mode}
-
+def edalize_argdict(args):
+    return {"use_edalize": args.use_edalize}
 
 #------------------------------------------------
 
