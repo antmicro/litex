@@ -53,7 +53,7 @@ class XilinxPlatform(GenericPlatform):
         self.toolchain_name = toolchain
 
         if use_edalize:
-            self.toolchain = edalize.VivadoEdalizeToolchain(toolchain=toolchain)
+            self.toolchain = edalize.EdalizeToolchain(toolchain=toolchain)
         else:
             if toolchain == "ise":
                 self.toolchain = ise.XilinxISEToolchain()

@@ -159,10 +159,3 @@ def edalize_args(parser):
 
 def edalize_argdict(args):
     return {"use_edalize": args.use_edalize}
-
-#------------------------------------------------
-
-# FIXME: get rid of this
-class VivadoEdalizeToolchain(EdalizeToolchain):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
