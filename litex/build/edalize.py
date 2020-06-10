@@ -11,118 +11,11 @@ import edalize
 from migen.fhdl.structure import _Fragment
 
 from litex.build.generic_platform import *
-from litex.build import tools
+from litex.build import edalize_ext
 from litex.build.xilinx import common
 
 from pprint import pprint
 
-# --------------------------------------------------------------------------------------------------
-# Functionality which should be added to Edalize
-
-class edalize_ext:
-    def get_edatool(toolchain):
-        return getattr(edalize_ext, "edatool_" + toolchain)
-
-
-    class edatool_vivado:
-        def __init__(self, edam=None, work_root=None):
-            self._edam = edam
-            self._work_root = work_root
-            self.named_signals = []
-            self.platform_commands = []
-
-        def configure(self):
-            # Process constraints
-            period_constraints = self._edam.get("constraints", {}).get("period", {})
-            false_paths = self._edam.get("constraints", {}).get("false_path", {})
-            self.platform_commands.append(_xdc_separator("Clock constraints"))
-            for clk, period in period_constraints.items():
-                self.platform_commands.append(
-                    f"create_clock -name {clk} -period {str(period)} [get_nets {clk}]")
-            for from_, to in false_paths:
-                self.platform_commands.append(
-                    "set_clock_groups "
-                    f"-group [get_clocks -include_generated_clocks -of [get_nets {from_}]] "
-                    f"-group [get_clocks -include_generated_clocks -of [get_nets {to}]] "
-                    "-asynchronous")
-
-            self.platform_commands.append(_xdc_separator("False path constraints"))
-            # The asynchronous input to a MultiReg is a false path
-            self.platform_commands.append(
-                "set_false_path -quiet "
-                "-through [get_nets -hierarchical -filter {mr_ff == TRUE}]"
-            )
-            # The asychronous reset input to the AsyncResetSynchronizer is a false path
-            self.platform_commands.append(
-                "set_false_path -quiet "
-                "-to [get_pins -filter {REF_PIN_NAME == PRE} "
-                    "-of_objects [get_cells -hierarchical -filter {ars_ff1 == TRUE || ars_ff2 == TRUE}]]"
-            )
-            # clock_period-2ns to resolve metastability on the wire between the AsyncResetSynchronizer FFs
-            self.platform_commands.append(
-                "set_max_delay 2 -quiet "
-                "-from [get_pins -filter {REF_PIN_NAME == C} "
-                    "-of_objects [get_cells -hierarchical -filter {ars_ff1 == TRUE}]] "
-                "-to [get_pins -filter {REF_PIN_NAME == D} "
-                    "-of_objects [get_cells -hierarchical -filter {ars_ff2 == TRUE}]]"
-            )
-
-            # Create .xdc
-            xdc = os.path.join(self._work_root, self._edam.get("name", "top") + ".xdc")
-            self._edam["files"].append({ "name": xdc, "file_type": "xdc" })
-            # FIXME: replace with edalize-friendly generic writing
-            tools.write_to_file(xdc, _build_xdc(self.named_signals, self.platform_commands))
-
-# Constraints (.xdc) -------------------------------------------------------------------------------
-
-def _xdc_separator(msg):
-    r =  "#"*80 + "\n"
-    r += "# " + msg + "\n"
-    r += "#"*80 + "\n"
-    return r
-
-def _format_xdc_constraint(c):
-    if isinstance(c, Pins):
-        return "set_property LOC " + c.identifiers[0]
-    elif isinstance(c, IOStandard):
-        return "set_property IOSTANDARD " + c.name
-    elif isinstance(c, Drive):
-        return "set_property DRIVE " + str(c.strength)
-    elif isinstance(c, Misc):
-        return "set_property " + c.misc.replace("=", " ")
-    elif isinstance(c, Inverted):
-        return None
-    else:
-        raise ValueError("unknown constraint {}".format(c))
-
-
-def _format_xdc(signame, resname, *constraints):
-    fmt_c = [_format_xdc_constraint(c) for c in constraints]
-    fmt_r = resname[0] + ":" + str(resname[1])
-    if resname[2] is not None:
-        fmt_r += "." + resname[2]
-    r = "# {}\n".format(fmt_r)
-    for c in fmt_c:
-        if c is not None:
-            r += c + " [get_ports {" + signame + "}]\n"
-    r += "\n"
-    return r
-
-
-def _build_xdc(named_sc, named_pc):
-    r = _xdc_separator("IO constraints")
-    for sig, pins, others, resname in named_sc:
-        if len(pins) > 1:
-            for i, p in enumerate(pins):
-                r += _format_xdc(sig + "[" + str(i) + "]", resname, Pins(p), *others)
-        elif pins:
-            r += _format_xdc(sig, resname, Pins(pins[0]), *others)
-        else:
-            r += _format_xdc(sig, resname, *others)
-    if named_pc:
-        r += _xdc_separator("Design constraints")
-        r += "\n" + "\n\n".join(named_pc)
-    return r
 
 # XilinxVivadoToolchain ----------------------------------------------------------------------------
 
@@ -217,10 +110,32 @@ class EdalizeToolchain:
             # name and file_type are not used, but documentation marks them as mandatory.
             edam["files"].append({ "name": "", "file_type": "", "is_include_file": True, "include_path": path })
 
-        backend_ext = edalize_ext.get_edatool(toolchain)(edam=edam, work_root=build_dir)
         named_sc, named_pc = platform.resolve_signals(v_output.ns)
-        backend_ext.named_signals.extend(named_sc)
-        backend_ext.platform_commands.extend(named_pc)
+
+        io = []
+        for sig, pins, properties, _ in named_sc:
+            # Translate properties from Litex classes to generic tuples
+            io_properties = []
+            for p in properties:
+                if isinstance(p, IOStandard):
+                    io_properties.append(("iostandard", p.name))
+                elif isinstance(p, Drive):
+                    io_properties.append(("drive", str(p.strength)))
+                elif isinstance(p, Inverted):
+                    io_properties.append(("inverted"))
+                elif isinstance(p, Misc):
+                    io_properties.append(("custom", str(p.misc)))
+                else:
+                    raise ValueError(f"unknown constraint {p}")
+            io.append({
+                "signal": sig,
+                "pins": pins,
+                "properties": io_properties
+            })
+
+        backend_ext = edalize_ext.get_edatool(toolchain)(edam=edam, work_root=build_dir)
+        backend_ext.io.extend(io)
+        backend_ext.constraints.extend(named_pc)
         backend_ext.configure()
 
         # NOTE: backend_ext.configure() modifies edam, so call it before this

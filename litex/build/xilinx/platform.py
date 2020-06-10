@@ -5,7 +5,8 @@
 import os
 
 from litex.build.generic_platform import GenericPlatform
-from litex.build.xilinx import common, vivado, ise, symbiflow, edalize
+from litex.build.xilinx import common, vivado, ise, symbiflow
+from litex.build import edalize
 
 from migen.fhdl.structure import _Fragment
 
