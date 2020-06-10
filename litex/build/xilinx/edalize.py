@@ -29,52 +29,50 @@ class edalize_ext:
             self._edam = edam
             self._work_root = work_root
             self.named_signals = []
-            self.named_platform_commands = []
+            self.platform_commands = []
 
-        # FIXME (mglb): this can't take platform or use litex-specific structures (clk)!
-        def process_constraints(self, platform):
+        def process_constraints(self):
             period_constraints = self._edam.get("constraints", {}).get("period", {})
             false_paths = self._edam.get("constraints", {}).get("false_path", {})
-            platform.add_platform_command(_xdc_separator("Clock constraints"))
-            for clk, period in sorted(period_constraints.items(), key=lambda x: x[0].duid):
-                platform.add_platform_command(
-                    "create_clock -name {clk} -period " + str(period) +
-                    " [get_nets {clk}]", clk=clk)
-            for from_, to in sorted(false_paths, key=lambda x: (x[0].duid, x[1].duid)):
-                platform.add_platform_command(
+            self.platform_commands.append(_xdc_separator("Clock constraints"))
+            for clk, period in period_constraints.items():
+                self.platform_commands.append(
+                    f"create_clock -name {clk} -period {str(period)} [get_nets {clk}]")
+            for from_, to in false_paths:
+                self.platform_commands.append(
                     "set_clock_groups "
-                    "-group [get_clocks -include_generated_clocks -of [get_nets {from_}]] "
-                    "-group [get_clocks -include_generated_clocks -of [get_nets {to}]] "
-                    "-asynchronous",
-                    from_=from_, to=to)
+                    f"-group [get_clocks -include_generated_clocks -of [get_nets {from_}]] "
+                    f"-group [get_clocks -include_generated_clocks -of [get_nets {to}]] "
+                    "-asynchronous")
 
-            platform.add_platform_command(_xdc_separator("False path constraints"))
+            self.platform_commands.append(_xdc_separator("False path constraints"))
             # The asynchronous input to a MultiReg is a false path
-            platform.add_platform_command(
+            self.platform_commands.append(
                 "set_false_path -quiet "
-                "-through [get_nets -hierarchical -filter {{mr_ff == TRUE}}]"
+                "-through [get_nets -hierarchical -filter {mr_ff == TRUE}]"
             )
             # The asychronous reset input to the AsyncResetSynchronizer is a false path
-            platform.add_platform_command(
+            self.platform_commands.append(
                 "set_false_path -quiet "
-                "-to [get_pins -filter {{REF_PIN_NAME == PRE}} "
-                    "-of_objects [get_cells -hierarchical -filter {{ars_ff1 == TRUE || ars_ff2 == TRUE}}]]"
+                "-to [get_pins -filter {REF_PIN_NAME == PRE} "
+                    "-of_objects [get_cells -hierarchical -filter {ars_ff1 == TRUE || ars_ff2 == TRUE}]]"
             )
             # clock_period-2ns to resolve metastability on the wire between the AsyncResetSynchronizer FFs
-            platform.add_platform_command(
+            self.platform_commands.append(
                 "set_max_delay 2 -quiet "
-                "-from [get_pins -filter {{REF_PIN_NAME == C}} "
-                    "-of_objects [get_cells -hierarchical -filter {{ars_ff1 == TRUE}}]] "
-                "-to [get_pins -filter {{REF_PIN_NAME == D}} "
-                    "-of_objects [get_cells -hierarchical -filter {{ars_ff2 == TRUE}}]]"
+                "-from [get_pins -filter {REF_PIN_NAME == C} "
+                    "-of_objects [get_cells -hierarchical -filter {ars_ff1 == TRUE}]] "
+                "-to [get_pins -filter {REF_PIN_NAME == D} "
+                    "-of_objects [get_cells -hierarchical -filter {ars_ff2 == TRUE}]]"
             )
 
         def configure(self):
+            self.process_constraints()
             # Create .xdc
             xdc = os.path.join(self._work_root, self._edam.get("name", "top") + ".xdc")
             self._edam["files"].append({ "name": xdc, "file_type": "xdc" })
             # FIXME: replace with edalize-friendly generic writing
-            tools.write_to_file(xdc, _build_xdc(self.named_signals, self.named_platform_commands))
+            tools.write_to_file(xdc, _build_xdc(self.named_signals, self.platform_commands))
 
 # Constraints (.xdc) -------------------------------------------------------------------------------
 
@@ -152,6 +150,27 @@ class EdalizeToolchain:
         enable_xpm = False,
         **kwargs):
 
+        # Generate verilog
+        v_output = platform.get_verilog(fragment, name=build_name, **kwargs)
+        v_file = build_name + ".v"
+        v_output.write(v_file)
+        platform.add_source(v_file)
+
+        # Resolve signals in constraints
+        period_constraints = dict()
+        for clk, period in self.clocks.items():
+            clk_signal = v_output.ns.get_name(clk)
+            period_constraints[clk_signal] = period
+        false_paths = set()
+        for from_, to in self.false_paths:
+            from_sig = v_output.ns.get_name(from_)
+            to_sig   = v_output.ns.get_name(to)
+            false_paths.add((from_sig, to_sig))
+
+        # Make sure add_*_constraint cannot be used again
+        del self.clocks
+        del self.false_paths
+
         # Edalize
         toolchain = "vivado"
         edam = {
@@ -170,21 +189,10 @@ class EdalizeToolchain:
 
             # XXX: edalize_ext stuff
             "constraints": {
-                "period":     self.clocks,
-                "false_path": self.false_paths,
+                "period":     period_constraints,
+                "false_path": false_paths,
             }
         }
-
-        # Make sure add_*_constraint cannot be used again
-        del self.clocks
-        del self.false_paths
-
-        # Generate verilog
-        v_output = platform.get_verilog(fragment, name=build_name, **kwargs)
-        named_sc, named_pc = platform.resolve_signals(v_output.ns)
-        v_file = build_name + ".v"
-        v_output.write(v_file)
-        platform.add_source(v_file)
 
         file_type_map = {
             "systemverilog": "systemVerilogSource",
@@ -211,10 +219,9 @@ class EdalizeToolchain:
             edam["files"].append({ "name": "", "file_type": "", "is_include_file": True, "include_path": path })
 
         backend_ext = edalize_ext.get_edatool(toolchain)(edam=edam, work_root=build_dir)
-
-        backend_ext.named_signals = named_sc
-        backend_ext.named_platform_commands = named_pc
-        backend_ext.process_constraints(platform)
+        named_sc, named_pc = platform.resolve_signals(v_output.ns)
+        backend_ext.named_signals.extend(named_sc)
+        backend_ext.platform_commands.extend(named_pc)
         backend_ext.configure()
 
         # NOTE: backend_ext.configure() modifies edam, so call it before this
