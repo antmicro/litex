@@ -254,18 +254,18 @@ class Platform(XilinxPlatform):
     default_clk_name   = "clk100"
     default_clk_period = 1e9/100e6
 
-    def __init__(self, variant="a7-35", toolchain="edalize"):
+    def __init__(self, variant="a7-35", toolchain="vivado", **kwargs):
         device = {
             "a7-35":  "xc7a35ticsg324-1L",
             "a7-100": "xc7a100tcsg324-1"
         }[variant]
-        XilinxPlatform.__init__(self, device, _io, _connectors, toolchain=toolchain)
+        XilinxPlatform.__init__(self, device, _io, _connectors, toolchain=toolchain, **kwargs)
         self.toolchain.bitstream_commands = \
             ["set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]"]
         self.toolchain.additional_commands = \
             ["write_cfgmem -force -format bin -interface spix4 -size 16 "
              "-loadbit \"up 0x0 {build_name}.bit\" -file {build_name}.bin"]
-        if toolchain in ["vivado", "edalize"]: # FIXME
+        if toolchain in ["vivado"]: # FIXME
             self.add_platform_command("set_property INTERNAL_VREF 0.675 [get_iobanks 34]")
 
     def create_programmer(self):
