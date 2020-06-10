@@ -24,8 +24,8 @@ class EdalizeToolchain:
         self._toolchain = toolchain
 
     def build(self, platform, fragment, build_dir, build_name, run,
-        synth_mode = "vivado",
-        enable_xpm = False,
+        # FIXME: this is vivado-specific. Must be generic
+        synth_mode = "vivado", enable_xpm = False,
         **kwargs):
 
         # Generate verilog
