@@ -31,7 +31,8 @@ class edalize_ext:
             self.named_signals = []
             self.platform_commands = []
 
-        def process_constraints(self):
+        def configure(self):
+            # Process constraints
             period_constraints = self._edam.get("constraints", {}).get("period", {})
             false_paths = self._edam.get("constraints", {}).get("false_path", {})
             self.platform_commands.append(_xdc_separator("Clock constraints"))
@@ -66,8 +67,6 @@ class edalize_ext:
                     "-of_objects [get_cells -hierarchical -filter {ars_ff2 == TRUE}]]"
             )
 
-        def configure(self):
-            self.process_constraints()
             # Create .xdc
             xdc = os.path.join(self._work_root, self._edam.get("name", "top") + ".xdc")
             self._edam["files"].append({ "name": xdc, "file_type": "xdc" })
