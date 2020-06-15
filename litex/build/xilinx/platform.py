@@ -120,3 +120,20 @@ class XilinxPlatform(GenericPlatform):
         from_.attr.add("keep")
         to.attr.add("keep")
         self.toolchain.add_false_path_constraint(self, from_, to)
+
+
+# XilinxPlatform arguments --------------------------------------------------------------------------
+
+def xilinx_platform_args(parser):
+    parser.add_argument("--use-edalize", action="store_true", help="Use Edalize toolchain backend")
+
+def xilinx_platform_argdict(args):
+    r = {}
+    r.update({
+        "use_edalize": args.use_edalize
+    })
+    return r
+
+def xilinx_platform_build_argdict(args):
+    r = {}
+    return r

@@ -4,6 +4,8 @@
 
 from litex.build.generic_platform import *
 from litex.build.xilinx import XilinxPlatform
+from litex.build.xilinx.platform import xilinx_platform_args, xilinx_platform_argdict, xilinx_platform_build_argdict
+from litex.build.xilinx.vivado import vivado_build_args, vivado_build_argdict
 from litex.build.openocd import OpenOCD
 
 # IOs ----------------------------------------------------------------------------------------------
@@ -277,3 +279,21 @@ class Platform(XilinxPlatform):
         from litex.build.xilinx import symbiflow
         if not isinstance(self.toolchain, symbiflow.SymbiflowToolchain): # FIXME
             self.add_period_constraint(self.lookup_request("clk100", loose=True), 1e9/100e6)
+
+def arty_platform_args(parser):
+    xilinx_platform_args(parser)
+    parser.add_argument("--toolchain", default="vivado", help="Gateware toolchain to use, vivado (default) or symbiflow")
+    vivado_build_args(parser)
+
+def arty_platform_argdict(args):
+    r = xilinx_platform_argdict(args)
+    r.update({
+        "toolchain": args.toolchain
+    })
+    return r
+
+def arty_platform_build_argdict(args):
+    r = xilinx_platform_build_argdict(args)
+    if args.toolchain in ["vivado"]:
+        r.update(vivado_build_argdict(args))
+    return r

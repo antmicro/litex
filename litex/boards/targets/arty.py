@@ -10,8 +10,6 @@ import argparse
 from migen import *
 
 from litex.boards.platforms import arty
-from litex.build.xilinx.vivado import vivado_build_args, vivado_build_argdict
-from litex.build.edalize import edalize_args, edalize_argdict
 
 from litex.soc.cores.clock import *
 from litex.soc.integration.soc_core import *
@@ -70,7 +68,7 @@ class _CRG(Module):
 
 class BaseSoC(SoCCore):
     def __init__(self, toolchain="vivado", sys_clk_freq=int(100e6), with_ethernet=False, with_etherbone=False, platform_args={}, **kwargs):
-        platform = arty.Platform(toolchain=toolchain, **platform_args)
+        platform = arty.Platform(**platform_args)
 
         # SoCCore ----------------------------------------------------------------------------------
         if toolchain == "symbiflow":
@@ -122,20 +120,18 @@ def main():
     parser = argparse.ArgumentParser(description="LiteX SoC on Arty A7")
     parser.add_argument("--build", action="store_true", help="Build bitstream")
     parser.add_argument("--load",  action="store_true", help="Load bitstream")
-    parser.add_argument("--toolchain", default="vivado", help="Gateware toolchain to use, vivado (default) or symbiflow")
     builder_args(parser)
     soc_sdram_args(parser)
-    edalize_args(parser)
-    vivado_build_args(parser)
+    arty.arty_platform_args(parser)
     parser.add_argument("--with-ethernet",  action="store_true", help="Enable Ethernet support")
     parser.add_argument("--with-etherbone", action="store_true", help="Enable Etherbone support")
     args = parser.parse_args()
 
     assert not (args.with_ethernet and args.with_etherbone)
-    soc = BaseSoC(args.toolchain, with_ethernet=args.with_ethernet, with_etherbone=args.with_etherbone, platform_args=edalize_argdict(args),
+    soc = BaseSoC(args.toolchain, with_ethernet=args.with_ethernet, with_etherbone=args.with_etherbone, platform_args=arty.arty_platform_argdict(args),
         **soc_sdram_argdict(args))
     builder = Builder(soc, **builder_argdict(args))
-    builder_kwargs = vivado_build_argdict(args) if args.toolchain in ["vivado"] else {}
+    builder_kwargs = arty.arty_platform_build_argdict(args)
     builder.build(**builder_kwargs, run=args.build)
 
     if args.load:

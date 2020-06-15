@@ -146,9 +146,3 @@ class EdalizeToolchain:
     def add_false_path_constraint(self, platform, from_, to):
         if (to, from_) not in self.false_paths:
             self.false_paths.add((from_, to))
-
-def edalize_args(parser):
-    parser.add_argument("--use-edalize", action="store_true", help="Use Edalize toolchain backend")
-
-def edalize_argdict(args):
-    return {"use_edalize": args.use_edalize}
