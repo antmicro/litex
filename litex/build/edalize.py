@@ -3,6 +3,7 @@
 
 import math
 import edalize
+import re
 
 from litex.build.generic_platform import IOStandard, Drive, Misc, Inverted
 from litex.build import edalize_ext
@@ -78,6 +79,39 @@ class EdalizeToolchain:
                 "part":     platform.device,
                 "synth":    kwargs.get("synth_mode", "vivado")
             }
+        elif self._toolchain == "ise":
+            device, speed, package = platform.device.rsplit("-", maxsplit=2)
+            device_family_map = [
+                ("xcv[0-9]+",       "virtex"),      # Virtex
+                ("xcv[0-9]+e",      "virtexe"),     # Virtex-E
+                ("xc2v[0-9]+",      "virtex2"),     # Virtex-II
+                ("xc2vp.*",         "virtex2p"),    # Virtex-II Pro
+                ("xc4v.*",          "virtex4"),     # Virtex-4
+                ("xc5v.*",          "virtex5"),     # Virtex-5
+                ("xc6v.*",          "virtex6"),     # Virtex-6
+                ("xc7v.*",          "virtex7"),     # Virtex-7
+                ("xc2s[0-9]+",      "spartan2"),    # Spartan-II
+                ("xc2s[0-9]+e",     "spartan2e"),   # Spartan-IIE
+                ("xc3s[0-9]+",      "spartan3"),    # Spartan-3
+                ("xc3s[0-9]+a",     "spartan3a"),   # Spartan-3A
+                ("xc3s[0-9]+e",     "spartan3e"),   # Spartan-3E
+                ("xc6s.*",          "spartan6"),    # Spartan-6
+                ("xc7k.*",          "kintex7"),     # Kintex-7
+                ("xc7a.*",          "artix7"),      # Artix-7
+                ("xc7z[0-9].*",     "zynq"),        # Zynq-7000
+            ]
+            family = ""
+            for regexp, dev_family in device_family_map:
+                if re.fullmatch(regexp, device):
+                    family = dev_family
+                    break
+            tool_options = {
+                "device":   device,
+                "family":   family,
+                "package":  package,
+                "speed":    f"-{speed}",
+            }
+
         # Edalize
         edam = {
             "files":        [],
