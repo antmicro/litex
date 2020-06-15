@@ -281,9 +281,11 @@ class Platform(XilinxPlatform):
             self.add_period_constraint(self.lookup_request("clk100", loose=True), 1e9/100e6)
 
 def arty_platform_args(parser):
-    xilinx_platform_args(parser)
-    parser.add_argument("--toolchain", default="vivado", help="Gateware toolchain to use, vivado (default) or symbiflow")
-    vivado_build_args(parser)
+    platform_group = parser.add_argument_group('Platform options')
+    xilinx_platform_args(platform_group)
+    platform_group.add_argument("--toolchain", default="vivado", help="Gateware toolchain to use, vivado (default) or symbiflow")
+    vivado_group = parser.add_argument_group('Vivado toolchain options')
+    vivado_build_args(vivado_group)
 
 def arty_platform_argdict(args):
     r = xilinx_platform_argdict(args)
