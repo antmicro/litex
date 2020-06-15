@@ -21,7 +21,8 @@ class EdalizeToolchain:
         self.clocks      = dict()
         self.false_paths = set()
 
-        self._toolchain = toolchain
+        edalize_toolchain_name_map = {}
+        self._toolchain = edalize_toolchain_name_map.get(toolchain, toolchain)
 
     def build(self, platform, fragment, build_dir, build_name, run, verilog_args={},
         **kwargs):
@@ -70,6 +71,13 @@ class EdalizeToolchain:
         del self.clocks
         del self.false_paths
 
+        # Map Litex toolchain options to edalize's tool_options.
+        tool_options = {}
+        if self._toolchain == "vivado":
+            tool_options = {
+                "part":     platform.device,
+                "synth":    kwargs.get("synth_mode", "vivado")
+            }
         # Edalize
         edam = {
             "files":        [],
@@ -77,10 +85,7 @@ class EdalizeToolchain:
             "name":         build_name,
             "parameters":   {},
             "tool_options": {
-                "vivado": {
-                    "part":  platform.device,
-                    "synth": kwargs.get("synth_mode", False),
-                }
+                self._toolchain: tool_options
             },
             "toplevel":     build_name,
             "vpi":          [],
