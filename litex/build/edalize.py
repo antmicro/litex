@@ -23,13 +23,11 @@ class EdalizeToolchain:
 
         self._toolchain = toolchain
 
-    def build(self, platform, fragment, build_dir, build_name, run,
-        # FIXME: this is vivado-specific. Must be generic
-        synth_mode = "vivado", enable_xpm = False,
+    def build(self, platform, fragment, build_dir, build_name, run, verilog_args={},
         **kwargs):
 
         # Generate verilog
-        v_output = platform.get_verilog(fragment, name=build_name, **kwargs)
+        v_output = platform.get_verilog(fragment, name=build_name, **verilog_args)
         named_sc, named_pc = platform.resolve_signals(v_output.ns)
         v_file = build_name + ".v"
         v_output.write(v_file)
@@ -81,7 +79,7 @@ class EdalizeToolchain:
             "tool_options": {
                 "vivado": {
                     "part":  platform.device,
-                    "synth": synth_mode,
+                    "synth": kwargs.get("synth_mode", False),
                 }
             },
             "toplevel":     build_name,
