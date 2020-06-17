@@ -2,7 +2,9 @@
 # This file is Copyright (c) 2017 Pierre-Olivier Vauboin <po@lambdaconcept>
 # License: BSD
 
-from migen.fhdl.structure import Signal
+import os
+
+from migen.fhdl.structure import Signal, _Fragment
 from migen.genlib.record import Record
 
 from litex.build.generic_platform import GenericPlatform
@@ -40,6 +42,24 @@ class SimPlatform(GenericPlatform):
         so.update(special_overrides)
         return GenericPlatform.get_verilog(self, *args, special_overrides=so, **kwargs)
 
-    def build(self, *args, **kwargs):
-        return self.toolchain.build(self, *args, **kwargs)
+    def build(self, fragment, build_dir="build", build_name="sim", run=True, *args, **kwargs):
+        # Create build directory
+        os.makedirs(build_dir, exist_ok=True)
+        cwd = os.getcwd()
+        os.chdir(build_dir)
 
+        # FIXME: is this condition really required?
+        if kwargs.get("build", True):
+            # Finalize design
+            if not isinstance(fragment, _Fragment):
+                fragment = fragment.get_fragment()
+            self.finalize(fragment)
+
+        # Run toolchain
+        vns = None
+        try:
+            vns = self.toolchain.build(self, fragment, build_dir, build_name, run, *args, **kwargs)
+        finally:
+            os.chdir(cwd)
+
+        return vns

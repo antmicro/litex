@@ -170,22 +170,13 @@ def _run_sim(build_name, as_root=False):
 
 
 class SimVerilatorToolchain:
-    def build(self, platform, fragment, build_dir="build", build_name="sim",
-            serial="console", build=True, run=True, threads=1,
+    def build(self, platform, fragment, build_dir, build_name, run,
+            serial="console", build=True, threads=1,
             verbose=True, sim_config=None, coverage=False, opt_level="O0",
             trace=False, trace_fst=False, trace_start=0, trace_end=-1,
             regular_comb=False):
 
-        # create build directory
-        os.makedirs(build_dir, exist_ok=True)
-        os.chdir(build_dir)
-
         if build:
-            # finalize design
-            if not isinstance(fragment, _Fragment):
-                fragment = fragment.get_fragment()
-            platform.finalize(fragment)
-
             # generate top module
             top_output = platform.get_verilog(fragment,
                 name=build_name, dummy_signal=False, regular_comb=regular_comb, blocking_assign=True)
@@ -215,8 +206,6 @@ class SimVerilatorToolchain:
             if sim_config.has_module("xgmii_ethernet"):
                 run_as_root = True
             _run_sim(build_name, as_root=run_as_root)
-
-        os.chdir("../../")
 
         if build:
             return top_output.ns
