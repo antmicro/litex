@@ -142,11 +142,12 @@ class EdalizeToolchain:
             edam["files"].append({ "name": filename, "file_type": file_type_map.get(language, "unknown") })
 
         # FIXME: this is not generic thing, move to platform or edalize_ext or somewhere
-        for filename, disable_constraints in platform.ips.items():
-            edam["files"].append({ "name": filename, "file_type": "xci" })
-            # FIXME:
-            #if disable_constraints:
-            #    tcl.append("set_property is_enabled false [get_files -of_objects [get_files {}] -filter {{FILE_TYPE == XDC}}]".format(filename_tcl))
+        if hasattr(platform, "ips"):
+            for filename, disable_constraints in platform.ips.items():
+                edam["files"].append({ "name": filename, "file_type": "xci" })
+                # FIXME:
+                #if disable_constraints:
+                #    tcl.append("set_property is_enabled false [get_files -of_objects [get_files {}] -filter {{FILE_TYPE == XDC}}]".format(filename_tcl))
 
         # FIXME: custom edifs not supported in edalize
         #for filename in platform.edifs:
