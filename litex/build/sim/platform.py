@@ -68,3 +68,14 @@ class SimPlatform(GenericPlatform):
             os.chdir(cwd)
 
         return vns
+
+def sim_platform_args(parser):
+    platform_group = parser.add_argument_group('Platform options')
+    platform_group.add_argument("--use-edalize", action="store_true", help="Use Edalize toolchain backend")
+
+def sim_platform_argdict(args):
+    r = {}
+    r.update({
+        "use_edalize": args.use_edalize
+    })
+    return r

@@ -10,7 +10,7 @@ import argparse
 from migen import *
 
 from litex.build.generic_platform import *
-from litex.build.sim import SimPlatform
+from litex.build.sim import SimPlatform, sim_platform_args, sim_platform_argdict
 from litex.build.sim.config import SimConfig
 
 from litex.soc.integration.common import *
@@ -74,8 +74,8 @@ _io = [
 # Platform -----------------------------------------------------------------------------------------
 
 class Platform(SimPlatform):
-    def __init__(self):
-        SimPlatform.__init__(self, "SIM", _io)
+    def __init__(self, **kwargs):
+        SimPlatform.__init__(self, "SIM", _io, **kwargs)
 
 # DFI PHY model settings ---------------------------------------------------------------------------
 
@@ -178,8 +178,9 @@ class SimSoC(SoCCore):
         sdram_verbosity       = 0,
         with_i2c              = False,
         with_sdcard           = False,
+        platform_args         = {},
         **kwargs):
-        platform     = Platform()
+        platform     = Platform(**platform_args)
         sys_clk_freq = int(1e6)
 
         # SoCCore ----------------------------------------------------------------------------------
@@ -317,6 +318,8 @@ def main():
     parser = argparse.ArgumentParser(description="Generic LiteX SoC Simulation")
     builder_args(parser)
     soc_sdram_args(parser)
+    sim_platform_args(parser)
+
     parser.add_argument("--threads",              default=1,               help="Set number of threads (default=1)")
     parser.add_argument("--rom-init",             default=None,            help="rom_init file")
     parser.add_argument("--ram-init",             default=None,            help="ram_init file")
@@ -384,6 +387,7 @@ def main():
         with_i2c       = args.with_i2c,
         with_sdcard    = args.with_sdcard,
         sdram_init     = [] if args.sdram_init is None else get_mem_data(args.sdram_init, cpu_endianness),
+        platform_args  = sim_platform_argdict(args),
         **soc_kwargs)
     if args.ram_init is not None:
         soc.add_constant("ROM_BOOT_ADDRESS", 0x40000000)
