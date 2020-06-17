@@ -9,16 +9,21 @@ from migen.genlib.record import Record
 
 from litex.build.generic_platform import GenericPlatform
 from litex.build.sim import common, verilator
+from litex.build import edalize
 
 
 class SimPlatform(GenericPlatform):
-    def __init__(self, *args, name="sim", toolchain="verilator", **kwargs):
+    def __init__(self, *args, name="sim", toolchain="verilator", use_edalize=False, **kwargs):
         GenericPlatform.__init__(self, *args, name=name, **kwargs)
         self.sim_requested = []
-        if toolchain == "verilator":
-            self.toolchain = verilator.SimVerilatorToolchain()
+
+        if use_edalize:
+            self.toolchain = edalize.EdalizeToolchain(toolchain=toolchain)
         else:
-            raise ValueError("Unknown toolchain")
+            if toolchain == "verilator":
+                self.toolchain = verilator.SimVerilatorToolchain()
+            else:
+                raise ValueError("Unknown toolchain")
 
     def request(self, name, number=None):
         index = ""
