@@ -208,6 +208,7 @@ def get_csr_header(regions, constants, csr_base=None, with_access_functions=True
     r += "#ifndef CSR_BASE\n"
     r += "#define CSR_BASE {}L\n".format(hex(csr_base))
     r += "#endif\n"
+    csrs = []  # (name, width_in_bytes, read_func)
     for name, region in regions.items():
         origin = region.origin - csr_base
         r += "\n/* "+name+" */\n"
@@ -222,7 +223,21 @@ def get_csr_header(regions, constants, csr_base=None, with_access_functions=True
                     for field in csr.fields.fields:
                         r += "#define CSR_"+name.upper()+"_"+csr.name.upper()+"_"+field.name.upper()+"_OFFSET "+str(field.offset)+"\n"
                         r += "#define CSR_"+name.upper()+"_"+csr.name.upper()+"_"+field.name.upper()+"_SIZE "+str(field.size)+"\n"
-
+                csrs.append(dict(
+                    name=name + "_" + csr.name,
+                    size=nr*region.busword//8,
+                ))
+    printer = ""
+    printer += "#define CSR_DEBUG_PRINTER\n"
+    printer += "#include <stdio.h>\n"
+    printer += "static inline void print_csrs(void) {\n"
+    w = max(len(csr["name"]) for csr in csrs)
+    for csr in csrs:
+        if csr["size"] <= 8:
+            printer += "\tprintf(\"{name:{width}} = 0x%0{n:d}llx\\n\", {name}_read());\n".format(
+                n=csr["size"]*2, name=csr["name"], width=w)
+    printer += "}"
+    r += "\n" + printer + "\n"
     r += "\n#endif\n"
     return r
 
