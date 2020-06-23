@@ -117,7 +117,12 @@ class JTAGPHY(Module):
             elif device[:3] == "xc7":
                 jtag = S7JTAG()
             elif device[:4] in ["xcku", "xcvu"]:
-                jtag = USJTAG()
+                import os
+                chain = int(os.environ.get("CHAIN", "1"))
+                print("=" * 80)
+                print("  Using JTAG.chain = %d" % chain)
+                print("=" * 80)
+                jtag = USJTAG(chain=chain)
             else:
                 raise NotImplementedError
             self.submodules += jtag
