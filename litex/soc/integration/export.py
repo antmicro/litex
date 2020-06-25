@@ -230,7 +230,7 @@ def get_csr_header(regions, constants, csr_base=None, with_access_functions=True
     printer = ""
     printer += "#define CSR_DEBUG_PRINTER\n"
     printer += "#include <stdio.h>\n"
-    printer += "static inline void print_csrs(void) {\n"
+    printer += "static inline void csr_print_all(void) {\n"
     w = max(len(csr["name"]) for csr in csrs)
     for csr in csrs:
         if csr["size"] <= 8:

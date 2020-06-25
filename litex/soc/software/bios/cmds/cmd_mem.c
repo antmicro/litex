@@ -226,7 +226,7 @@ define_command(memspeed, memspeed_handler, "Run a memory speed test", MEM_CMDS);
  */
 static void csrprint(int nb_params, char **params)
 {
-    print_csrs();
+    csr_print_all();
 }
 define_command(csrprint, csrprint, "Print CSR values", MEM_CMDS);
 #endif
