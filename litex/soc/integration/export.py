@@ -233,9 +233,19 @@ def get_csr_header(regions, constants, csr_base=None, with_access_functions=True
     printer += "static inline void csr_print_all(void) {\n"
     w = max(len(csr["name"]) for csr in csrs)
     for csr in csrs:
-        if csr["size"] <= 8:
-            printer += "\tprintf(\"{name:{width}} = 0x%0{n:d}llx\\n\", {name}_read());\n".format(
+        if csr["size"] <= 4:
+            printer += "\tprintf(\"{name:{width}} = 0x%0{n:d}lx\\n\", {name}_read());\n".format(
                 n=csr["size"]*2, name=csr["name"], width=w)
+        else:
+            printer += "\t{\n"
+            printer += "\t\tuint8_t buf[{}];\n".format(csr["size"])
+            printer += "\t\tcsr_rd_buf_uint8({addr}, buf, {cnt});\n".format(
+                addr="CSR_{}_ADDR".format(csr["name"].upper()), cnt=csr["size"])
+            fmt = "%02x" * csr["size"]
+            args = ["buf[{}]".format(i) for i in range(csr["size"])]
+            printer += "\t\tprintf(\"{name:{width}} = 0x{fmt}\\n\", {args});\n".format(
+                name=csr["name"], width=w, fmt=fmt, args=", ".join(args))
+            printer += "\t}\n"
     printer += "}"
     r += "\n" + printer + "\n"
     r += "\n#endif\n"
