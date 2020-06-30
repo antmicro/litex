@@ -232,16 +232,44 @@ define_command(csrprint, csrprint, "Print CSR values", MEM_CMDS);
 #endif
 
 
+#ifdef CSR_WB_INJECTOR_BASE
+static void wbsw(int nb_params, char **params)
+{
+	wb_injector_soft_control_write(1);
+}
+define_command(wbsw, wbsw, "Use wishbone software control", MEM_CMDS);
+
+static void wbhw(int nb_params, char **params)
+{
+	wb_injector_soft_control_write(0);
+}
+define_command(wbhw, wbhw, "Use wishbone hardware control", MEM_CMDS);
+#endif
+
 #ifdef CSR_WB_SOFTCONTROL_BASE
+__attribute__((unused)) static void cdelay(int i)
+{
+#ifndef CONFIG_SIM_DISABLE_DELAYS
+	while(i > 0) {
+		__asm__ volatile(CONFIG_CPU_NOP);
+		i--;
+	}
+#endif
+}
+
 static void wbr(int nb_params, char **params)
 {
 	char *c;
 	unsigned int *addr;
+	unsigned long startaddr;
 	unsigned int length;
-    unsigned int i;
+	unsigned int nwords;
+	unsigned int i;
+	unsigned int buf[256];
+	unsigned int buflen;
 
 	if (nb_params < 1) {
-		printf("mr <address> [length]");
+		printf("wbr <address> [length]");
 		return;
 	}
 	addr = (unsigned int *)strtoul(params[0], &c, 0);
@@ -250,7 +278,7 @@ static void wbr(int nb_params, char **params)
 		return;
 	}
 	if (nb_params == 1) {
-		length = 4;
+		length = 1;
 	} else {
 		length = strtoul(params[1], &c, 0);
 		if(*c != 0) {
@@ -259,11 +287,22 @@ static void wbr(int nb_params, char **params)
 		}
 	}
 
-    for (i = 0; i < length; ++i) {
-        wb_softcontrol_adr_write((unsigned long)(addr + i));
-        wb_softcontrol_read_write(1);
-        printf("0x%08x: 0x%08x\n", (unsigned long)(addr + i), wb_softcontrol_data_read());
-    }
+	nwords = (length + 3) / 4;
+	startaddr = (unsigned long) addr;
+
+	for (i = 0, buflen = 0; i < nwords; ++i) {
+		wb_softcontrol_adr_write((unsigned long)(addr + 4*i));
+		wb_softcontrol_read_write(1);
+		cdelay(100);
+		buf[buflen++] = wb_softcontrol_data_read();
+		if (buflen == (sizeof(buf) / sizeof(*buf))) {
+			dump_bytes(buf, buflen * sizeof(*buf), startaddr);
+			startaddr += buflen;
+			buflen = 0;
+		}
+	}
+	if (buflen != 0)
+		dump_bytes(buf, buflen * sizeof(*buf), startaddr);
 }
 define_command(wbr, wbr, "Read using softcontrol wishbone controller", MEM_CMDS);
 
@@ -276,7 +315,7 @@ static void wbw(int nb_params, char **params)
 	unsigned int i;
 
 	if (nb_params < 2) {
-		printf("mw <address> <value> [count]");
+		printf("wbw <address> <value> [count]");
 		return;
 	}
 
@@ -306,6 +345,7 @@ static void wbw(int nb_params, char **params)
 	for (i = 0; i < count; i++) {
         wb_softcontrol_adr_write((unsigned long)(addr + i));
         wb_softcontrol_write_write(1);
+        cdelay(100);
     }
 }
 define_command(wbw, wbw, "Write using softcontrol wishbone controller", MEM_CMDS);
