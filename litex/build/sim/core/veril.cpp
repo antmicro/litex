@@ -19,6 +19,8 @@ VerilatedVcdC* tfp;
 long tfp_start;
 long tfp_end;
 
+Vsim *simulation = nullptr;
+
 extern "C" void litex_sim_eval(void *vsim)
 {
   Vsim *sim = (Vsim*)vsim;
@@ -45,17 +47,53 @@ extern "C" void litex_sim_init_tracer(void *vsim, long start, long end)
       sim->trace(tfp, 99);
       tfp->open("sim.vcd");
 #endif
+  simulation = sim;
 }
 
 extern "C" void litex_sim_tracer_dump()
 {
-  static unsigned int ticks=0;
+  static unsigned int ticks = 0;
+  static int dump_triggered = 0;
+  const unsigned int ticks_latency = 100;
+  static unsigned int ticks_trigger = 0;
   int dump = 1;
+
+  if (simulation != nullptr && ticks > ticks_trigger + ticks_latency) {
+    if (!dump_triggered && simulation->sim_trigger) {
+      dump_triggered = 1;
+      ticks_trigger = ticks;
+      printf("========================================\n");
+      printf("    TRACE DUMP STARTED\n");
+      printf("========================================\n");
+    } else if (dump_triggered && simulation->sim_trigger) {
+      dump_triggered = 0;
+      ticks_trigger = ticks;
+      printf("========================================\n");
+      printf("    TRACE DUMP FINISHED\n");
+      printf("========================================\n");
+    }
+  }
+
+  dump = dump_triggered;
+
   if (ticks < tfp_start)
       dump = 0;
   if (tfp_end != -1)
       if (ticks > tfp_end)
           dump = 0;
+
+  // if (dump && !dump_on) {
+  //     dump_on = 1;
+  //     printf("========================================\n");
+  //     printf("    TRACE DUMP STARTED\n");
+  //     printf("========================================\n");
+  // } else if (!dump && dump_on) {
+  //     dump_on = 0;
+  //     printf("========================================\n");
+  //     printf("    TRACE DUMP FINISHED\n");
+  //     printf("========================================\n");
+  // }
+
   if (dump)
       tfp->dump(ticks);
   ticks++;

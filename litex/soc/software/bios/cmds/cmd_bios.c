@@ -145,3 +145,10 @@ define_command(flush_cpu_dcache, flush_cpu_dcache, "Flush CPU data cache", CACHE
 define_command(flush_l2_cache, flush_l2_cache, "Flush L2 cache", CACHE_CMDS);
 #endif
 
+#ifdef CSR_SIM_TRIGGER_BASE
+static void sim_trigger(int nb_params, char **params)
+{
+  sim_trigger_trigger_write(1);
+}
+define_command(trigger, sim_trigger, "Trigger simulation pin", MISC_CMDS);
+#endif
