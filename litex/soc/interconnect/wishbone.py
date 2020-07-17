@@ -13,7 +13,7 @@ from migen.genlib.misc import split, displacer, chooser, WaitTimer
 
 from litex.build.generic_platform import *
 
-from litex.soc.interconnect import csr
+from litex.soc.interconnect import csr, csr_bus
 
 # Wishbone Definition ------------------------------------------------------------------------------
 
