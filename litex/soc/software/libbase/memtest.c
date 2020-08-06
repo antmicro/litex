@@ -1,3 +1,4 @@
+// This file is Copyright (c) 2020 Antmicro <www.antmicro.com>
 #include "memtest.h"
 
 #include <stdio.h>
@@ -29,6 +30,8 @@
 #endif
 #define MEMTEST_ADDR_RANDOM 0
 
+#include <sim_debug.h>
+
 static unsigned int seed_to_data_32(unsigned int seed, int random)
 {
 	return random ? lfsr(32, seed) : seed + 1;
@@ -41,6 +44,7 @@ static unsigned short seed_to_data_16(unsigned short seed, int random)
 
 int memtest_bus(unsigned int *addr, unsigned long size)
 {
+    sim_mark_func();
 	volatile unsigned int *array = addr;
 	int i, errors;
 	unsigned int rdata;
@@ -86,6 +90,7 @@ int memtest_bus(unsigned int *addr, unsigned long size)
 
 int memtest_addr(unsigned int *addr, unsigned long size, int random)
 {
+    sim_mark_func();
 	volatile unsigned int *array = addr;
 	int i, errors;
 	unsigned short seed_16;
@@ -120,6 +125,7 @@ int memtest_addr(unsigned int *addr, unsigned long size, int random)
 
 int memtest_data(unsigned int *addr, unsigned long size, int random)
 {
+    sim_mark_func();
 	volatile unsigned int *array = addr;
 	int i, errors;
 	unsigned int seed_32;
@@ -221,11 +227,13 @@ int memtest(unsigned int *addr, unsigned long maxsize)
 	unsigned long addr_size = MEMTEST_ADDR_SIZE < maxsize ? MEMTEST_ADDR_SIZE : maxsize;
 	unsigned long data_size = MEMTEST_DATA_SIZE < maxsize ? MEMTEST_DATA_SIZE : maxsize;
 
+    sim_trace(1);
 	printf("Memtest at 0x%p...\n", addr);
-
 	bus_errors  = memtest_bus(addr, bus_size);
+    sim_trace(0);
 	addr_errors = memtest_addr(addr, addr_size, MEMTEST_ADDR_RANDOM);
 	data_errors = memtest_data(addr, data_size, MEMTEST_DATA_RANDOM);
+    sim_finish();
 
 	if(bus_errors + addr_errors + data_errors != 0) {
 		printf("- bus errors:  %d/%ld\n", bus_errors,  2*bus_size/4);

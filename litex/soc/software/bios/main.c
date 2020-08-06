@@ -148,11 +148,11 @@ int main(int i, char **c)
 	spiflash_init();
 #endif
 
-	if(sdr_ok) {
-		printf("--============== \e[1mBoot\e[0m ==================--\n");
-		boot_sequence();
-		printf("\n");
-	}
+	// if(sdr_ok) {
+	//   printf("--============== \e[1mBoot\e[0m ==================--\n");
+	//   boot_sequence();
+	//   printf("\n");
+	// }
 
 	printf("--============= \e[1mConsole\e[0m ================--\n");
 #if !defined(TERM_MINI) && !defined(TERM_NO_HIST)
