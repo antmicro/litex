@@ -526,10 +526,6 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
         ]
 
         # prepare spi transfer
-        self.sync += If(self.out_len.re & (self.out_len.storage != 0) & self.en_quad.storage[0],
-                        self.out_left.eq(Cat(1, self.out_len.storage)
-                        )
-        )
 
         self.sync += If(self.out_len.re & (self.out_len.storage == 0),
                         self.out_left.eq(0)
