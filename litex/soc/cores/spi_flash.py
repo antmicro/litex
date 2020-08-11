@@ -417,6 +417,7 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
             self.comb += bus.dat_r.eq(sr[:wbone_width])
         else:
             self.comb += bus.dat_r.eq(reverse_bytes(sr[:wbone_width]))
+
         hw_read_logic_single = [
             pads.clk.eq(clk),
             pads.cs_n.eq(cs_n),
@@ -514,7 +515,6 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
             (0,
              [queue.status[0].eq(0)]),
         ]
-
 
         write_seq = [
             (4*cmd_width//spi_width*div,
