@@ -395,12 +395,6 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
 
         dq = TSTriple(spi_width)
 
-        sr = Signal(max(cmd_width, addr_width, wbone_width))
-        if endianness == "big":
-            self.comb += bus.dat_r.eq(sr)
-        else:
-            self.comb += bus.dat_r.eq(reverse_bytes(sr))
-
         self.specials.dq0 = Tristate(pads.dq[0], o=dq.o[0], i=dq.i[0], oe=dq.oe)
         self.specials.dq1 = Tristate(pads.dq[1], o=dq.o[1], i=dq.i[1], oe=dq.oe)
         if with_bitbang:
