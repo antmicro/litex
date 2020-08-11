@@ -530,17 +530,17 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
         self.sync += If(self.out_len.re & (self.out_len.storage == 0),
                         self.out_left.eq(0)
         )
-        self.sync += If(self.out_len.re & (self.out_len.storage != 0) & ~self.en_quad.storage[0],
+        self.sync += If(self.out_len.re & (self.out_len.storage != 0),
                         self.out_left.eq(Cat(1, Replicate(0, 2), self.out_len.storage))
         )
-        self.sync += If(self.in_len.re & (self.in_len.storage != 0) & ~self.en_quad.storage[0],
+        self.sync += If(self.in_len.re & (self.in_len.storage != 0),
                         [queue.status[2].eq(1),
                          self.in_left.eq(Cat(Replicate(0, 3), in_len.storage)),
                          self.quad_transfer.eq(0)]
         )
 
         # write data to sr
-        self.sync += If(queue.status[2] & (i == div - 1) & ~self.en_quad.storage[0],
+        self.sync += If(queue.status[2] & (i == div - 1),
                         sr[-max_transfer_size:].eq(self.spi_in.storage), queue.status[2].eq(0), queue.status[3].eq(1), cs_n.eq(0), dq_oe.eq(1))
 
         # count spi to slave transfer cycles
@@ -563,8 +563,8 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
         self.sync += If(~self.mode & bus.cyc & bus.stb & ~bus.we, queue.status[0].eq(1))
         self.sync += If(~self.mode & bus.cyc & bus.stb & bus.we, queue.status[1].eq(1))
 
-        self.sync += timeline(queue.status[0] & ~self.en_quad.storage[0] & (i == div - 1), accumulate_timeline_deltas(read_seq))
-        self.sync += timeline(queue.status[1] & ~self.en_quad.storage[0] & (i == div - 1), accumulate_timeline_deltas(write_seq))
+        self.sync += timeline(queue.status[0] & (i == div - 1), accumulate_timeline_deltas(read_seq))
+        self.sync += timeline(queue.status[1] & (i == div - 1), accumulate_timeline_deltas(write_seq))
 
 # Xilinx 7-Series FPGAs SPI Flash (non-memory-mapped) ----------------------------------------------
 
