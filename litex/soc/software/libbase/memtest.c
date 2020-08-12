@@ -9,6 +9,7 @@
 #include <generated/soc.h>
 #include <generated/csr.h>
 
+// #define MEMTEST_DBG_DEBUG
 // #define MEMTEST_BUS_DEBUG
 // #define MEMTEST_DATA_DEBUG
 // #define MEMTEST_ADDR_DEBUG
@@ -40,6 +41,64 @@ static unsigned int seed_to_data_32(unsigned int seed, int random)
 static unsigned short seed_to_data_16(unsigned short seed, int random)
 {
 	return random ? lfsr(16, seed) : seed + 1;
+}
+
+unsigned int dbg_ref_data(int *counter)
+{
+    // unsigned int ref_data = // e.g. 0x11110000, 0x33332222
+    //         ((*counter+1) << 28) |
+    //         ((*counter+1) << 24) |
+    //         ((*counter+1) << 20) |
+    //         ((*counter+1) << 16) |
+    //         ((*counter+0) << 12) |
+    //         ((*counter+0) <<  8) |
+    //         ((*counter+0) <<  4) |
+    //         ((*counter+0) <<  0);
+    // *counter = (*counter + 2) % 0xf;
+    unsigned int ref_data = // e.g. 0x33221100
+            ((*counter+3) << 28) |
+            ((*counter+3) << 24) |
+            ((*counter+2) << 20) |
+            ((*counter+2) << 16) |
+            ((*counter+1) << 12) |
+            ((*counter+1) <<  8) |
+            ((*counter+0) <<  4) |
+            ((*counter+0) <<  0);
+    *counter = (*counter + 4) % 0xf;
+    return ref_data;
+}
+
+int memtest_dbg(unsigned int *addr, unsigned long size)
+{
+    sim_mark_func();
+
+	volatile unsigned int *array = addr;
+	int i, errors, counter;
+	unsigned int rdata, refdata;
+
+	errors = 0;
+    counter = 0;
+
+	for(i = 0; i < size/4;i++) {
+        refdata = dbg_ref_data(&counter);
+		array[i] = refdata;
+	}
+	flush_cpu_dcache();
+#ifdef CONFIG_L2_SIZE
+	flush_l2_cache();
+#endif
+    counter = 0;
+	for(i = 0; i < size/4; i++) {
+		rdata = array[i];
+        refdata = dbg_ref_data(&counter);
+		if(rdata != refdata) {
+			errors++;
+#ifdef MEMTEST_DBG_DEBUG
+			printf("[bus: 0x%0x]: 0x%08x vs 0x%08x\n", i, rdata, refdata);
+#endif
+		}
+	}
+	return errors;
 }
 
 int memtest_bus(unsigned int *addr, unsigned long size)
@@ -222,29 +281,32 @@ void memspeed(unsigned int *addr, unsigned long size, bool read_only)
 
 int memtest(unsigned int *addr, unsigned long maxsize)
 {
-	int bus_errors, data_errors, addr_errors;
+	int dbg_errors, bus_errors, data_errors, addr_errors;
 	unsigned long bus_size  = MEMTEST_BUS_SIZE < maxsize ? MEMTEST_BUS_SIZE : maxsize;
 	unsigned long addr_size = MEMTEST_ADDR_SIZE < maxsize ? MEMTEST_ADDR_SIZE : maxsize;
 	unsigned long data_size = MEMTEST_DATA_SIZE < maxsize ? MEMTEST_DATA_SIZE : maxsize;
 
-    sim_trace(1);
+	sim_trace(1);
 	printf("Memtest at 0x%p...\n", addr);
-	bus_errors  = memtest_bus(addr, bus_size);
+	dbg_errors = memtest_dbg(addr, bus_size);
     sim_trace(0);
+	bus_errors  = memtest_bus(addr, bus_size);
 	addr_errors = memtest_addr(addr, addr_size, MEMTEST_ADDR_RANDOM);
 	data_errors = memtest_data(addr, data_size, MEMTEST_DATA_RANDOM);
-    sim_finish();
 
-	if(bus_errors + addr_errors + data_errors != 0) {
+	if(dbg_errors + bus_errors + addr_errors + data_errors != 0) {
+		printf("- dbg errors:  %d/%ld\n", dbg_errors,  bus_size/4);
 		printf("- bus errors:  %d/%ld\n", bus_errors,  2*bus_size/4);
 		printf("- addr errors: %d/%ld\n", addr_errors, addr_size/4);
 		printf("- data errors: %d/%ld\n", data_errors, data_size/4);
 		printf("Memtest KO\n");
+		sim_finish();
 		return 0;
 	}
 	else {
 		printf("Memtest OK\n");
 		memspeed(addr, data_size, false);
+		sim_finish();
 		return 1;
 	}
 }
