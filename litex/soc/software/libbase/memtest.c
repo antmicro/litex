@@ -9,8 +9,8 @@
 #include <generated/soc.h>
 #include <generated/csr.h>
 
-// #define MEMTEST_DBG_DEBUG
-// #define MEMTEST_BUS_DEBUG
+#define MEMTEST_DBG_DEBUG
+#define MEMTEST_BUS_DEBUG
 // #define MEMTEST_DATA_DEBUG
 // #define MEMTEST_ADDR_DEBUG
 
@@ -286,9 +286,10 @@ int memtest(unsigned int *addr, unsigned long maxsize)
 	unsigned long addr_size = MEMTEST_ADDR_SIZE < maxsize ? MEMTEST_ADDR_SIZE : maxsize;
 	unsigned long data_size = MEMTEST_DATA_SIZE < maxsize ? MEMTEST_DATA_SIZE : maxsize;
 
-	sim_trace(1);
 	printf("Memtest at 0x%p...\n", addr);
+    sim_trace(1);
 	dbg_errors = memtest_dbg(addr, bus_size);
+	// addr_errors = memtest_addr(addr, addr_size, 1);
     sim_trace(0);
 	bus_errors  = memtest_bus(addr, bus_size);
 	addr_errors = memtest_addr(addr, addr_size, MEMTEST_ADDR_RANDOM);

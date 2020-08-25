@@ -6,6 +6,7 @@
 // This file is Copyright (c) 2018 Jean-François Nguyen <jf@lambdaconcept.fr>
 // This file is Copyright (c) 2018 Sergiusz Bazanski <q3k@q3k.org>
 // This file is Copyright (c) 2018 Tim 'mithro' Ansell <me@mith.ro>
+// This file is Copyright (c) 2020 Antmicro <www.antmicro.com>
 // License: BSD
 
 #include <generated/csr.h>
@@ -794,8 +795,12 @@ int sdrlevel(void)
 }
 #endif
 
+#include <sim_debug.h>
+
 int sdrinit(void)
 {
+    sim_trace(1);
+    sim_mark_func();
 	printf("Initializing DRAM @0x%08x...\n", MAIN_RAM_BASE);
 
 #ifdef CSR_DDRCTRL_BASE
@@ -803,7 +808,9 @@ int sdrinit(void)
 	ddrctrl_init_error_write(0);
 #endif
 	sdrsw();
+
 	init_sequence();
+    sim_trace(0);
 #ifdef CSR_DDRPHY_BASE
 #if CSR_DDRPHY_EN_VTC_ADDR
 	ddrphy_en_vtc_write(0);
