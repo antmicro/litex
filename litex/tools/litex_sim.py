@@ -25,6 +25,7 @@ from litedram import modules as litedram_modules
 from litedram.modules import parse_spd_hexdump
 from litedram.common import *
 from litedram.phy.model import SDRAMPHYModel
+from litedram.frontend.dma import LiteDRAMDMAReader
 
 from liteeth.phy.model import LiteEthPHYModel
 from liteeth.mac import LiteEthMAC
@@ -225,6 +226,30 @@ class SimSoC(SoCCore):
             self.add_constant("MEMTEST_DATA_SIZE", 8*1024)
             self.add_constant("MEMTEST_ADDR_SIZE", 8*1024)
 
+            port = self.sdram.crossbar.get_port()
+            self.submodules.dram_dma = LiteDRAMDMAReader(port)
+
+            class RowHammerDMA(Module, AutoCSR):
+                def __init__(self, dma, bankbits, colbits):
+                    self.enabled = CSRStorage()
+
+                    shift = (colbits + bankbits)
+                    address = [(1 << shift), (2 << shift)]
+
+                    cnt = Signal()
+                    self.sync += If(dma.sink.ready, cnt.eq(cnt + 1))
+
+                    self.comb += [
+                        dma.sink.address.eq(Array(address)[cnt]),
+                        dma.sink.valid.eq(self.enabled.storage),
+                        dma.source.ready.eq(1),
+                    ]
+
+            self.submodules.rowhammer = RowHammerDMA(self.dram_dma,
+                                                     bankbits=sdram_module.geom_settings.bankbits,
+                                                     colbits=sdram_module.geom_settings.colbits)
+            self.add_csr("rowhammer")
+
         #assert not (with_ethernet and with_etherbone)
 
         if with_ethernet and with_etherbone:
@@ -349,7 +374,7 @@ def main():
     soc_kwargs     = soc_sdram_argdict(args)
     builder_kwargs = builder_argdict(args)
 
-    sys_clk_freq = int(1e6)
+    sys_clk_freq = int(100e6)
     sim_config = SimConfig()
     sim_config.add_clocker("sys_clk", freq_hz=sys_clk_freq)
 

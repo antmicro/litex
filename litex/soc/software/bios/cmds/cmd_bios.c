@@ -8,6 +8,7 @@
 #include <sim_debug.h>
 
 #include <generated/csr.h>
+#include <generated/mem.h>
 
 #include "../command.h"
 #include "../helpers.h"
@@ -189,3 +190,69 @@ static void cmd_sim_mark(int nb_params, char **params)
 }
 define_command(mark, cmd_sim_mark, "Set a debug simulation marker", MISC_CMDS);
 #endif
+
+// module: MT41K64M16, 8 banks, 1024 columns
+#define COLBITS 10
+#define BANKBITS 3
+#define ROW_ADDR(x) (MAIN_RAM_BASE + ((x) << (COLBITS + BANKBITS + 2)))
+
+/**
+ * Command "rowhammer"
+ */
+static void rowhammer(int nb_params, char **params)
+{
+	char *c;
+	unsigned int length, i;
+
+	if (nb_params < 1) {
+		printf("rowhammer <length>");
+		return;
+	}
+	length = strtoul(params[0], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect length");
+		return;
+	}
+
+	sim_mark_func();
+	sim_trace(1);
+
+	for (i = 0; i < length; ++i) {
+		*((volatile unsigned int *) ROW_ADDR(1));
+		*((volatile unsigned int *) ROW_ADDR(2));
+// 		flush_cpu_dcache();
+// #ifdef CONFIG_L2_SIZE
+// 		flush_l2_cache();
+// #endif
+	}
+
+	sim_trace(0);
+}
+define_command(rowhammer, rowhammer, "Row Hammer software version", MISC_CMDS);
+
+static void rowhammer_dma(int nb_params, char **params)
+{
+	char *c;
+	unsigned int delay;
+
+	if (nb_params < 1) {
+		printf("rowhammer_dma <delay>");
+		return;
+	}
+	delay = strtoul(params[0], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect delay");
+		return;
+	}
+
+	sim_mark_func();
+	sim_trace(1);
+
+	rowhammer_enabled_write(1);
+	volatile unsigned int i = 0;
+	while (i++ < delay);
+	rowhammer_enabled_write(0);
+
+	sim_trace(0);
+}
+define_command(rowhammer_dma, rowhammer_dma, "Row Hammer DMA version", MISC_CMDS);
