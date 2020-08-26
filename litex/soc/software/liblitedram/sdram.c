@@ -837,4 +837,30 @@ int sdrinit(void)
 	return 1;
 }
 
+void rpcutr(int utr_en, int utr_op)
+{
+    sim_mark_func();
+    sim_trace(1);
+
+	/* RPC special commands: ON */
+	sdram_dfii_pi0_address_write(0x0);
+	sdram_dfii_pi0_baddress_write(0);
+	sdram_dfii_control_write(DFII_CONTROL_ODT);
+
+	/* UTR */
+    utr_en = ((utr_en &  0b1) << 0);
+    utr_op = ((utr_op & 0b11) << 1);
+    printf("utr_en=%d, utr_op=0b%d%d\n", utr_en, (utr_op >> 2) & 1, (utr_op >> 1) & 1);
+	sdram_dfii_pi0_address_write(utr_op | utr_en);
+	sdram_dfii_pi0_baddress_write(0);
+	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
+
+	/* RPC special commands: OFF */
+	sdram_dfii_pi0_address_write(0x0);
+	sdram_dfii_pi0_baddress_write(0);
+	sdram_dfii_control_write(DFII_CONTROL_ODT|DFII_CONTROL_RESET_N);
+
+    sim_trace(0);
+}
+
 #endif

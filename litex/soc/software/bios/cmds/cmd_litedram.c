@@ -280,3 +280,39 @@ static void spdread_handler(int nb_params, char **params)
 }
 define_command(spdread, spdread_handler, "Read SPD EEPROM", LITEDRAM_CMDS);
 #endif
+
+/**
+ * Command "rpcutr"
+ *
+ * Write RPC Utility Register
+ *
+ */
+#ifdef CSR_SDRAM_BASE
+static void rpcutr_handler(int nb_params, char **params)
+{
+	unsigned int utr_en, utr_op;
+	char *c;
+
+	if (nb_params < 1) {
+		printf("rpcutr <utr_en> <utr_op>");
+		return;
+	}
+
+	utr_en = strtoul(params[0], &c, 0);
+	if (*c != 0 || utr_en > 1) {
+		printf("Incorrect UTR_EN");
+		return;
+	}
+
+	utr_op = strtoul(params[1], &c, 0);
+	if (*c != 0 || utr_op > 0b11) {
+		printf("Incorrect UTR_OP");
+		return;
+	}
+
+	rpcutr(utr_en, utr_op);
+}
+
+define_command(rpcutr, rpcutr_handler, "Write RPC Utility Register", LITEDRAM_CMDS);
+#endif
+

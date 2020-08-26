@@ -22,4 +22,6 @@ int sdrlevel(void);
 
 int sdrinit(void);
 
+void rpcutr(int utr_en, int utr_op);
+
 #endif /* __SDRAM_H */
