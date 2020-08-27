@@ -447,6 +447,8 @@ int write_level(void)
 
 #endif /*  SDRAM_PHY_WRITE_LEVELING_CAPABLE */
 
+#if defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
+
 static void read_delay_rst(int module) {
 	/* sel module */
 	ddrphy_dly_sel_write(1 << module);
@@ -709,6 +711,9 @@ static void read_level(int module)
 	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
 	cdelay(15);
 }
+
+#endif /* SDRAM_PHY_READ_LEVELING_CAPABLE */
+
 #endif /* CSR_DDRPHY_BASE */
 
 #endif /* CSR_SDRAM_BASE */
