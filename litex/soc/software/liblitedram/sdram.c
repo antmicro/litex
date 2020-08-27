@@ -868,4 +868,32 @@ void rpcutr(int utr_en, int utr_op)
     sim_trace(0);
 }
 
+void rpcmrs(int cl, int nwr, int zout, int odt, int odt_stb, int csr_fx, int odt_pd) {
+    cl      = (cl      &  0b111) <<  0;
+    nwr     = (nwr     &  0b111) <<  3;
+    zout    = (zout    & 0b1111) <<  6;
+    odt     = (odt     &  0b111) << 10;
+    csr_fx  = (csr_fx  &    0b1) << 13;
+    odt_stb = (odt_stb &    0b1) <<  0;
+    odt_pd  = (odt_pd  &    0b1) <<  1;
+
+    printf("cl      = %d\n", cl      >>  0);
+    printf("nwr     = %d\n", nwr     >>  3);
+    printf("zout    = %d\n", zout    >>  6);
+    printf("odt     = %d\n", odt     >> 10);
+    printf("csr_fx  = %d\n", csr_fx  >> 13);
+    printf("odt_stb = %d\n", odt_stb >>  0);
+    printf("odt_pd  = %d\n", odt_pd  >>  1);
+
+    sim_mark_func();
+    sim_trace(1);
+
+	/* Load Mode Register */
+    sdram_dfii_pi0_address_write(cl|nwr|zout|odt|csr_fx);
+    sdram_dfii_pi0_baddress_write(odt_stb|odt_pd);
+	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
+
+    sim_trace(0);
+}
+
 #endif

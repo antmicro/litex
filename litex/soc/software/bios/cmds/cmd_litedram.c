@@ -212,7 +212,7 @@ define_command(sdrwloff, sdrwloff, "Disable write leveling", LITEDRAM_CMDS);
  * Perform read/write leveling
  *
  */
-#if defined(CSR_DDRPHY_BASE) && defined(CSR_SDRAM_BASE)
+#if defined(CSR_DDRPHY_BASE) && defined(CSR_SDRAM_BASE) && (defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE))
 define_command(sdrlevel, sdrlevel, "Perform read/write leveling", LITEDRAM_CMDS);
 #endif
 
@@ -316,3 +316,37 @@ static void rpcutr_handler(int nb_params, char **params)
 define_command(rpcutr, rpcutr_handler, "Write RPC Utility Register", LITEDRAM_CMDS);
 #endif
 
+#ifdef CSR_SDRAM_BASE
+static void rpcmrs_handler(int nb_params, char **params)
+{
+	char *c;
+    int cl, nwr, zout, odt, odt_stb, csr_fx, odt_pd;
+
+	if (nb_params < 7) {
+		printf("mrs <cl> <nwr> <zout> <odt> <odt_stb> <csr_fx> <odt_pd>");
+		return;
+	}
+
+#define _parse_arg(name, i, max) do {                       \
+        name = strtoul(params[i], &c, 0);                   \
+        if (*c != 0 || name > (max)) {                      \
+            printf("Incorrect " #name ", max = %d", (max)); \
+            return;                                         \
+        }                                                   \
+        printf(#name " = %d\n", name);                      \
+    } while (0);
+
+    _parse_arg(cl,      0, 0b111);
+    _parse_arg(nwr,     1, 0b111);
+    _parse_arg(zout,    2, 0b1111);
+    _parse_arg(odt,     3, 0b111);
+    _parse_arg(csr_fx,  4, 0b1);
+    _parse_arg(odt_stb, 5, 0b1);
+    _parse_arg(odt_pd,  6, 0b1);
+
+#undef _parse_arg
+
+    rpcmrs(cl, nwr, zout, odt, odt_stb, csr_fx, odt_pd);
+}
+define_command(rpcmrs, rpcmrs_handler, "Write RPC Mode Register", LITEDRAM_CMDS);
+#endif
