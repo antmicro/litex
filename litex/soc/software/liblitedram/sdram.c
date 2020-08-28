@@ -845,6 +845,11 @@ void rpcutr(int utr_en, int utr_op)
 {
     sim_mark_func();
 
+	/* Precharge ALL */
+	sdram_dfii_pi0_address_write(0x400);
+	sdram_dfii_pi0_baddress_write(0);
+	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
+
 	/* RPC special commands: ON */
 	sdram_dfii_pi0_address_write(0x0);
 	sdram_dfii_pi0_baddress_write(0);
