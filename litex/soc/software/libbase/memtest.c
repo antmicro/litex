@@ -285,11 +285,11 @@ int memtest(unsigned int *addr, unsigned long maxsize)
 	unsigned long bus_size  = MEMTEST_BUS_SIZE < maxsize ? MEMTEST_BUS_SIZE : maxsize;
 	unsigned long addr_size = MEMTEST_ADDR_SIZE < maxsize ? MEMTEST_ADDR_SIZE : maxsize;
 	unsigned long data_size = MEMTEST_DATA_SIZE < maxsize ? MEMTEST_DATA_SIZE : maxsize;
+    int trace_on = sim_trace_on();
+    int ret;
 
 	printf("Memtest at 0x%p...\n", addr);
-    sim_trace(1);
 	dbg_errors = memtest_dbg(addr, bus_size);
-	// addr_errors = memtest_addr(addr, addr_size, 1);
     sim_trace(0);
 	bus_errors  = memtest_bus(addr, bus_size);
 	addr_errors = memtest_addr(addr, addr_size, MEMTEST_ADDR_RANDOM);
@@ -301,13 +301,15 @@ int memtest(unsigned int *addr, unsigned long maxsize)
 		printf("- addr errors: %d/%ld\n", addr_errors, addr_size/4);
 		printf("- data errors: %d/%ld\n", data_errors, data_size/4);
 		printf("Memtest KO\n");
-		sim_finish();
-		return 0;
+		// sim_finish();
+		ret = 0;
 	}
 	else {
 		printf("Memtest OK\n");
 		memspeed(addr, data_size, false);
-		sim_finish();
-		return 1;
+		ret = 1;
 	}
+    // sim_finish();
+    sim_trace(trace_on);
+    return ret;
 }

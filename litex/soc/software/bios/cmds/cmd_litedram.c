@@ -350,3 +350,33 @@ static void rpcmrs_handler(int nb_params, char **params)
 }
 define_command(rpcmrs, rpcmrs_handler, "Write RPC Mode Register", LITEDRAM_CMDS);
 #endif
+
+#include <memtest.h>
+
+#ifdef CSR_SDRAM_BASE
+static void rpctest(int nb_params, char **params)
+{
+	char *c;
+
+	if (nb_params < 0) {
+		printf("rpctest");
+		return;
+	}
+
+    sim_trace(1);
+
+#define UTR(en, op) do { sdrsw(); rpcutr(en, op); sdrhw(); } while(0)
+
+    UTR(1, 1);
+    // memtest((unsigned int *) MAIN_RAM_BASE, MAIN_RAM_SIZE);
+	dump_bytes((unsigned int *) MAIN_RAM_BASE, 0x200, (unsigned long) MAIN_RAM_BASE);
+	UTR(0, 0);
+    // memtest((unsigned int *) MAIN_RAM_BASE, MAIN_RAM_SIZE);
+	dump_bytes((unsigned int *) MAIN_RAM_BASE, 0x200, (unsigned long) MAIN_RAM_BASE);
+
+#undef UTR
+
+    sim_trace(0);
+}
+define_command(rpctest, rpctest, "RPC test", LITEDRAM_CMDS);
+#endif

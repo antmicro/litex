@@ -804,8 +804,8 @@ int sdrlevel(void)
 
 int sdrinit(void)
 {
-    sim_trace(1);
     sim_mark_func();
+
 	printf("Initializing DRAM @0x%08x...\n", MAIN_RAM_BASE);
 
 #ifdef CSR_DDRCTRL_BASE
@@ -815,7 +815,6 @@ int sdrinit(void)
 	sdrsw();
 
 	init_sequence();
-    sim_trace(0);
 #ifdef CSR_DDRPHY_BASE
 #if CSR_DDRPHY_EN_VTC_ADDR
 	ddrphy_en_vtc_write(0);
@@ -845,7 +844,6 @@ int sdrinit(void)
 void rpcutr(int utr_en, int utr_op)
 {
     sim_mark_func();
-    sim_trace(1);
 
 	/* RPC special commands: ON */
 	sdram_dfii_pi0_address_write(0x0);
@@ -864,11 +862,14 @@ void rpcutr(int utr_en, int utr_op)
 	sdram_dfii_pi0_address_write(0x0);
 	sdram_dfii_pi0_baddress_write(0);
 	sdram_dfii_control_write(DFII_CONTROL_ODT|DFII_CONTROL_RESET_N);
-
-    sim_trace(0);
 }
 
 void rpcmrs(int cl, int nwr, int zout, int odt, int odt_stb, int csr_fx, int odt_pd) {
+    int trace_on = sim_trace_on();
+    sim_mark_func();
+
+    sim_trace(0);
+
     cl      = (cl      &  0b111) <<  0;
     nwr     = (nwr     &  0b111) <<  3;
     zout    = (zout    & 0b1111) <<  6;
@@ -885,15 +886,12 @@ void rpcmrs(int cl, int nwr, int zout, int odt, int odt_stb, int csr_fx, int odt
     printf("odt_stb = %d\n", odt_stb >>  0);
     printf("odt_pd  = %d\n", odt_pd  >>  1);
 
-    sim_mark_func();
-    sim_trace(1);
+    sim_trace(trace_on);
 
 	/* Load Mode Register */
     sdram_dfii_pi0_address_write(cl|nwr|zout|odt|csr_fx);
     sdram_dfii_pi0_baddress_write(odt_stb|odt_pd);
 	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
-
-    sim_trace(0);
 }
 
 #endif
