@@ -488,7 +488,7 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
                If(self.quad_transfer,
                   sr.eq(Cat(dqi, sr[:-spi_width]))
                ).Else(
-                   sr.eq(Cat(dqi[1], sr[:-1]))
+                   sr.eq(Cat(dqi[1], sr[:-1], Replicate(1,3)))
                   )
             ).Else(
                 i.eq(i + 1),
@@ -526,6 +526,11 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
         ]
 
         # prepare spi transfer
+        self.sync += If(self.in_len.re & (self.in_len.storage != 0),
+                        [queue.status[2].eq(1),
+                         self.in_left.eq(Cat(Replicate(0, 3), in_len.storage)),
+                         self.quad_transfer.eq(0)]
+        )
 
         self.sync += If(self.out_len.re & (self.out_len.storage == 0),
                         self.out_left.eq(0)
@@ -533,14 +538,9 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
         self.sync += If(self.out_len.re & (self.out_len.storage != 0),
                         self.out_left.eq(Cat(1, Replicate(0, 2), self.out_len.storage))
         )
-        self.sync += If(self.in_len.re & (self.in_len.storage != 0),
-                        [queue.status[2].eq(1),
-                         self.in_left.eq(Cat(Replicate(0, 3), in_len.storage)),
-                         self.quad_transfer.eq(0)]
-        )
 
         # write data to sr
-        self.sync += If(queue.status[2] & (i == div - 1),
+        self.sync += If(queue.status[2] & ~queue.status[1] & (i == div - 1),
                         sr[-max_transfer_size:].eq(self.spi_in.storage), queue.status[2].eq(0), queue.status[3].eq(1), cs_n.eq(0), dq_oe.eq(1))
 
         # count spi to slave transfer cycles
@@ -548,8 +548,9 @@ class SpiFlashQuadReadWrite(SpiFlashCommon, AutoCSR):
         # count spi to master transfer cycles
         self.sync += If(queue.status[3] & (self.in_left < 1) & (self.out_left > 0) & (i == div - 1), self.out_left.eq(self.out_left - 1), dq_oe.eq(0))
 
+        self.sync += If(queue.status[3] & (in_left <= 1) & (out_left <= 1) & (i == div - 1), cs_n.eq(1))        
         #end transmision and read data from sr
-        self.sync += If(~self.in_len.re & (in_left < 1) & (out_left < 1) & queue.status[3], queue.status[3].eq(0), cs_n.eq(1),
+        self.sync += If(~self.in_len.re & (in_left < 1) & (out_left < 1) & queue.status[3], queue.status[3].eq(0), dq_oe.eq(0),
                         If(self.out_len.storage == 1, self.spi_out.status.eq(Cat(Replicate(0, 8*7), sr))
                         ).Elif(self.out_len.storage == 2, self.spi_out.status.eq(Cat(Replicate(0, 8*6), sr))
                         ).Elif(self.out_len.storage == 3, self.spi_out.status.eq(Cat(Replicate(0, 8*5), sr))
