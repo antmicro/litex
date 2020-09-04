@@ -358,6 +358,7 @@ static void rpctest(int nb_params, char **params)
 {
 	char *c;
     unsigned int utr_en;
+    unsigned int i;
 
 	if (nb_params < 0) {
 		printf("rpctest <utr_en>");
@@ -376,8 +377,12 @@ static void rpctest(int nb_params, char **params)
 
     UTR(utr_en, utr_en);
     // memtest((unsigned int *) MAIN_RAM_BASE, MAIN_RAM_SIZE);
-	dump_bytes((unsigned int *) MAIN_RAM_BASE + 0x1111, 0x100, (unsigned long) MAIN_RAM_BASE + 0x1111);
+	dump_bytes((unsigned int *) MAIN_RAM_BASE + 0x1111, 0x40, (unsigned long) MAIN_RAM_BASE + 0x1111);
+    for (i = 0; i < 8; ++i) {
+        *((unsigned int *) MAIN_RAM_BASE + 0x1111 + i) = 0xaabbcc00 + i;
+    }
 	UTR(0, 0);
+
 
 #undef UTR
 

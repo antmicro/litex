@@ -289,6 +289,7 @@ int memtest(unsigned int *addr, unsigned long maxsize)
     int ret;
 
 	printf("Memtest at 0x%p...\n", addr);
+    sim_trace(1);
 	dbg_errors = memtest_dbg(addr, bus_size);
     sim_trace(0);
 	bus_errors  = memtest_bus(addr, bus_size);
@@ -301,7 +302,6 @@ int memtest(unsigned int *addr, unsigned long maxsize)
 		printf("- addr errors: %d/%ld\n", addr_errors, addr_size/4);
 		printf("- data errors: %d/%ld\n", data_errors, data_size/4);
 		printf("Memtest KO\n");
-		// sim_finish();
 		ret = 0;
 	}
 	else {

@@ -804,6 +804,7 @@ int sdrlevel(void)
 
 int sdrinit(void)
 {
+    sim_trace(1);
     sim_mark_func();
 
 	printf("Initializing DRAM @0x%08x...\n", MAIN_RAM_BASE);
@@ -832,12 +833,14 @@ int sdrinit(void)
 		ddrctrl_init_done_write(1);
 		ddrctrl_init_error_write(1);
 #endif
+        sim_trace(0);
 		return 0;
 	}
 #ifdef CSR_DDRCTRL_BASE
 	ddrctrl_init_done_write(1);
 #endif
 
+    sim_trace(0);
 	return 1;
 }
 
