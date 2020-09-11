@@ -133,7 +133,7 @@ int main(int i, char **c)
 #ifdef CSR_ETHMAC_BASE
 	eth_init();
 #endif
-#ifdef CSR_SDRAM_BASE
+#if defined(CSR_SDRAM_BASE) && !defined(CSR_ANALYZER_BASE)
 	sdr_ok = sdrinit();
 #else
 #endif
