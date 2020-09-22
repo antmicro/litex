@@ -20,10 +20,11 @@ class I2CMaster(Module, AutoCSR):
     (I2C_OE, I2C_W). Software get back SDA value with the read CSRStatus (_r).
     """
     pads_layout = [("scl", 1), ("sda", 1)]
-    def __init__(self, pads=None):
+    def __init__(self, pads=None, tristate_scl=False):
         if pads is None:
             pads = Record(self.pads_layout)
         self.pads = pads
+        self._tristate_scl = tristate_scl
         self._w = CSRStorage(fields=[
             CSRField("scl", size=1, offset=0),
             CSRField("oe",  size=1, offset=1),
@@ -40,11 +41,14 @@ class I2CMaster(Module, AutoCSR):
         _sda_oe = Signal()
         _sda_r  = Signal()
         self.comb += [
-            pads.scl.eq(self._w.fields.scl),
             _sda_oe.eq( self._w.fields.oe),
             _sda_w.eq(  self._w.fields.sda),
             self._r.fields.sda.eq(_sda_r),
         ]
+        if self._tristate_scl:
+            self.specials += Tristate(pads.scl, self._w.fields.scl, Constant(1))
+        else:
+            self.comb += pads.scl.eq(self._w.fields.scl),
         self.specials += Tristate(pads.sda, _sda_w, _sda_oe, _sda_r)
 
 

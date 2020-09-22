@@ -101,29 +101,29 @@ _io = [
         Subsignal("a", Pins(
             "R2 M6 N4 T1 N6 R7 V6 U7",
             "R8 V7 R6 U6 T6 T8"),
-            IOStandard("SSTL135")),
-        Subsignal("ba",    Pins("R1 P4 P2"), IOStandard("SSTL135")),
-        Subsignal("ras_n", Pins("P3"), IOStandard("SSTL135")),
-        Subsignal("cas_n", Pins("M4"), IOStandard("SSTL135")),
-        Subsignal("we_n",  Pins("P5"), IOStandard("SSTL135")),
-        Subsignal("cs_n",  Pins("U8"), IOStandard("SSTL135")),
-        Subsignal("dm", Pins("L1 U1"), IOStandard("SSTL135")),
+            IOStandard("SSTL15")),
+        Subsignal("ba",    Pins("R1 P4 P2"), IOStandard("SSTL15")),
+        Subsignal("ras_n", Pins("P3"), IOStandard("SSTL15")),
+        Subsignal("cas_n", Pins("M4"), IOStandard("SSTL15")),
+        Subsignal("we_n",  Pins("P5"), IOStandard("SSTL15")),
+        Subsignal("cs_n",  Pins("U8"), IOStandard("SSTL15")),
+        Subsignal("dm", Pins("L1 U1"), IOStandard("SSTL15")),
         Subsignal("dq", Pins(
             "K5 L3 K3 L6 M3 M1 L4 M2",
             "V4 T5 U4 V5 V1 T3 U3 R3"),
-            IOStandard("SSTL135"),
+            IOStandard("SSTL15"),
             Misc("IN_TERM=UNTUNED_SPLIT_40")),
         Subsignal("dqs_p", Pins("N2 U2"),
-            IOStandard("DIFF_SSTL135"),
+            IOStandard("DIFF_SSTL15"),
             Misc("IN_TERM=UNTUNED_SPLIT_40")),
         Subsignal("dqs_n", Pins("N1 V2"),
-            IOStandard("DIFF_SSTL135"),
+            IOStandard("DIFF_SSTL15"),
             Misc("IN_TERM=UNTUNED_SPLIT_40")),
-        Subsignal("clk_p", Pins("U9"), IOStandard("DIFF_SSTL135")),
-        Subsignal("clk_n", Pins("V9"), IOStandard("DIFF_SSTL135")),
-        Subsignal("cke",   Pins("N5"), IOStandard("SSTL135")),
-        Subsignal("odt",   Pins("R5"), IOStandard("SSTL135")),
-        Subsignal("reset_n", Pins("K6"), IOStandard("SSTL135")),
+        Subsignal("clk_p", Pins("U9"), IOStandard("DIFF_SSTL15")),
+        Subsignal("clk_n", Pins("V9"), IOStandard("DIFF_SSTL15")),
+        Subsignal("cke",   Pins("N5"), IOStandard("SSTL15")),
+        Subsignal("odt",   Pins("R5"), IOStandard("SSTL15")),
+        Subsignal("reset_n", Pins("K6"), IOStandard("SSTL15")),
         Misc("SLEW=FAST"),
     ),
 
@@ -317,7 +317,7 @@ class Platform(XilinxPlatform):
             ["write_cfgmem -force -format bin -interface spix4 -size 16 "
              "-loadbit \"up 0x0 {build_name}.bit\" -file {build_name}.bin"]
         if toolchain == "vivado": # FIXME
-            self.add_platform_command("set_property INTERNAL_VREF 0.675 [get_iobanks 34]")
+            self.add_platform_command("set_property INTERNAL_VREF 0.75 [get_iobanks 34]")
 
     def create_programmer(self):
         bscan_spi = "bscan_spi_xc7a100t.bit" if "xc7a100t" in self.device else "bscan_spi_xc7a35t.bit"

@@ -146,3 +146,95 @@ static void i2cscan_handler(int nb_params, char **params)
 }
 define_command(i2cscan, i2cscan_handler, "Scan for I2C slaves", I2C_CMDS);
 #endif
+
+#ifdef CSR_I2C_BASE
+static void rpc_ddrvcc_read(int nb_params, char **params)
+{
+	unsigned char vbuck2_a, vbuck2_b;
+
+	i2c_read(0x58, 0xa3, &vbuck2_a, 1, true);
+	i2c_read(0x58, 0xb4, &vbuck2_b, 1, true);
+
+#define BUCK_mV(val) (300 + 10 * (val))
+	printf("DDRVCC settings:\n");
+	printf("  buck2[A] = %d.%d\n", BUCK_mV(vbuck2_a) / 1000, BUCK_mV(vbuck2_a) % 1000);
+	printf("  buck2[B] = %d.%d\n", BUCK_mV(vbuck2_b) / 1000, BUCK_mV(vbuck2_b) % 1000);
+#undef BUCK_mV
+}
+define_command(ddrvcc_rd, rpc_ddrvcc_read, "DDRVCC read A/B voltages", I2C_CMDS);
+#endif
+
+/*
+ * Originally there are 2 voltages controller by R261/R266: A = 1.5V, B = 1.35V,
+ * B is used by default on Arty.
+ */
+#ifdef CSR_I2C_BASE
+static void rpc_ddrvcc_swap(int nb_params, char **params)
+{
+	unsigned int vbuck2_a, vbuck2_b;
+	i2c_read(0x58, 0xa3, &vbuck2_a, 1, true);
+	i2c_read(0x58, 0xb4, &vbuck2_b, 1, true);
+	i2c_write(0x58, 0xa3, &vbuck2_b, 1);
+	i2c_write(0x58, 0xb4, &vbuck2_a, 1);
+}
+define_command(ddrvcc_swp, rpc_ddrvcc_swap, "DDRVCC swap A/B voltages", I2C_CMDS);
+#endif
+
+/*
+ * Set both voltages to 1.5V (independent of R261/R266 resistors)
+ */
+#ifdef CSR_I2C_BASE
+static void rpc_ddrvcc_15(int nb_params, char **params)
+{
+	unsigned int vbuck2_15 = 0x78;
+	i2c_write(0x58, 0xa3, &vbuck2_15, 1);
+	i2c_write(0x58, 0xb4, &vbuck2_15, 1);
+}
+define_command(ddrvcc_15, rpc_ddrvcc_15, "DDRVCC 1.5V", I2C_CMDS);
+#endif
+
+/*
+ * Set both voltages to 1.35V (independent of R261/R266 resistors)
+ */
+#ifdef CSR_I2C_BASE
+static void rpc_ddrvcc_135(int nb_params, char **params)
+{
+	unsigned int vbuck2_135 = 0x69;
+	i2c_write(0x58, 0xa3, &vbuck2_135, 1);
+	i2c_write(0x58, 0xb4, &vbuck2_135, 1);
+}
+define_command(ddrvcc_135, rpc_ddrvcc_135, "DDRVCC 1.35V", I2C_CMDS);
+#endif
+
+/*
+ * DA9062 configuration is not persistent (?) so in order to reset the RPC DRAM chip,
+ * we can disable and enable buck 2 voltage.
+ */
+#ifdef CSR_I2C_BASE
+static void rpc_ddrvcc_enable(int nb_params, char **params)
+{
+	char *c;
+	unsigned int en;
+	unsigned int buck2_cont;
+
+	if (nb_params < 1) {
+		printf("ddrvcc_en <en>");
+		return;
+	}
+
+	en = strtoul(params[0], &c, 0);
+	if (*c != 0 || en > 1) {
+		printf("Incorrect value");
+		return;
+	}
+
+	i2c_read(0x58, 0x20, &buck2_cont, 1, true);
+	if (en) {
+		buck2_cont |= 1u;
+	} else {
+		buck2_cont &= ~1u;
+	}
+	i2c_write(0x58, 0x20, &buck2_cont, 1);
+}
+define_command(ddrvcc_en, rpc_ddrvcc_enable, "DDRVCC enable/disable", I2C_CMDS);
+#endif
