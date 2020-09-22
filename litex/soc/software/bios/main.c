@@ -151,6 +151,22 @@ int main(int i, char **c)
 	//   printf("\n");
 	// }
 
+	printf("--=========== \e[1mDDR voltage\e[0m ==============--\n");
+	// configure 1.5V DDRVCC for RPC DRAM chip
+	unsigned int j;
+	const char *enable = "1", *disable = "0";
+
+	command_dispatcher("ddrvcc_en", 1, &disable);
+
+	printf("Setting DDRVCC = 1.5V\n");
+	command_dispatcher("ddrvcc_15", 0, NULL);
+	for (j = 0; j < CONFIG_CLOCK_FREQUENCY/2; ++j) {
+		__asm__ volatile(CONFIG_CPU_NOP);
+	}
+
+	command_dispatcher("ddrvcc_en", 1, &enable);
+	printf("\n");
+
 	printf("--============= \e[1mConsole\e[0m ================--\n");
 #if !defined(TERM_MINI) && !defined(TERM_NO_HIST)
 	hist_init();
