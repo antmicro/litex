@@ -151,6 +151,8 @@ int main(int i, char **c)
 	//   printf("\n");
 	// }
 
+    // FIXME: this way we prevent the long waiting inside a simulation
+#if defined(CSR_SDRAM_BASE) && defined(CSR_ANALYZER_BASE)
 	printf("--=========== \e[1mDDR voltage\e[0m ==============--\n");
 	// configure 1.5V DDRVCC for RPC DRAM chip
 	unsigned int j;
@@ -166,6 +168,7 @@ int main(int i, char **c)
 
 	command_dispatcher("ddrvcc_en", 1, &enable);
 	printf("\n");
+#endif
 
 	printf("--============= \e[1mConsole\e[0m ================--\n");
 #if !defined(TERM_MINI) && !defined(TERM_NO_HIST)
