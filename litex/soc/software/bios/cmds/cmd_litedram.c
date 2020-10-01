@@ -356,33 +356,16 @@ define_command(rpcmrs, rpcmrs_handler, "Write RPC Mode Register", LITEDRAM_CMDS)
 #ifdef CSR_SDRAM_BASE
 static void rpctest(int nb_params, char **params)
 {
-	char *c;
-    unsigned int utr_en;
     unsigned int i;
-
-	if (nb_params < 0) {
-		printf("rpctest <utr_en>");
-		return;
-	}
-
-	utr_en = strtoul(params[0], &c, 0);
-	if (*c != 0 || utr_en > 1) {
-		printf("Incorrect UTR_EN");
-		return;
-	}
 
     sim_trace(1);
 
 #define UTR(en, op) do { sdrsw(); rpcutr(en, op); sdrhw(); } while(0)
 
-    UTR(utr_en, utr_en);
+    UTR(1, 0);
     // memtest((unsigned int *) MAIN_RAM_BASE, MAIN_RAM_SIZE);
 	dump_bytes((unsigned int *) MAIN_RAM_BASE + 0x1111, 0x40, (unsigned long) MAIN_RAM_BASE + 0x1111);
-    for (i = 0; i < 8; ++i) {
-        *((unsigned int *) MAIN_RAM_BASE + 0x1111 + i) = 0xaabbcc00 + i;
-    }
 	UTR(0, 0);
-
 
 #undef UTR
 
