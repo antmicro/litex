@@ -379,38 +379,45 @@ static void rdly_handler(int nb_params, char **params)
 {
 	char *c;
     unsigned int i;
-    unsigned int rdly_dq, rdly_dq_bitslip;
+	unsigned int rdly_dq_bitslip;
+    unsigned int rdly_dq = 0;
 
-	if (nb_params < 2) {
-		printf("rdly <rdly_dq> <rdly_dq_bitslip>");
+	if (nb_params < 1) {
+		printf("rdly <rdly_dq_bitslip> [<rdly_dq>]");
 		return;
 	}
 
-	rdly_dq = strtoul(params[0], &c, 0);
-	if (*c != 0 || rdly_dq > 31) {
-		printf("Incorrect rdly_dq");
-		return;
-	}
-
-	rdly_dq_bitslip = strtoul(params[1], &c, 0);
+	rdly_dq_bitslip = strtoul(params[0], &c, 0);
 	if (*c != 0 || rdly_dq_bitslip > 31) {
 		printf("Incorrect rdly_dq_bitslip");
 		return;
 	}
 
-	printf("Setting rdly_dq=%d rdly_dq_bitslip=%d\n", rdly_dq, rdly_dq_bitslip);
-
-	ddrphy_dly_sel_write(0b11);
-	ddrphy_rdly_dq_rst_write(1);
-	for (int i = 0; i < rdly_dq; ++i) {
-		ddrphy_rdly_dq_inc_write(1);
+	if (nb_params > 1) {
+		rdly_dq = strtoul(params[1], &c, 0);
+		if (*c != 0 || rdly_dq > 31) {
+			printf("Incorrect rdly_dq");
+			return;
+		}
 	}
 
+	printf("Setting rdly_dq_bitslip=%d\n", rdly_dq_bitslip);
 	ddrphy_dly_sel_write(0b11);
 	ddrphy_rdly_dq_bitslip_rst_write(1);
 	for (int i = 0; i < rdly_dq_bitslip; ++i) {
 		ddrphy_rdly_dq_bitslip_write(1);
 	}
+
+#ifdef CSR_DDRPHY_RDLY_DQ_RST_ADDR
+	printf("Setting rdly_dq=%d\n", rdly_dq);
+	ddrphy_dly_sel_write(0b11);
+	ddrphy_rdly_dq_rst_write(1);
+	for (int i = 0; i < rdly_dq; ++i) {
+		ddrphy_rdly_dq_inc_write(1);
+	}
+#else
+	printf("Read delay CSR not available!\n");
+#endif
 }
 define_command(rdly, rdly_handler, "Set read delays", LITEDRAM_CMDS);
 #endif
