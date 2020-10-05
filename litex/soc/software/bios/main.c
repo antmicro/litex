@@ -76,6 +76,7 @@ int main(int i, char **c)
 	struct command_struct *cmd;
 	int nb_params;
 	int sdr_ok;
+	int sys_clk_freq_mhz, sys_clk_freq_mhz_frac;
 
 #ifdef CONFIG_CPU_HAS_INTERRUPT
 	irq_setmask(0);
@@ -99,29 +100,49 @@ int main(int i, char **c)
 	// printf(" Migen git sha1: "MIGEN_GIT_SHA1"\n");
 	// printf(" LiteX git sha1: "LITEX_GIT_SHA1"\n");
 	// printf("\n");
-	printf("--=============== \e[1mSoC\e[0m ==================--\n");
-	printf("\e[1mCPU\e[0m:\t\t%s @ %dMHz\n",
+	// printf("--=============== \e[1mSoC\e[0m ==================--\n");
+	printf("\n\n\e[1mCPU\e[0m:\t\t%s @ %dMHz\n",
 		CONFIG_CPU_HUMAN_NAME,
 		CONFIG_CLOCK_FREQUENCY/1000000);
+#ifdef CSR_CRG_COUNTERS_RUN_ADDR
+	{
+		unsigned int ref_start, sys_start, ref_end, sys_end, i;
+		crg_counters_run_write(0);
+		ref_start = crg_ref_clk_counter_read();
+		sys_start = crg_sys_clk_counter_read();
+		crg_counters_run_write(1);
+		for (i = 0; i < 1000; ++i) {
+			__asm__ volatile(CONFIG_CPU_NOP);
+		}
+		crg_counters_run_write(0);
+		ref_end = crg_ref_clk_counter_read();
+		sys_end = crg_sys_clk_counter_read();
+		// 200MHz ref clk
+		sys_clk_freq_mhz = (sys_end - sys_start) * 2000ul / (ref_end - ref_start);
+		sys_clk_freq_mhz_frac = sys_clk_freq_mhz%10;
+		sys_clk_freq_mhz /= 10;
+	}
+#endif
+	printf("measured:\t\t %d.%dMHz\n", sys_clk_freq_mhz, sys_clk_freq_mhz_frac);
 	// printf("\e[1mBUS\e[0m:\t\t%s %d-bit @ %dGiB\n",
 	// 	CONFIG_BUS_STANDARD,
 	// 	CONFIG_BUS_DATA_WIDTH,
 	// 	(1 << (CONFIG_BUS_ADDRESS_WIDTH - 30)));
 	// printf("\e[1mCSR\e[0m:\t\t%d-bit data\n",
 	// 	CONFIG_CSR_DATA_WIDTH);
-	printf("\e[1mROM\e[0m:\t\t%dKiB\n", ROM_SIZE/1024);
-	printf("\e[1mSRAM\e[0m:\t\t%dKiB\n", SRAM_SIZE/1024);
+	// printf("\e[1mROM\e[0m:\t\t%dKiB\n", ROM_SIZE/1024);
+	// printf("\e[1mSRAM\e[0m:\t\t%dKiB\n", SRAM_SIZE/1024);
 #ifdef CONFIG_L2_SIZE
-	printf("\e[1mL2\e[0m:\t\t%dKiB\n", CONFIG_L2_SIZE/1024);
+	// printf("\e[1mL2\e[0m:\t\t%dKiB\n", CONFIG_L2_SIZE/1024);
 #endif
 #ifdef MAIN_RAM_SIZE
 #ifdef CSR_SDRAM_BASE
-	printf("\e[1mSDRAM\e[0m:\t\t%dKiB %d-bit @ %dMbps/pin\n",
-		MAIN_RAM_SIZE/1024,
-		sdrdatabits(),
-		sdrfreq()/1000000);
+	// printf("\e[1mSDRAM\e[0m:\t\t%dKiB %d-bit @ %dMbps/pin\n",
+		// MAIN_RAM_SIZE/1024,
+		// sdrdatabits(),
+		// sdrfreq()/1000000);
 #else
-	printf("\e[1mMAIN-RAM\e[0m:\t%dKiB \n", MAIN_RAM_SIZE/1024);
+	// printf("\e[1mMAIN-RAM\e[0m:\t%dKiB \n", MAIN_RAM_SIZE/1024);
 #endif
 #endif
 	printf("\n");
@@ -130,14 +151,14 @@ int main(int i, char **c)
 
     // FIXME: this way we prevent the long waiting inside a simulation
 #if defined(CSR_SDRAM_BASE) && defined(CSR_ANALYZER_BASE)
-	printf("--=========== \e[1mDDR voltage\e[0m ==============--\n");
+	// printf("--=========== \e[1mDDR voltage\e[0m ==============--\n");
 	// configure 1.5V DDRVCC for RPC DRAM chip
 	unsigned int j;
 	const char *enable = "1", *disable = "0";
 
 	command_dispatcher("ddrvcc_en", 1, &disable);
 
-	printf("Setting DDRVCC = 1.5V\n");
+	printf("DDRVCC = 1.5V\n");
 	command_dispatcher("ddrvcc_15", 0, NULL);
 	for (j = 0; j < CONFIG_CLOCK_FREQUENCY/2; ++j) {
 		__asm__ volatile(CONFIG_CPU_NOP);
@@ -148,7 +169,7 @@ int main(int i, char **c)
 #endif
 
 #if defined(CSR_ETHMAC_BASE) || defined(CSR_SDRAM_BASE)
-    printf("--========== \e[1mInitialization\e[0m ============--\n");
+    // printf("--========== \e[1mInitialization\e[0m ============--\n");
 #ifdef CSR_ETHMAC_BASE
 	eth_init();
 #endif
@@ -157,7 +178,7 @@ int main(int i, char **c)
 #else
 #endif
 	if (sdr_ok !=1)
-		printf("Memory initialization failed\n");
+		printf("init failed\n");
 	printf("\n");
 #endif
 #ifdef CSR_SPIFLASH_MMAP_BASE
@@ -170,7 +191,7 @@ int main(int i, char **c)
 	//   printf("\n");
 	// }
 
-	printf("--============= \e[1mConsole\e[0m ================--\n");
+	// printf("--============= \e[1mConsole\e[0m ================--\n");
 #if !defined(TERM_MINI) && !defined(TERM_NO_HIST)
 	hist_init();
 #endif
