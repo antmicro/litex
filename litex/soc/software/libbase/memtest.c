@@ -292,6 +292,7 @@ int memtest(unsigned int *addr, unsigned long maxsize)
     sim_trace(1);
 	dbg_errors = memtest_dbg(addr, bus_size);
     sim_trace(0);
+    sim_finish();
 	bus_errors  = memtest_bus(addr, bus_size);
 	addr_errors = memtest_addr(addr, addr_size, MEMTEST_ADDR_RANDOM);
 	data_errors = memtest_data(addr, data_size, MEMTEST_DATA_RANDOM);
@@ -309,7 +310,6 @@ int memtest(unsigned int *addr, unsigned long maxsize)
 		memspeed(addr, data_size, false);
 		ret = 1;
 	}
-    // sim_finish();
     sim_trace(trace_on);
     return ret;
 }
