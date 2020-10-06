@@ -150,7 +150,7 @@ int main(int i, char **c)
         sdr_ok = 1;
 
     // FIXME: this way we prevent the long waiting inside a simulation
-#if defined(CSR_SDRAM_BASE) && defined(CSR_ANALYZER_BASE)
+#if defined(CSR_SDRAM_BASE) && defined(SET_DDR_VCC_15)
 	// printf("--=========== \e[1mDDR voltage\e[0m ==============--\n");
 	// configure 1.5V DDRVCC for RPC DRAM chip
 	unsigned int j;
