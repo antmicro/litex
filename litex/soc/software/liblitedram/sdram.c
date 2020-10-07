@@ -54,13 +54,13 @@ int sdrfreq(void) {
 void sdrsw(void)
 {
 	sdram_dfii_control_write(DFII_CONTROL_CKE|DFII_CONTROL_ODT|DFII_CONTROL_RESET_N);
-	printf("SDRAM now under software control\n");
+	// printf("SDRAM now under software control\n");
 }
 
 void sdrhw(void)
 {
 	sdram_dfii_control_write(DFII_CONTROL_SEL);
-	printf("SDRAM now under hardware control\n");
+	// printf("SDRAM now under hardware control\n");
 }
 
 void sdrrow(unsigned int row)
@@ -259,7 +259,7 @@ static int write_level_scan(int *delays, int loops, int show)
 	cdelay(100);
 	for(i=0;i<SDRAM_PHY_MODULES;i++) {
 		if (show)
-			printf("m%d: |", i);
+			// printf("m%d: |", i);
 
 		/* rst delay */
 		write_delay_rst(i);
@@ -286,13 +286,13 @@ static int write_level_scan(int *delays, int loops, int show)
 				taps_scan[j] = 1;
 			else
 				taps_scan[j] = 0;
-			if (show_iter)
-				printf("%d", taps_scan[j]);
+			// if (show_iter)
+			// 	printf("%d", taps_scan[j]);
 			write_delay_inc(i);
 			cdelay(10);
 		}
-		if (show)
-			printf("|");
+		// if (show)
+		// 	printf("|");
 
 		/* find longer 1 window and set delay at the 0/1 transition */
 		one_window_active = 0;
@@ -327,8 +327,8 @@ static int write_level_scan(int *delays, int loops, int show)
 			for(j=0; j<delays[i]; j++)
 				write_delay_inc(i);
 		}
-		if (show)
-			printf(" delay: %02d\n", delays[i]);
+		// if (show)
+		// 	printf(" delay: %02d\n", delays[i]);
 	}
 
 	sdrwloff();
@@ -543,7 +543,9 @@ static int read_level_scan(int module, int bitslip)
 	sdram_dfii_pird_baddress_write(0);
 	score = 0;
 
+#ifndef NO_READ_LEVEL_PRINT
 	printf("m%d, b%02d: |", module, bitslip);
+#endif
 	read_delay_rst(module);
 	for(i=0;i<SDRAM_PHY_DELAYS;i++) {
 		int working = 1;
@@ -569,12 +571,16 @@ static int read_level_scan(int module, int bitslip)
 		if (((ddrphy_burstdet_seen_read() >> module) & 0x1) != 1)
 			working = 0;
 #endif
+#ifndef NO_READ_LEVEL_PRINT
 		if (show)
 			printf("%d", working);
+#endif
 		score += working;
 		read_delay_inc(module);
 	}
+#ifndef NO_READ_LEVEL_PRINT
 	printf("| ");
+#endif
 
 	/* Precharge */
 	sdram_dfii_pi0_address_write(0);
@@ -585,7 +591,7 @@ static int read_level_scan(int module, int bitslip)
 	return score;
 }
 
-static void read_level(int module)
+static void read_level(int module, int print)
 {
 	unsigned int prv;
 	unsigned char prs[SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
@@ -594,7 +600,10 @@ static void read_level(int module)
 	int working;
 	int delay, delay_min, delay_max;
 
-	printf("delays: ");
+#ifndef NO_READ_LEVEL_PRINT
+	if (print)
+#endif
+		printf("delays: ");
 
 	/* Generate pseudo-random sequence */
 	prv = 42;
@@ -695,10 +704,16 @@ static void read_level(int module)
 	}
 	delay_max = delay;
 
-	if (delay_min >= SDRAM_PHY_DELAYS)
-		printf("-");
-	else
-		printf("%02d+-%02d", (delay_min+delay_max)/2, (delay_max-delay_min)/2);
+#ifndef NO_READ_LEVEL_PRINT
+	if (print) {
+#endif
+		if (delay_min >= SDRAM_PHY_DELAYS)
+			printf("-");
+		else
+			printf("%02d+-%02d", (delay_min+delay_max)/2, (delay_max-delay_min)/2);
+#ifndef NO_READ_LEVEL_PRINT
+	}
+#endif
 
 	/* Set delay to the middle */
 	read_delay_rst(module);
@@ -740,8 +755,10 @@ static void read_leveling(void)
 		for(bitslip=0; bitslip<SDRAM_PHY_BITSLIPS; bitslip++) {
 			/* compute score */
 			score = read_level_scan(module, bitslip);
-			read_level(module);
+			read_level(module, 0);
+#ifndef NO_READ_LEVEL_PRINT
 			printf("\n");
+#endif
 			if (score > best_score) {
 				best_bitslip = bitslip;
 				best_score = score;
@@ -760,7 +777,7 @@ static void read_leveling(void)
 			read_bitslip_inc(module);
 
 		/* re-do leveling on best read window*/
-		read_level(module);
+		read_level(module, 1);
 		printf("\n");
 	}
 }
@@ -792,7 +809,7 @@ int sdrlevel(void)
 #endif
 
 #ifdef SDRAM_PHY_READ_LEVELING_CAPABLE
-	printf("Read leveling:\n");
+	// printf("Read leveling:\n");
 	read_leveling();
 #endif
 
@@ -807,7 +824,7 @@ int sdrinit(void)
     sim_trace(1);
     sim_mark_func();
 
-	printf("Initializing DRAM @0x%08x...\n", MAIN_RAM_BASE);
+	// printf("Initializing DRAM @0x%08x...\n", MAIN_RAM_BASE);
 
 #ifdef CSR_DDRCTRL_BASE
 	ddrctrl_init_done_write(0);

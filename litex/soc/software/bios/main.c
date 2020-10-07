@@ -101,9 +101,9 @@ int main(int i, char **c)
 	// printf(" LiteX git sha1: "LITEX_GIT_SHA1"\n");
 	// printf("\n");
 	// printf("--=============== \e[1mSoC\e[0m ==================--\n");
-	printf("\n\n\e[1mCPU\e[0m:\t\t%s @ %dMHz\n",
-		CONFIG_CPU_HUMAN_NAME,
-		CONFIG_CLOCK_FREQUENCY/1000000);
+	// printf("\n\n\e[1mCPU\e[0m:\t\t%s @ %dMHz\n",
+	// 	CONFIG_CPU_HUMAN_NAME,
+	// 	CONFIG_CLOCK_FREQUENCY/1000000);
 #ifdef CSR_CRG_COUNTERS_RUN_ADDR
 	{
 		unsigned int ref_start, sys_start, ref_end, sys_end, i;
@@ -122,8 +122,10 @@ int main(int i, char **c)
 		sys_clk_freq_mhz_frac = sys_clk_freq_mhz%10;
 		sys_clk_freq_mhz /= 10;
 	}
+#else
+	sys_clk_freq_mhz = CONFIG_CLOCK_FREQUENCY/1000000;
 #endif
-	printf("measured:\t\t %d.%dMHz\n", sys_clk_freq_mhz, sys_clk_freq_mhz_frac);
+	printf("\nf %d.%dMHz\n", sys_clk_freq_mhz, sys_clk_freq_mhz_frac);
 	// printf("\e[1mBUS\e[0m:\t\t%s %d-bit @ %dGiB\n",
 	// 	CONFIG_BUS_STANDARD,
 	// 	CONFIG_BUS_DATA_WIDTH,
@@ -145,7 +147,7 @@ int main(int i, char **c)
 	// printf("\e[1mMAIN-RAM\e[0m:\t%dKiB \n", MAIN_RAM_SIZE/1024);
 #endif
 #endif
-	printf("\n");
+	// printf("\n");
 
         sdr_ok = 1;
 
@@ -158,14 +160,14 @@ int main(int i, char **c)
 
 	command_dispatcher("ddrvcc_en", 1, &disable);
 
-	printf("DDRVCC = 1.5V\n");
+	printf("DDRVCC=1.5V\n");
 	command_dispatcher("ddrvcc_15", 0, NULL);
-	for (j = 0; j < CONFIG_CLOCK_FREQUENCY/2; ++j) {
+	for (j = 0; j < sys_clk_freq_mhz*1000000/2; ++j) {
 		__asm__ volatile(CONFIG_CPU_NOP);
 	}
 
 	command_dispatcher("ddrvcc_en", 1, &enable);
-	printf("\n");
+	// printf("\n");
 #endif
 
 #if defined(CSR_ETHMAC_BASE) || defined(CSR_SDRAM_BASE)

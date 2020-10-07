@@ -235,7 +235,7 @@ static void rpc_ddrvcc_enable(int nb_params, char **params)
 		buck2_cont &= ~1u;
 	}
 	i2c_write(0x58, 0x20, &buck2_cont, 1);
-	printf("DDRVCC %s\n", en ? "enabled" : "disabled");
+	// printf("DDRVCC %s\n", en ? "enabled" : "disabled");
 }
 define_command(ddrvcc_en, rpc_ddrvcc_enable, "DDRVCC enable/disable", I2C_CMDS);
 #endif

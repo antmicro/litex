@@ -22,7 +22,8 @@
 #endif
 
 #ifndef MEMTEST_DATA_SIZE
-#define MEMTEST_DATA_SIZE (2*1024*1024)
+// #define MEMTEST_DATA_SIZE (2*1024*1024)
+#define MEMTEST_DATA_SIZE (32*1024)
 #endif
 #define MEMTEST_DATA_RANDOM 1
 
@@ -193,22 +194,22 @@ int memtest_data(unsigned int *addr, unsigned long size, int random)
 	errors = 0;
 	seed_32 = 1;
 
-	init_progression_bar(size/4);
+	// init_progression_bar(size/4);
 	for(i = 0; i < size/4; i++) {
 		seed_32 = seed_to_data_32(seed_32, random);
 		array[i] = seed_32;
-		if (i%0x8000 == 0)
-			show_progress(i);
+		// if (i%0x8000 == 0)
+		// 	show_progress(i);
 	}
-	show_progress(i);
-	printf("\n");
+	// show_progress(i);
+	// printf("\n");
 
 	seed_32 = 1;
 	flush_cpu_dcache();
 #ifdef CONFIG_L2_SIZE
 	flush_l2_cache();
 #endif
-	init_progression_bar(size/4);
+	// init_progression_bar(size/4);
 	for(i = 0; i < size/4; i++) {
 		seed_32 = seed_to_data_32(seed_32, random);
 		rdata = array[i];
@@ -218,11 +219,11 @@ int memtest_data(unsigned int *addr, unsigned long size, int random)
 			printf("[data 0x%0x]: 0x%08x vs 0x%08x\n", i, rdata, seed_32);
 #endif
 		}
-		if (i%0x8000 == 0)
-			show_progress(i);
+		// if (i%0x8000 == 0)
+		// 	show_progress(i);
 	}
-	show_progress(i);
-	printf("\n");
+	// show_progress(i);
+	// printf("\n");
 
 	return errors;
 }
@@ -237,7 +238,7 @@ void memspeed(unsigned int *addr, unsigned long size, bool read_only)
 	__attribute__((unused)) unsigned long data;
 	const unsigned int sz = sizeof(unsigned long);
 
-	printf("Memspeed at 0x%p...\n", addr);
+	// printf("Memspeed at 0x%p...\n", addr);
 
 	/* init timer */
 	timer0_en_write(0);
@@ -288,7 +289,7 @@ int memtest(unsigned int *addr, unsigned long maxsize)
     int trace_on = sim_trace_on();
     int ret;
 
-	printf("Memtest at 0x%p...\n", addr);
+	// printf("Memtest at 0x%p...\n", addr);
     sim_trace(1);
 	dbg_errors = memtest_dbg(addr, bus_size);
     sim_trace(0);
@@ -307,9 +308,10 @@ int memtest(unsigned int *addr, unsigned long maxsize)
 	}
 	else {
 		printf("Memtest OK\n");
-		memspeed(addr, data_size, false);
+		// memspeed(addr, data_size, false);
 		ret = 1;
 	}
+    // sim_finish();
     sim_trace(trace_on);
     return ret;
 }
