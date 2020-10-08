@@ -193,6 +193,10 @@ int main(int i, char **c)
 	//   printf("\n");
 	// }
 
+#ifdef RPC_UTR_TEST
+	command_dispatcher("rpctest", 0, NULL);
+#endif
+
 	// printf("--============= \e[1mConsole\e[0m ================--\n");
 #if !defined(TERM_MINI) && !defined(TERM_NO_HIST)
 	hist_init();

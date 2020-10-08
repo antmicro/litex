@@ -363,8 +363,7 @@ static void rpctest(int nb_params, char **params)
 #define UTR(en, op) do { sdrsw(); rpcutr(en, op); sdrhw(); } while(0)
 
     UTR(1, 0);
-    // memtest((unsigned int *) MAIN_RAM_BASE, MAIN_RAM_SIZE);
-	dump_bytes((unsigned int *) MAIN_RAM_BASE + 0x1111, 0x40, (unsigned long) MAIN_RAM_BASE + 0x1111);
+	dump_bytes((unsigned int *) MAIN_RAM_BASE, 0x20, (unsigned long) MAIN_RAM_BASE);
 	UTR(0, 0);
 
 #undef UTR

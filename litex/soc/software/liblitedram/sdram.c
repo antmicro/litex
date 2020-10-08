@@ -832,7 +832,19 @@ int sdrinit(void)
 #endif
 	sdrsw();
 
+#ifndef SDRAM_WAIT_MANUAL_INIT_SEQUENCE
+#ifdef CSR_DDRPHY_RESET_FSM_ADDR
+	ddrphy_reset_fsm_write(1);
+#endif
+	cdelay(10000);
 	init_sequence();
+	cdelay(10000);
+#else
+	ctrl_scratch_write(0x01010101);
+	while (ctrl_scratch_read() != SDRAM_WAIT_MANUAL_INIT_SEQUENCE) {
+		cdelay(1);
+	}
+#endif
 #ifdef CSR_DDRPHY_BASE
 #if CSR_DDRPHY_EN_VTC_ADDR
 	ddrphy_en_vtc_write(0);
@@ -878,7 +890,7 @@ void rpcutr(int utr_en, int utr_op)
 	/* UTR */
     utr_en = ((utr_en &  0b1) << 0);
     utr_op = ((utr_op & 0b11) << 1);
-    printf("utr_en=%d, utr_op=0b%d%d\n", utr_en, (utr_op >> 2) & 1, (utr_op >> 1) & 1);
+    // printf("utr_en=%d, utr_op=0b%d%d\n", utr_en, (utr_op >> 2) & 1, (utr_op >> 1) & 1);
 	sdram_dfii_pi0_address_write(utr_op | utr_en);
 	sdram_dfii_pi0_baddress_write(0);
 	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
