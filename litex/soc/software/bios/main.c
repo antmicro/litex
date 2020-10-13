@@ -167,6 +167,9 @@ int main(int i, char **c)
 	}
 
 	command_dispatcher("ddrvcc_en", 1, &enable);
+	for (j = 0; j < sys_clk_freq_mhz*1000000/2; ++j) {
+		__asm__ volatile(CONFIG_CPU_NOP);
+	}
 	// printf("\n");
 #endif
 
