@@ -153,6 +153,11 @@ _io = [
         Subsignal("crs",     Pins("G14")),
         IOStandard("LVCMOS33"),
     ),
+
+    ("virtual_i", 0, Pins("D4"),  IOStandard("LVCMOS33")),
+    ("virtual_i", 1, Pins("D3"),  IOStandard("LVCMOS33")),
+    ("virtual_o", 0, Pins("F4"),  IOStandard("LVCMOS33")),
+    ("virtual_o", 1, Pins("F3"),  IOStandard("LVCMOS33")),
 ]
 
 # Connectors ---------------------------------------------------------------------------------------
