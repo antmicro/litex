@@ -15,6 +15,7 @@ from litex.boards.platforms import arty
 from litex.build.xilinx.vivado import vivado_build_args, vivado_build_argdict
 
 from litex.soc.cores.clock import *
+from litex.soc.cores.prm import *
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.soc_sdram import *
 from litex.soc.integration.builder import *
@@ -99,6 +100,13 @@ class BaseSoC(SoCCore):
             pads         = platform.request_all("user_led"),
             sys_clk_freq = sys_clk_freq)
         self.add_csr("leds")
+
+        # PRM -------------------------------------------------------------------------------------
+        self.submodules.prm = PRIOInterfacer(
+            i_pads         = platform.request_all("virtual_i"),
+            o_pads         = platform.request_all("virtual_o"),
+            inputs = 2,
+            outputs = 2)
 
 # Build --------------------------------------------------------------------------------------------
 
