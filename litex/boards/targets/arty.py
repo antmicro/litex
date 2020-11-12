@@ -103,8 +103,8 @@ class BaseSoC(SoCCore):
 
         # PRM -------------------------------------------------------------------------------------
         self.submodules.prm = PRIOInterfacer(
-            i_pads         = platform.request_all("virtual_i"),
-            o_pads         = platform.request_all("virtual_o"),
+            bus            = self.bus,
+            pads         = platform.request("virtual"),
             inputs = 2,
             outputs = 2)
 

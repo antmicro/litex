@@ -154,10 +154,20 @@ _io = [
         IOStandard("LVCMOS33"),
     ),
 
-    ("virtual_i", 0, Pins("D4"),  IOStandard("LVCMOS33")),
-    ("virtual_i", 1, Pins("D3"),  IOStandard("LVCMOS33")),
-    ("virtual_o", 0, Pins("F4"),  IOStandard("LVCMOS33")),
-    ("virtual_o", 1, Pins("F3"),  IOStandard("LVCMOS33")),
+    ("virtual", 0,
+        Subsignal("adr",    Pins("G13 B11 A11 D12 D13 B18 A18 K16 E15 E16 D15 C15 J17 J18 K15 J15 U12 V12 V10 V11 U14 V14 T13 U13 D4 D3 F4 F3 E2 D2 H2 G2")),
+        Subsignal("dat_w",  Pins("V15 U16 P14 T11 R12 T14 T15 T16 N15 M16 V17 U18 R17 P17 U11 V16 M13 R10 R11 R13 R15 P15 R16 N16 N14 U17 T18 R18 P18 N17 F5 D8")),
+        Subsignal("dat_r",  Pins("C7 E7 D7 D5 B7 B6 E6 E5 A4 A3 C5 C6 A5 A6 B4 C4 A1 B1 B2 B3 C14 D14 F1 C1 L18 M18 G6 G4 B17 B16 B12 C12")),
+        Subsignal("sel",    Pins("F14 F13 A16 A15")),
+        Subsignal("cyc",    Pins("L13")),
+        Subsignal("stb",    Pins("A13")),
+        Subsignal("ack",    Pins("F6")),
+        Subsignal("we",     Pins("E1")),
+        Subsignal("cti",    Pins("L14 M14 G3")),
+        Subsignal("bte",    Pins("L16 K17")),
+        Subsignal("err",    Pins("K18")),
+        IOStandard("LVCMOS33"),
+    ),
 ]
 
 # Connectors ---------------------------------------------------------------------------------------
