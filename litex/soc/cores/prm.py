@@ -22,7 +22,7 @@ class PRIOInterfacer(Module, AutoCSR):
         bus_io = self.bus.get_ios()
         print("PRM ITERFACE: WISHBONE IO: ")
         print(bus_io)
-        self.bus.connect_to_pads(pads=pads, mode="slave")
+        self.comb += self.bus.connect_to_pads(pads=pads, mode="slave")
 
         # for i in range(inputs):
             # self.ina.append(Signal())
