@@ -286,9 +286,10 @@ void sdram_write_leveling_force_cmd_delay(int taps, int show) {
 	if (show)
 		printf("Forcing Cmd delay to %d taps\n", taps);
 	ddrphy_cdly_rst_write(1);
+	cdelay(100);
 	while (taps > 0) {
 		ddrphy_cdly_inc_write(1);
-		cdelay(1000);
+		cdelay(100);
 		taps--;
 	}
 }
@@ -363,6 +364,7 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show)
 
 		/* rst delay */
 		sdram_write_leveling_rst_delay(i);
+		cdelay(100);
 
 		/* scan write delay taps */
 		for(j=0;j<err_ddrphy_wdly;j++) {
@@ -388,7 +390,7 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show)
 			if (show_iter)
 				printf("%d", taps_scan[j]);
 			sdram_write_leveling_inc_delay(i);
-			cdelay(10);
+			cdelay(100);
 		}
 		if (show)
 			printf("|");
@@ -420,21 +422,27 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show)
 
 		/* rst delay */
 		sdram_write_leveling_rst_delay(i);
+		cdelay(100);
 
 		/* use forced delay if configured */
 		if (_sdram_write_leveling_dat_delays[i] >= 0) {
 			delays[i] = _sdram_write_leveling_dat_delays[i];
 
 			/* configure write delay */
-			for(j=0; j<delays[i]; j++)
+			for(j=0; j<delays[i]; j++)  {
 				sdram_write_leveling_inc_delay(i);
+				cdelay(100);
+			}
 		/* succeed only if the start of a 1s window has been found */
 		} else if (one_window_best_count > 0 && one_window_best_start > 0) {
 			delays[i] = one_window_best_start;
 
 			/* configure write delay */
 			for(j=0; j<delays[i]; j++)
+			{
 				sdram_write_leveling_inc_delay(i);
+				cdelay(100);
+			}
 		}
 		if (show) {
 			if (delays[i] == -1)
@@ -464,11 +472,12 @@ static void sdram_write_leveling_find_cmd_delay(unsigned int *best_error, int *b
 
 	/* scan through the range */
 	ddrphy_cdly_rst_write(1);
+	cdelay(100);
 	for (cdly = cdly_start; cdly < cdly_stop; cdly += cdly_step) {
 		/* increment cdly to current value */
 		while (cdly_actual < cdly) {
 			ddrphy_cdly_inc_write(1);
-			cdelay(10);
+			cdelay(100);
 			cdly_actual++;
 		}
 
@@ -547,9 +556,10 @@ int sdram_write_leveling(void)
 	/* set working or forced delay */
 	if (best_cdly >= 0) {
 		ddrphy_cdly_rst_write(1);
+		cdelay(100);
 		for (int i = 0; i < best_cdly; ++i) {
 			ddrphy_cdly_inc_write(1);
-			cdelay(10);
+			cdelay(100);
 		}
 	}
 
