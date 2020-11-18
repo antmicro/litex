@@ -318,8 +318,10 @@ static void sdram_write_leveling_rst_delay(int module) {
 	ddrphy_wdly_dq_rst_write(1);
 	ddrphy_wdly_dqs_rst_write(1);
 #ifdef SDRAM_PHY_WRITE_LEVELING_REINIT
-	for(i=0; i<ddrphy_half_sys8x_taps_read(); i++)
+	for(i=0; i<ddrphy_half_sys8x_taps_read(); i++) {
+		cdelay(100);
 		ddrphy_wdly_dqs_inc_write(1);
+	}
 #endif
 
 	/* unsel module */
