@@ -103,10 +103,7 @@ class BaseSoC(SoCCore):
 
         # PRM -------------------------------------------------------------------------------------
         self.submodules.prm = PRIOInterfacer(
-            bus            = self.bus,
-            pads         = platform.request("synthio_bus"),
-            inputs = 2,
-            outputs = 2)
+            pads         = platform.request("synthio_bus"))
 
 # Build --------------------------------------------------------------------------------------------
 
