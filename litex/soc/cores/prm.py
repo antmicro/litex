@@ -11,15 +11,18 @@ class PRIOInterfacer(Module):
 
         ###
 
+        # Connect bus signals to pads but also insert SYN_BUFS
         self.comb += self.connect_to_pads(bus, pads, "master")
 
     def connect_to_pads(self, bus, pads, mode="master"):
         assert mode in ["slave", "master"]
         r = []
+
         for name, width, direction in bus.layout:
             static_sig = Signal(width, name)
             sig  = getattr(bus, name)
             pad  = getattr(pads, name)
+
             if mode == "master":
                 if direction == DIR_M_TO_S:
                     for i in range(width):
@@ -34,6 +37,5 @@ class PRIOInterfacer(Module):
                     r.append(pad.eq(sig))
                 else:
                     r.append(sig.eq(pad))
-        print("connect_to_pads:")
-        print(r)
+
         return r
