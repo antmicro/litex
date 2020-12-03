@@ -8,8 +8,6 @@ class PRIOInterfacer(Module):
     def __init__(self, pads):
         self.bus = wishbone.Interface()
 
-        ###
-
         # Connect bus signals to pads but also insert SYN_BUFS
         self.comb += self.connect_to_pads(pads, "master")
 
@@ -21,6 +19,29 @@ class PRIOInterfacer(Module):
             static_sig = Signal(width, name)
             sig  = getattr(self.bus, name)
             pad  = getattr(pads, name)
+
+            ### Use some active logic to avoid direct routing to GND
+            if (name == "bte"):
+                self.bus_bte = Signal(width)
+                self.bus_bte.attr.add("keep")
+                self.bus.bte.attr.add("keep")
+                for i in range(width):
+                    bte_lut = Instance("LUT1", name='k_'+name+str(i), i_I0=self.bus.bte[i], o_O=self.bus_bte[i], p_INIT=2)
+                    bte_lut.attr.add("keep")
+                    self.specials += bte_lut
+                    self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=self.bus_bte[i], o_O=pad[i])
+                continue
+
+            #if (name == "err"):
+            #    self.bus_err = Signal(width)
+            #    self.bus_err.attr.add("keep")
+            #    self.bus.err.attr.add("keep")
+            #    for i in range(width):
+            #        err_lut = Instance("LUT1", name='k_'+name+str(i), i_I0=self.bus_err[i], o_O=self.bus_err[i], p_INIT=2)
+            #        err_lut.attr.add("keep")
+            #        self.specials += err_lut
+            #        self.specials += Instance("SYN_IBUF", name=name+str(i), i_I=pad[i], o_O=self.bus_err[i])
+            #    continue
 
             if mode == "master":
                 if direction == DIR_M_TO_S:
