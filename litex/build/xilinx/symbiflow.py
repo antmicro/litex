@@ -87,7 +87,7 @@ def _run_make():
 
 class SymbiflowToolchain:
     attr_translate = {
-        "keep":            ("dont_touch", "true"),
+        "keep":            "keep",
         "no_retiming":     ("dont_touch", "true"),
         "async_reg":       ("async_reg",  "true"),
         "mr_ff":           ("mr_ff",      "true"), # user-defined attribute
