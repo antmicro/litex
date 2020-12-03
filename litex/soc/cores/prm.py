@@ -22,14 +22,15 @@ class PRIOInterfacer(Module):
 
             ### Use some active logic to avoid direct routing to GND
             if (name == "bte"):
+                clk = ClockSignal("sys")
+                sig0 = Signal()
+                self.comb += sig0.eq(0)
+
                 self.bus_bte = Signal(width)
-                self.bus_bte.attr.add("keep")
-                self.bus.bte.attr.add("keep")
                 for i in range(width):
-                    bte_lut = Instance("LUT1", name='k_'+name+str(i), i_I0=self.bus.bte[i], o_O=self.bus_bte[i], p_INIT=2)
-                    bte_lut.attr.add("keep")
-                    self.specials += bte_lut
-                    self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=self.bus_bte[i], o_O=pad[i])
+                    fd_inst = Instance("FD", i_C=clk, i_D=sig0, o_Q=self.bus.bte[i])
+                    fd_inst.attr.add("keep")
+                    self.specials += fd_inst
                 continue
 
             #if (name == "err"):
