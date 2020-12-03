@@ -208,12 +208,19 @@ def _printattr(attr, attr_translate):
             at = attr_translate[attr]
             if at is None:
                 continue
-            attr_name, attr_value = at
+            elif isinstance(at, str):
+                attr_name = at
+                attr_value = ""
+            else:
+                attr_name, attr_value = at
         if not firsta:
             r += ", "
         firsta = False
         const_expr = "\"" + attr_value + "\"" if not isinstance(attr_value, int) else str(attr_value)
-        r += attr_name + " = " + const_expr
+        if isinstance(at, str):
+            r += attr_name
+        else:
+            r += attr_name + " = " + const_expr
     if r:
         r = "(* " + r + " *)"
     return r
