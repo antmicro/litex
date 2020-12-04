@@ -3,13 +3,54 @@
 from migen import *
 
 from litex.soc.interconnect import wishbone
+from litex.soc.interconnect.csr import *
+
+
+in_layout = [
+    ("in0", 1),
+    ("in1", 2),
+    ("in2", 3),
+    ("in3", 4),
+    ("in4", 5),
+]
+
+out_layout = [
+    ("out0", 1),
+    ("out1", 2),
+    ("out2", 3),
+    ("out3", 4),
+    ("out4", 5),
+]
 
 class PRIOInterfacer(Module):
-    def __init__(self, pads):
+    def __init__(self, bus_pads, input_pads, output_pads):
         self.bus = wishbone.Interface()
 
+        additional_in, in_csrs = self.connect_additional_io(input_pads, in_layout, "input")
+        additional_out, out_csrs = self.connect_additional_io(output_pads, out_layout, "output")
+
         # Connect bus signals to pads but also insert SYN_BUFS
-        self.comb += self.connect_to_pads(pads, "master")
+        self.comb += self.connect_to_pads(bus_pads, "master")
+
+    def connect_additional_io(self, pads, layout, direction):
+        assert direction in ["input", "output"]
+        extend_io = []
+        csr = []
+
+        for name, width in layout:
+            sig = Signal(width, name)
+            extend_io.append(sig)
+            if (direction == "input"):
+                reg = CSRStorage(width, name="csr_"+name)
+                csr.append(reg)
+                self.sync += sig.eq(reg.storage)
+            else:
+                reg = CSRStatus(width, name="csr_"+name)
+                csr.append(reg)
+                self.sync += reg.status.eq(sig)
+
+        return extend_io, csr
+
 
     def connect_to_pads(self, pads, mode="master"):
         assert mode in ["slave", "master"]
