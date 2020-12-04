@@ -26,30 +26,30 @@ class PRIOInterfacer(Module):
     def __init__(self, bus_pads, input_pads, output_pads):
         self.bus = wishbone.Interface()
 
-        additional_in, in_csrs = self.connect_additional_io(input_pads, in_layout, "input")
-        additional_out, out_csrs = self.connect_additional_io(output_pads, out_layout, "output")
+        self.connect_additional_io(input_pads, output_pads, in_layout, out_layout)
 
         # Connect bus signals to pads but also insert SYN_BUFS
         self.comb += self.connect_to_pads(bus_pads, "master")
 
-    def connect_additional_io(self, pads, layout, direction):
-        assert direction in ["input", "output"]
-        extend_io = []
-        csr = []
+    def connect_additional_io(self, ipads, opads, ilayout, olayout):
+        self.additional_in = []
+        self.additional_out = []
+        self.csr_in = []
+        self.csr_out = []
 
-        for name, width in layout:
+        for name, width in ilayout:
             sig = Signal(width, name)
-            extend_io.append(sig)
-            if (direction == "input"):
-                reg = CSRStorage(width, name="csr_"+name)
-                csr.append(reg)
-                self.sync += sig.eq(reg.storage)
-            else:
-                reg = CSRStatus(width, name="csr_"+name)
-                csr.append(reg)
-                self.sync += reg.status.eq(sig)
+            self.additional_in.append(sig)
+            reg = CSRStorage(width, name="csr_"+name)
+            self.csr_in.append(reg)
+            self.sync += self.additional_in[-1].eq(self.csr_in[-1].storage)
 
-        return extend_io, csr
+        for name, width in olayout:
+            sig = Signal(width, name)
+            self.additional_out.append(sig)
+            reg = CSRStatus(width, name="csr_"+name)
+            self.csr_out.append(reg)
+            self.sync += self.csr_out[-1].status.eq(self.additional_out[-1])
 
 
     def connect_to_pads(self, pads, mode="master"):
