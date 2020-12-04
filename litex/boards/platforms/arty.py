@@ -180,6 +180,24 @@ _io = [
         Subsignal("err",    Pins("SYN111 ")),
         IOStandard("LVCMOS33"),
      ),
+
+    ("synthio_in", 0,
+        Subsignal("in0", Pins("G13")),
+        Subsignal("in1", Pins("B11 A11")),
+        Subsignal("in2", Pins("D12 D13 B18")),
+        Subsignal("in3", Pins("A18 K16 E15 D15")),
+        Subsignal("in4", Pins("C15 J17 J18 K15 J15")),
+        IOStandard("LVCMOS33"),
+     ),
+
+    ("synthio_out", 0,
+        Subsignal("out0", Pins("U12")),
+        Subsignal("out1", Pins("V12 V10")),
+        Subsignal("out2", Pins("V11 U14 V14")),
+        Subsignal("out3", Pins("T13 U13 D4 D3")),
+        Subsignal("out4", Pins("F4 F3 E2 D2 H2")),
+        IOStandard("LVCMOS33"),
+     ),
 ]
 
 # Connectors ---------------------------------------------------------------------------------------
