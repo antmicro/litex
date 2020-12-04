@@ -34,22 +34,18 @@ class PRIOInterfacer(Module):
     def connect_additional_io(self, ipads, opads, ilayout, olayout):
         self.additional_in = []
         self.additional_out = []
-        self.csr_in = []
-        self.csr_out = []
 
         for name, width in ilayout:
+            pad  = getattr(ipads, name)
             sig = Signal(width, name)
             self.additional_in.append(sig)
-            reg = CSRStorage(width, name="csr_"+name)
-            self.csr_in.append(reg)
-            self.sync += self.additional_in[-1].eq(self.csr_in[-1].storage)
+            self.comb += self.additional_in[-1].eq(pad)
 
         for name, width in olayout:
+            pad  = getattr(opads, name)
             sig = Signal(width, name)
             self.additional_out.append(sig)
-            reg = CSRStatus(width, name="csr_"+name)
-            self.csr_out.append(reg)
-            self.sync += self.csr_out[-1].status.eq(self.additional_out[-1])
+            self.comb += pad.eq(self.additional_out[-1])
 
 
     def connect_to_pads(self, pads, mode="master"):
