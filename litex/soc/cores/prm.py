@@ -7,19 +7,19 @@ from litex.soc.interconnect.csr import *
 
 
 in_layout = [
-    ("in0", 1),
-    ("in1", 2),
-    ("in2", 3),
-    ("in3", 4),
-    ("in4", 4),
+    ("roi_in0", 1),
+    ("roi_in1", 2),
+    ("roi_in2", 3),
+    ("roi_in3", 4),
+    ("roi_in4", 4),
 ]
 
 out_layout = [
-    ("out0", 1),
-    ("out1", 2),
-    ("out2", 3),
-    ("out3", 4),
-    ("out4", 4),
+    ("roi_out0", 1),
+    ("roi_out1", 2),
+    ("roi_out2", 3),
+    ("roi_out3", 4),
+    ("roi_out4", 4),
 ]
 
 class PRIOInterfacer(Module):
