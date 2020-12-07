@@ -11,7 +11,7 @@ in_layout = [
     ("in1", 2),
     ("in2", 3),
     ("in3", 4),
-    ("in4", 5),
+    ("in4", 4),
 ]
 
 out_layout = [
@@ -19,7 +19,7 @@ out_layout = [
     ("out1", 2),
     ("out2", 3),
     ("out3", 4),
-    ("out4", 5),
+    ("out4", 4),
 ]
 
 class PRIOInterfacer(Module):
