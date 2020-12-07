@@ -39,13 +39,17 @@ class PRIOInterfacer(Module):
             pad  = getattr(ipads, name)
             sig = Signal(width, name)
             self.additional_in.append(sig)
-            self.comb += self.additional_in[-1].eq(pad)
+            for i in range(width):
+                self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=self.additional_in[-1][i], o_O=pad[i])
+            # self.comb += self.additional_in[-1].eq(pad)
 
         for name, width in olayout:
             pad  = getattr(opads, name)
             sig = Signal(width, name)
             self.additional_out.append(sig)
-            self.comb += pad.eq(self.additional_out[-1])
+            for i in range(width):
+                self.specials += Instance("SYN_IBUF", name=name+str(i), i_I=pad[i], o_O=self.additional_out[-1][i])
+            # self.comb += pad.eq(self.additional_out[-1])
 
 
     def connect_to_pads(self, pads, mode="master"):
