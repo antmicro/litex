@@ -22,6 +22,7 @@ from litex.soc.cores.pwm import PWM
 from litex.soc.cores.gpio import GPIOTristate
 from litex.soc.cores.spi import SPIMaster, SPISlave
 from litex.soc.cores.clock import S7MMCM
+from litex.soc.cores.prm import *
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -51,6 +52,7 @@ class LiteXCore(SoCMini):
         with_mmcm       = False,
         with_gpio       = False, gpio_width=32,
         with_spi_master = False, spi_master_data_width=8, spi_master_clk_freq=8e6,
+        with_prm        = False,
         **kwargs):
 
         platform = Platform(_io)
@@ -118,6 +120,44 @@ class LiteXCore(SoCMini):
             )
             self.add_csr("spi_master")
 
+        # PRM
+        if with_prm:
+            platform.add_extension([
+                 ("synthio_bus", 0,
+                     Subsignal("adr",   Pins("SYN2 SYN3 SYN4 SYN5 SYN6 SYN7 SYN8 SYN9 SYN10 SYN11 SYN12 SYN13 SYN14 SYN15 SYN16 SYN17 SYN18 SYN19 SYN20 SYN21 SYN22 SYN23 SYN24 SYN25 SYN26 SYN27 SYN28 SYN29 SYN30 SYN31 ")),
+                     Subsignal("dat_w",   Pins("SYN32 SYN33 SYN34 SYN35 SYN36 SYN37 SYN38 SYN39 SYN40 SYN41 SYN42 SYN43 SYN44 SYN45 SYN46 SYN47 SYN48 SYN49 SYN50 SYN51 SYN52 SYN53 SYN54 SYN55 SYN56 SYN57 SYN58 SYN59 SYN60 SYN61 SYN62 SYN63 ")),
+                     Subsignal("dat_r",   Pins("SYN90 SYN91 SYN92 SYN93 SYN94 SYN95 SYN96 SYN97 SYN98 SYN99 SYN100 SYN101 SYN102 SYN103 SYN104 SYN105 SYN106 SYN107 SYN108 SYN109 SYN110 SYN111 SYN112 SYN113 SYN114 SYN115 SYN116 SYN117 SYN118 SYN119 SYN120 SYN121 ")),
+                     Subsignal("sel",   Pins("SYN64 SYN65 SYN66 SYN67 ")),
+                     Subsignal("cyc",   Pins("SYN68 ")),
+                     Subsignal("stb",   Pins("SYN69 ")),
+                     Subsignal("ack",   Pins("SYN122 ")),
+                     Subsignal("we",   Pins("SYN70 ")),
+                     Subsignal("cti",   Pins("SYN71 SYN72 SYN73 ")),
+                     Subsignal("bte",   Pins("SYN74 SYN75 ")),
+                     Subsignal("err",   Pins("SYN123 ")),
+                 ),
+                 ("synthio_in", 0,
+                     Subsignal("roi_in0",   Pins("SYN76 ")),
+                     Subsignal("roi_in1",   Pins("SYN77 SYN78 ")),
+                     Subsignal("roi_in2",   Pins("SYN79 SYN80 SYN81 ")),
+                     Subsignal("roi_in3",   Pins("SYN82 SYN83 SYN84 SYN85 ")),
+                     Subsignal("roi_in4",   Pins("SYN86 SYN87 SYN88 SYN89 ")),
+                 ),
+                 ("synthio_out", 0,
+                     Subsignal("roi_out0",   Pins("SYN124 ")),
+                     Subsignal("roi_out1",   Pins("SYN125 SYN126 ")),
+                     Subsignal("roi_out2",   Pins("SYN127 SYN128 SYN129 ")),
+                     Subsignal("roi_out3",   Pins("SYN130 SYN131 SYN132 SYN133 ")),
+                     Subsignal("roi_out4",   Pins("SYN134 SYN135 SYN136 SYN137 ")),
+                 ),
+            ])
+            self.submodules.prm = PRIOInterfacer(
+            bus_pads         = platform.request("synthio_bus"),
+            input_pads       = platform.request("synthio_in"),
+            output_pads      = platform.request("synthio_out"),
+            mode             = "slave")
+            self.add_csr("prm")
+
         # PWM
         if with_pwm:
             platform.add_extension([("pwm", 0, Pins(1))])
@@ -168,6 +208,7 @@ def soc_argdict(args):
         "uart_fifo_depth",
         "with_ctrl",
         "with_timer",
+        "with_prm",
         "with_gpio",
         "gpio_width",
         "with_spi_master",
@@ -196,6 +237,7 @@ def main():
     parser.add_argument("--with-spi-master",       action="store_true",   help="Add SPI master core")
     parser.add_argument("--spi-master-data-width", default=8,   type=int, help="SPI master data width")
     parser.add_argument("--spi-master-clk-freq",   default=8e6, type=int, help="SPI master output clock frequency")
+    parser.add_argument("--with-prm",              action="store_true",   help="Add PRM core")
     parser.add_argument("--with-gpio",             action="store_true",   help="Add GPIO core")
     parser.add_argument("--gpio-width",            default=32,  type=int, help="GPIO signals width")
 
