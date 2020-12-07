@@ -23,13 +23,13 @@ out_layout = [
 ]
 
 class PRIOInterfacer(Module):
-    def __init__(self, bus_pads, input_pads, output_pads):
+    def __init__(self, bus_pads, input_pads, output_pads, mode):
         self.bus = wishbone.Interface()
 
         self.connect_additional_io(input_pads, output_pads, in_layout, out_layout)
 
         # Connect bus signals to pads but also insert SYN_BUFS
-        self.comb += self.connect_to_pads(bus_pads, "master")
+        self.comb += self.connect_to_pads(bus_pads, mode)
 
     def connect_additional_io(self, ipads, opads, ilayout, olayout):
         self.additional_in = []
