@@ -36,11 +36,16 @@ class PRIOInterfacer(Module):
         self.additional_out = []
 
         for name, width in ilayout:
+            clk = ClockSignal("sys")
             pad  = getattr(ipads, name)
             sig = Signal(width, name)
             self.additional_in.append(sig)
+            bufsig = Signal(width, name=name+"_bufsig")
             for i in range(width):
-                self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=self.additional_in[-1][i], o_O=pad[i])
+                fd_inst = Instance("FD", i_C=clk, i_D=self.additional_in[-1][i], o_Q=bufsig[i])
+                fd_inst.attr.add("keep")
+                self.specials += fd_inst
+                self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=bufsig[i], o_O=pad[i])
             # self.comb += self.additional_in[-1].eq(pad)
 
         for name, width in olayout:
