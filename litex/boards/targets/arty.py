@@ -108,6 +108,10 @@ class BaseSoC(SoCCore):
             roi_output_pads      = platform.request("synthio_out"),
             mode             = "master")
 
+        self.add_csr("prm")
+        prm_region = SoCRegion(origin=self.mem_map.get("prm", None), size=0x1000, cached=False)
+        self.bus.add_slave(name="prm", slave=self.prm.bus, region=prm_region)
+
 # Build --------------------------------------------------------------------------------------------
 
 def main():
