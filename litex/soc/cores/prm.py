@@ -99,8 +99,10 @@ class PRIOInterfacer(Module):
                     #r.append(static_sig.eq(pad))
             else:
                 if direction == DIR_S_TO_M:
-                    r.append(pad.eq(sig))
+                    for i in range(width):
+                        self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=sig[i], o_O=pad[i])
                 else:
-                    r.append(sig.eq(pad))
+                    for i in range(width):
+                        self.specials += Instance("SYN_IBUF", name=name+str(i), i_I=pad[i], o_O=sig[i])
 
         return r
