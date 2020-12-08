@@ -26,7 +26,8 @@ class PRIOInterfacer(Module):
     def __init__(self, bus_pads, input_pads, output_pads, mode):
         self.bus = wishbone.Interface()
 
-        self.connect_additional_io(input_pads, output_pads, in_layout, out_layout)
+        self.connect_additional_io(input_pads, output_pads,
+                                   in_layout, out_layout)
 
         # Connect bus signals to pads but also insert SYN_BUFS
         self.comb += self.connect_to_pads(bus_pads, mode)
@@ -39,22 +40,31 @@ class PRIOInterfacer(Module):
             clk = ClockSignal("sys")
             pad  = getattr(ipads, name)
             sig = Signal(width, name)
-            self.additional_in.append(sig)
             bufsig = Signal(width, name=name+"_bufsig")
+
+            self.additional_in.append(sig)
+
             for i in range(width):
-                fd_inst = Instance("FD", i_C=clk, i_D=self.additional_in[-1][i], o_Q=bufsig[i])
+                fd_inst = Instance("FD",
+                                    i_C=clk,
+                                    i_D=self.additional_in[-1][i],
+                                    o_Q=bufsig[i])
                 fd_inst.attr.add("keep")
                 self.specials += fd_inst
-                self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=bufsig[i], o_O=pad[i])
-            # self.comb += self.additional_in[-1].eq(pad)
+                self.specials += Instance("SYN_OBUF",
+                                            name=name+str(i),
+                                            i_I=bufsig[i],
+                                            o_O=pad[i])
 
         for name, width in olayout:
             pad  = getattr(opads, name)
             sig = Signal(width, name)
             self.additional_out.append(sig)
             for i in range(width):
-                self.specials += Instance("SYN_IBUF", name=name+str(i), i_I=pad[i], o_O=self.additional_out[-1][i])
-            # self.comb += pad.eq(self.additional_out[-1])
+                self.specials += Instance("SYN_IBUF",
+                                            name=name+str(i),
+                                            i_I=pad[i],
+                                            o_O=self.additional_out[-1][i])
 
 
     def connect_to_pads(self, pads, mode="master"):
@@ -71,38 +81,43 @@ class PRIOInterfacer(Module):
                 clk = ClockSignal("sys")
                 self.bus_bte = Signal(width)
                 for i in range(width):
-                    fd_inst = Instance("FD", i_C=clk, i_D=sig[i], o_Q=self.bus_bte[i])
+                    fd_inst = Instance("FD",
+                                        i_C=clk,
+                                        i_D=sig[i],
+                                        o_Q=self.bus_bte[i])
                     fd_inst.attr.add("keep")
                     self.specials += fd_inst
-                    self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=self.bus_bte[i], o_O=pad[i])
+                    self.specials += Instance("SYN_OBUF",
+                                                name=name+str(i),
+                                                i_I=self.bus_bte[i],
+                                                o_O=pad[i])
                 continue
-
-            #if (name == "err"):
-            #    self.bus_err = Signal(width)
-            #    self.bus_err.attr.add("keep")
-            #    self.bus.err.attr.add("keep")
-            #    for i in range(width):
-            #        err_lut = Instance("LUT1", name='k_'+name+str(i), i_I0=self.bus_err[i], o_O=self.bus_err[i], p_INIT=2)
-            #        err_lut.attr.add("keep")
-            #        self.specials += err_lut
-            #        self.specials += Instance("SYN_IBUF", name=name+str(i), i_I=pad[i], o_O=self.bus_err[i])
-            #    continue
 
             if mode == "master":
                 if direction == DIR_M_TO_S:
                     for i in range(width):
-                        self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=sig[i], o_O=pad[i])
-                    #r.append(sig.eq(pad))
+                        self.specials += Instance("SYN_OBUF",
+                                                    name=name+str(i),
+                                                    i_I=sig[i],
+                                                    o_O=pad[i])
                 else:
                     for i in range(width):
-                        self.specials += Instance("SYN_IBUF", name=name+str(i), i_I=pad[i], o_O=sig[i])
-                    #r.append(static_sig.eq(pad))
+                        self.specials += Instance("SYN_IBUF",
+                                                    name=name+str(i),
+                                                    i_I=pad[i],
+                                                    o_O=sig[i])
             else:
                 if direction == DIR_S_TO_M:
                     for i in range(width):
-                        self.specials += Instance("SYN_OBUF", name=name+str(i), i_I=sig[i], o_O=pad[i])
+                        self.specials += Instance("SYN_OBUF",
+                                                    name=name+str(i),
+                                                    i_I=sig[i],
+                                                    o_O=pad[i])
                 else:
                     for i in range(width):
-                        self.specials += Instance("SYN_IBUF", name=name+str(i), i_I=pad[i], o_O=sig[i])
+                        self.specials += Instance("SYN_IBUF",
+                                                    name=name+str(i),
+                                                    i_I=pad[i],
+                                                    o_O=sig[i])
 
         return r
