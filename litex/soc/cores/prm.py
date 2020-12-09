@@ -28,14 +28,8 @@ class PRIOInterfacer(Module, AutoCSR):
                                   io_layout,
                                   mode)
 
-        self.add_csr(self.addit_roi_out[-1])
-
         # Connect bus signals to pads but also insert SYN_BUFS
         self.comb += self.connect_to_pads(bus_pads, mode)
-
-    def add_csr(self, output_sig):
-        self.prm = CSRStorage(len(output_sig), description="PRM Control reg")
-        self.comb += output_sig.eq(self.prm.storage)
 
     def connect_addit_roi_io(self, roi_ipads, roi_opads, io_layout, mode="master"):
         assert mode in ["slave", "master"]
