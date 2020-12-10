@@ -110,8 +110,9 @@ class BaseSoC(SoCCore):
             mode             = "master")
 
         self.add_csr("prm")
-        prm_region = SoCRegion(origin=self.mem_map.get("prm", None), size=0x1000, cached=False)
-        self.bus.add_slave(name="prm", slave=self.prm.bus, region=prm_region)
+        prm_region = SoCRegion(origin=self.mem_map.get("prm", 0x80000000), size=0x1000, cached=False)
+        self.submodules.roi_writer = MemoryWriter(data_width=32, depth=10)
+        self.bus.add_slave(name="prm", slave=self.roi_writer.bus, region=prm_region)
 
 # Build --------------------------------------------------------------------------------------------
 
