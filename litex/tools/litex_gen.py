@@ -23,6 +23,7 @@ from litex.soc.cores.gpio import GPIOTristate
 from litex.soc.cores.spi import SPIMaster, SPISlave
 from litex.soc.cores.clock import S7MMCM
 from litex.soc.cores.prm import *
+from litex.soc.cores.led import LedChaser
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -157,6 +158,11 @@ class LiteXCore(SoCMini):
             roi_output_pads  = platform.request("synthio_out"),
             mode             = "slave")
             self.add_csr("prm")
+
+            self.submodules.leds = LedChaser(
+                pads         = self.prm.addit_roi_out[-1],
+                sys_clk_freq = sys_clk_freq)
+            self.add_csr("leds")
 
         # PWM
         if with_pwm:
