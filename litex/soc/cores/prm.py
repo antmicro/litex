@@ -144,3 +144,47 @@ class PRIOInterfacer(Module):
                                                     o_O=sig[i])
 
         return r
+
+class MemoryWriter(Module):
+    def __init__(self, data_width, depth):
+        mem = Memory(data_width, depth)
+        self.specials.port = mem.get_port(write_capable=True)
+
+        # get the wishbone Interface accessor object
+        self.bus = wishbone.Interface()
+
+        # get wishbone signals
+        adr = getattr(self.bus, "adr")
+        dat_w = getattr(self.bus, "dat_w")
+        we = getattr(self.bus, "we")
+
+        # connect the write port to wishbone bus
+        self.comb += [
+           self.port.adr.eq(adr),
+           self.port.dat_w.eq(dat_w),
+           self.port.we.eq(we)
+        ]
+
+        # attach a wishbone interface to the Memory() object, with a read-only port
+        self.submodules.wb_sram_if = wishbone.SRAM(mem, read_only=True)
+
+
+        # connect the Wishbone bus to the Memory wishbone port, using the address filter
+        # to help decode the address.
+        # The decdoder address filter as a list with entries as follows:
+        #   (filter_function, wishbone_interface.bus)
+        # This is useful if you need to attach multiple local logic memories into the
+        # same wishbone address bank.
+        wb_con = wishbone.Decoder(self.bus, [(self.slave_filter, self.wb_sram_if.bus)], register=True)
+        # add the decoder as a submodule so it gets pulled into the finalize sweep
+        self.submodules += wb_con
+
+    # build an address filter object. This is a migen expression returns 1
+    # when the address "a" matches the RAM address space. Useful for precisely
+    # targeting the RAM relative to other wishbone-connected objects within
+    # the logic, e.g. other RAM blocks or registers.
+    #
+    # This filter means the RAM object will occupy its entire own CSR block,
+    # with aliased copies of the RAM filling the entire block
+    def slave_filter(self, a):
+        return 1
