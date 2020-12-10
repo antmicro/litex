@@ -19,7 +19,7 @@ io_layout = [
     ("roi_out4", 4, DIR_S_TO_M),
 ]
 
-class PRIOInterfacer(Module, AutoCSR):
+class PRIOInterfacer(Module):
     def __init__(self, bus_pads, roi_input_pads, roi_output_pads, mode):
         self.bus = wishbone.Interface()
 
