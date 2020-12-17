@@ -24,6 +24,7 @@ from litex.soc.cores.pwm import PWM
 from litex.soc.cores.gpio import GPIOTristate
 from litex.soc.cores.spi import SPIMaster, SPISlave
 from litex.soc.cores.clock import S7MMCM
+from litex.soc.cores.led import *
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -63,6 +64,7 @@ class LiteXCore(SoCMini):
         with_pwm        = False,
         with_mmcm       = False,
         with_gpio       = False, gpio_width=32,
+        with_led_chaser = False, leds_width=4,
         with_spi_master = False, spi_master_data_width=8, spi_master_clk_freq=8e6,
         **kwargs):
 
@@ -151,6 +153,13 @@ class LiteXCore(SoCMini):
             platform.add_extension(wb_bus.get_ios("wb"))
             wb_pads = platform.request("wb")
             self.comb += wb_bus.connect_to_pads(wb_pads, mode="slave")
+        # LedChaser
+        if with_led_chaser:
+            platform.add_extension([("leds", 0, Pins(leds_width))])
+            self.submodules.leds = LedChaser(
+                pads = platform.request("leds"),
+                sys_clk_freq = sys_clk_freq)
+            self.add_csr("leds")
 
         # AXI-Lite Master
         if kwargs["bus"] == "axi":
@@ -187,6 +196,8 @@ def soc_argdict(args):
         "with_timer",
         "with_gpio",
         "gpio_width",
+        "with_led_chaser",
+        "leds_width",
         "with_spi_master",
         "spi_master_data_width",
         "spi_master_clk_freq",
@@ -224,6 +235,8 @@ def main():
     parser.add_argument("--spi-master-clk-freq",   default=8e6, type=int, help="SPI master output clock frequency")
     parser.add_argument("--with-gpio",             action="store_true",   help="Add GPIO core")
     parser.add_argument("--gpio-width",            default=32,  type=int, help="GPIO signals width")
+    parser.add_argument("--with-led-chaser",       action="store_true",   help="Add LedChaser core")
+    parser.add_argument("--leds-width",            default=4,   type=int, help="LedChaser signals width")
 
     # CSR settings
     parser.add_argument("--csr-base",          default=0x0,   type=lambda x: int(x,0), help="CSR base address for generated core")
