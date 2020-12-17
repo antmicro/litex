@@ -59,7 +59,6 @@ class Platform(GenericPlatform):
 # LiteXCore ----------------------------------------------------------------------------------------
 
 class LiteXCore(SoCMini):
-    SoCMini.mem_map["csr"] = 0x00000000
     def __init__(self, sys_clk_freq=int(100e6),
         with_pwm        = False,
         with_mmcm       = False,
@@ -84,6 +83,7 @@ class LiteXCore(SoCMini):
         # SoCMini ----------------------------------------------------------------------------------
         print(kwargs)
         SoCMini.__init__(self, platform, clk_freq=sys_clk_freq, **kwargs)
+        SoCMini.mem_map["csr"] = kwargs["csr_base"]
 
         # MMCM
         if with_mmcm:
@@ -190,6 +190,7 @@ def soc_argdict(args):
         "with_spi_master",
         "spi_master_data_width",
         "spi_master_clk_freq",
+        "csr_base",
         "csr_data_width",
         "csr_address_width",
         "csr_paging"]:
@@ -225,9 +226,10 @@ def main():
     parser.add_argument("--gpio-width",            default=32,  type=int, help="GPIO signals width")
 
     # CSR settings
-    parser.add_argument("--csr-data-width",    default=8,     type=int, help="CSR bus data-width (8 or 32, default=8)")
-    parser.add_argument("--csr-address-width", default=14,    type=int, help="CSR bus address-width")
-    parser.add_argument("--csr-paging",        default=0x800, type=int, help="CSR bus paging")
+    parser.add_argument("--csr-base",          default=0x0,   type=lambda x: int(x,0), help="CSR base address for generated core")
+    parser.add_argument("--csr-data-width",    default=8,     type=int,                help="CSR bus data-width (8 or 32, default=8)")
+    parser.add_argument("--csr-address-width", default=14,    type=int,                help="CSR bus address-width")
+    parser.add_argument("--csr-paging",        default=0x800, type=lambda x: int(x,0), help="CSR bus paging")
 
     # Constraints type
     parser.add_argument("--constr", default="xdc", type=str, help="Generate constraints of given type")
