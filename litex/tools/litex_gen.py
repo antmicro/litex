@@ -12,6 +12,8 @@ import argparse
 from migen import *
 
 from litex.build.generic_platform import *
+from litex.build.xilinx.vivado import _xdc_separator, _format_xdc, _build_xdc
+from litex.build.xilinx.ise import _format_ucf, _build_ucf
 
 from litex.soc.integration.soc_core import *
 from litex.soc.integration.builder import *
@@ -33,14 +35,26 @@ _io = [
 # Platform -----------------------------------------------------------------------------------------
 
 class Platform(GenericPlatform):
-    def __init__(self, io):
+    def __init__(self, io, top, constr=None):
         GenericPlatform.__init__(self, "", io)
+        self.top = top
+        self.constr = constr
 
     def build(self, fragment, build_dir, **kwargs):
         os.makedirs(build_dir, exist_ok=True)
         os.chdir(build_dir)
-        top_output = self.get_verilog(fragment)
-        top_output.write("litex_core.v")
+        top_output = self.get_verilog(fragment, name=self.top)
+        named_sc, named_pc = self.resolve_signals(top_output.ns)
+        top_file = self.top + ".v"
+        top_output.write(top_file)
+
+        if self.constr is not None:
+            if self.constr == "ucf":
+                tools.write_to_file(self.top + ".ucf", _build_ucf(named_sc, named_pc))
+            elif self.constr == "xdc":
+                tools.write_to_file(self.top + ".xdc", _build_xdc(named_sc, named_pc))
+            else:
+                raise OSError("Unsupported constraints type")
 
 # LiteXCore ----------------------------------------------------------------------------------------
 
@@ -53,7 +67,7 @@ class LiteXCore(SoCMini):
         with_spi_master = False, spi_master_data_width=8, spi_master_clk_freq=8e6,
         **kwargs):
 
-        platform = Platform(_io)
+        platform = Platform(_io, top=kwargs["top"], constr=kwargs["constr"])
 
         # UART
         if kwargs["with_uart"]:
@@ -162,6 +176,8 @@ def soc_argdict(args):
     ret = {}
     for arg in [
         "bus",
+        "top",
+        "constr",
         "with_pwm",
         "with_mmcm",
         "with_uart",
@@ -181,10 +197,15 @@ def soc_argdict(args):
 
 def main():
     parser = argparse.ArgumentParser(description="LiteX standalone core generator")
-    builder_args(parser)
 
     # Bus
     parser.add_argument("--bus",                   default="wishbone",    type=str, help="Type of Bus (wishbone, axi)")
+
+    # Top name
+    parser.add_argument("--top",                   default="litex_core",  type=str, help="Name of top module")
+
+    # Output directory
+    parser.add_argument("--output_dir",            default="build",       type=str, help="Output directory")
 
     # Cores
     parser.add_argument("--with-pwm",              action="store_true",   help="Add PWM core")
@@ -204,11 +225,16 @@ def main():
     parser.add_argument("--csr-address-width", default=14,    type=int, help="CSR bus address-width")
     parser.add_argument("--csr-paging",        default=0x800, type=int, help="CSR bus paging")
 
+    # Constraints type
+    parser.add_argument("--constr", default="xdc", type=str, help="Generate constraints of given type")
+
+    builder_args(parser)
     args = parser.parse_args()
 
     soc     = LiteXCore(**soc_argdict(args))
     builder = Builder(soc, **builder_argdict(args))
-    builder.build()
+    builder_kwargs = {}
+    builder.build(**builder_kwargs)
 
 
 if __name__ == "__main__":
