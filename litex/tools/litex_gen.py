@@ -25,6 +25,7 @@ from litex.soc.cores.gpio import GPIOTristate
 from litex.soc.cores.spi import SPIMaster, SPISlave
 from litex.soc.cores.clock import S7MMCM
 from litex.soc.cores.led import *
+from litex.soc.cores.prm import *
 
 # Platform -----------------------------------------------------------------------------------------
 
@@ -66,6 +67,7 @@ class LiteXCore(SoCMini):
         with_gpio       = False, gpio_width=32,
         with_led_chaser = False, leds_width=4,
         with_spi_master = False, spi_master_data_width=8, spi_master_clk_freq=8e6,
+        prm             = False,
         **kwargs):
 
         platform = Platform(_io, top=kwargs["top"], constr=kwargs["constr"])
@@ -80,12 +82,50 @@ class LiteXCore(SoCMini):
             ])
 
         # CRG --------------------------------------------------------------------------------------
-        self.submodules.crg = CRG(platform.request("sys_clk"), rst=platform.request("sys_rst"))
+        if not prm:
+            self.submodules.crg = CRG(platform.request("sys_clk"), rst=platform.request("sys_rst"))
 
         # SoCMini ----------------------------------------------------------------------------------
-        print(kwargs)
         SoCMini.__init__(self, platform, clk_freq=sys_clk_freq, **kwargs)
         SoCMini.mem_map["csr"] = kwargs["csr_base"]
+
+        bus = None
+        # Wishbone Master
+        if kwargs["bus"] == "wishbone":
+            bus = wishbone.Interface()
+            self.bus.add_master(master=bus)
+            if not prm:
+                platform.add_extension(bus.get_ios("wb"))
+                bus_pads = platform.request("wb")
+                self.comb += bus.connect_to_pads(bus_pads, mode="slave")
+
+        # AXI-Lite Master
+        if kwargs["bus"] == "axi":
+            bus = axi.AXILiteInterface(data_width=32, address_width=32)
+            wb_bus = wishbone.Interface()
+            axi2wb = axi.AXILite2Wishbone(bus, wb_bus)
+            self.submodules += axi2wb
+            self.bus.add_master(master=wb_bus)
+            if not prm:
+                platform.add_extension(bus.get_ios("axi"))
+                bus_pads = platform.request("axi")
+                self.comb += bus.connect_to_pads(bus_pads, mode="slave")
+
+        # PRM
+        if prm:
+            assert bus is not None
+            roi_outs = []
+            roi_ins = []
+            if with_led_chaser:
+                roi_outs += [PRMConnector("leds", Signal(leds_width))]
+            self.submodules.prm = PRM(
+                platform = platform,
+                bus      = bus,
+                bus_type = kwargs["bus"],
+                mode     = "roi",
+                roi_ins  = roi_ins,
+                roi_outs = roi_outs)
+            self.submodules.crg = CRG(self.prm.get_clk_pad(), rst=self.prm.get_rst_pad())
 
         # MMCM
         if with_mmcm:
@@ -146,31 +186,22 @@ class LiteXCore(SoCMini):
             self.submodules.gpio = GPIOTristate(platform.request("gpio"))
             self.add_csr("gpio")
 
-        # Wishbone Master
-        if kwargs["bus"] == "wishbone":
-            wb_bus = wishbone.Interface()
-            self.bus.add_master(master=wb_bus)
-            platform.add_extension(wb_bus.get_ios("wb"))
-            wb_pads = platform.request("wb")
-            self.comb += wb_bus.connect_to_pads(wb_pads, mode="slave")
         # LedChaser
         if with_led_chaser:
-            platform.add_extension([("leds", 0, Pins(leds_width))])
-            self.submodules.leds = LedChaser(
-                pads = platform.request("leds"),
-                sys_clk_freq = sys_clk_freq)
+            if not prm:
+                platform.add_extension([("leds", 0, Pins(leds_width))])
+                self.submodules.leds = LedChaser(
+                    pads = platform.request("leds"),
+                    sys_clk_freq = sys_clk_freq)
+            else:
+                for roi_o in self.prm.roi_outs:
+                    if roi_o.name == "leds":
+                        led_pads = roi_o
+                        break
+                self.submodules.leds = LedChaser(
+                    pads = led_pads.get_core_io_all(),
+                    sys_clk_freq = sys_clk_freq)
             self.add_csr("leds")
-
-        # AXI-Lite Master
-        if kwargs["bus"] == "axi":
-            axi_bus = axi.AXILiteInterface(data_width=32, address_width=32)
-            wb_bus = wishbone.Interface()
-            axi2wb = axi.AXILite2Wishbone(axi_bus, wb_bus)
-            self.submodules += axi2wb
-            self.bus.add_master(master=wb_bus)
-            platform.add_extension(axi_bus.get_ios("axi"))
-            axi_pads = platform.request("axi")
-            self.comb += axi_bus.connect_to_pads(axi_pads, mode="slave")
 
         # IRQs
         for name, loc in sorted(self.irq.locs.items()):
@@ -204,7 +235,8 @@ def soc_argdict(args):
         "csr_base",
         "csr_data_width",
         "csr_address_width",
-        "csr_paging"]:
+        "csr_paging",
+        "prm"]:
         ret[arg] = getattr(args, arg)
     return ret
 
@@ -237,6 +269,7 @@ def main():
     parser.add_argument("--gpio-width",            default=32,  type=int, help="GPIO signals width")
     parser.add_argument("--with-led-chaser",       action="store_true",   help="Add LedChaser core")
     parser.add_argument("--leds-width",            default=4,   type=int, help="LedChaser signals width")
+    parser.add_argument("--prm",                   action="store_true",   help="Mark generated core as PRM")
 
     # CSR settings
     parser.add_argument("--csr-base",          default=0x0,   type=lambda x: int(x,0), help="CSR base address for generated core")
