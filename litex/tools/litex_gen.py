@@ -175,6 +175,7 @@ class LiteXCore(SoCMini):
 def soc_argdict(args):
     ret = {}
     for arg in [
+        "sys_clk_freq",
         "bus",
         "top",
         "constr",
@@ -197,6 +198,9 @@ def soc_argdict(args):
 
 def main():
     parser = argparse.ArgumentParser(description="LiteX standalone core generator")
+
+    # Clock frequency
+    parser.add_argument("--sys-clk-freq",          type=int, default=int(100e6), help="System clock frequency (default: 100MHz)")
 
     # Bus
     parser.add_argument("--bus",                   default="wishbone",    type=str, help="Type of Bus (wishbone, axi)")
