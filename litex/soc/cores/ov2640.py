@@ -12,6 +12,7 @@ _ov2640_pads_layout = [
 
 class OV2640(Module, AutoCSR):
     def __init__(self, pads):
+
         self.camera_pads = camera_pads = Record(_ov2640_pads_layout)
 
         self.pclk_valid = pclk_valid = Signal ()
@@ -40,13 +41,12 @@ class OV2640(Module, AutoCSR):
         self.outer_valid = outer_valid = Signal ()
         last_data = Signal (8)
         counter = Signal (32)
-        self.pixel = pixel = Signal (16)
-        pixel_d = Signal (16)
-
-        self.sync += pixel_d.eq(pixel)
+        self.pixel_rgb565 = pixel_rgb565 = Signal (16)
+        self.pixel_rgba = pixel_rgba     = Signal (32)
 
         # FSM
         self.submodules.fsm = fsm = FSM(reset_state="WAIT_END_VSYNC")
+
         fsm.act("WAIT_END_VSYNC",
             If(~vsync_d,
                 NextState("WAIT_START_VSYNC")
@@ -59,14 +59,19 @@ class OV2640(Module, AutoCSR):
                 NextState("CAPTURE")
             )
         )
-        fsm.act("CAPTURE",  
+        fsm.act("CAPTURE",
             inner_valid.eq(vsync_d & href_d & pclk_d & pclk_valid),
-            pixel.eq(pixel_d),
             If (inner_valid,
                 If(~counter & 1, #if counter % 2 == 0:
                     NextValue(last_data, data_d),
                 ).Else(
-                    pixel.eq((last_data << 8) | data_d),
+                    pixel_rgb565.eq((last_data << 8) | data_d),
+                    pixel_rgba.eq(                                          # Save RGBA pixel as Little Endian (ABGR32)
+                        (last_data[3:] << 3) |                              # red   = pixel[11:16]
+                        ((last_data[:3] << 5) | (data_d[5:] << 2)) << 8 |   # green = pixel[5:11]
+                        (data_d[:5] << 3) << 16 |                           # blue  = pixel[:5]
+                        0xff << 24                                          # alpha = 255 (not transparent)
+                    ),
                     outer_valid.eq(1),
                 ),
                 NextValue(counter, counter + 1),
