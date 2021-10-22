@@ -8,7 +8,7 @@ from litex.soc.interconnect.axi import *
 class FastVDMAWriter(Module):
     def __init__(self, platform, data_width=32, adr_width=30):
         # Add verilog file with generated netlist for FastVDMA -------------------------------------
-        platform.add_sources(os.path.abspath(os.path.dirname(__file__)), "fastvdma_writer.v")
+        platform.add_source(os.path.abspath(os.path.dirname(__file__)), "fastvdma_writer.v")
 
         # Attach FastVDMA signals to Wishbone and AXI Stream ---------------------------------------
         self.wb_ctrl = wishbone.Interface(data_width, adr_width)

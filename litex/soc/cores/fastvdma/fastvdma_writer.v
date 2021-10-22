@@ -1,4 +1,4 @@
-module WishboneCSR_( // @[:@3.2]
+module Writer_WishboneCSR( // @[:@3.2]
   input         clock, // @[:@4.4]
   input         reset, // @[:@5.4]
   input  [31:0] io_ctl_dat_i, // @[:@6.4]
@@ -489,7 +489,7 @@ module WishboneClassicWriter( // @[:@92.2]
     end
   end
 endmodule
-module CSR_( // @[:@160.2]
+module Writer_CSR( // @[:@160.2]
   output [31:0] io_csr_0_dataOut, // @[:@163.4]
   output        io_csr_0_dataWrite, // @[:@163.4]
   input  [31:0] io_csr_0_dataIn, // @[:@163.4]
@@ -698,7 +698,7 @@ module CSR_( // @[:@160.2]
   assign io_csr_15_dataWrite = _T_343 & io_bus_write; // @[CSR.scala 49:27:@466.6 CSR.scala 51:27:@469.6]
   assign io_bus_dataIn = _T_344 ? io_csr_15_dataIn : _GEN_56; // @[CSR.scala 37:17:@167.4]
 endmodule
-module AddressGenerator_( // @[:@473.2]
+module Writer_AddressGenerator( // @[:@473.2]
   input         clock, // @[:@474.4]
   input         reset, // @[:@475.4]
   input         io_ctl_start, // @[:@476.4]
@@ -976,7 +976,7 @@ module AddressGenerator_( // @[:@473.2]
     end
   end
 endmodule
-module TransferSplitter_( // @[:@546.2]
+module Writer_TransferSplitter( // @[:@546.2]
   output        io_xferIn_done, // @[:@549.4]
   input  [31:0] io_xferIn_length, // @[:@549.4]
   input         io_xferIn_valid, // @[:@549.4]
@@ -988,7 +988,7 @@ module TransferSplitter_( // @[:@546.2]
   assign io_xferOut_length = io_xferIn_length; // @[TransferSplitter.scala 132:16:@553.4]
   assign io_xferOut_valid = io_xferIn_valid; // @[TransferSplitter.scala 132:16:@552.4]
 endmodule
-module TransferSplitter_1_( // @[:@630.2]
+module Writer_TransferSplitter_1( // @[:@630.2]
   input         clock, // @[:@631.4]
   input         reset, // @[:@632.4]
   output        io_xferIn_done, // @[:@633.4]
@@ -1258,7 +1258,7 @@ module TransferSplitter_1_( // @[:@630.2]
     end
   end
 endmodule
-module ClearCSR_( // @[:@704.2]
+module Writer_ClearCSR( // @[:@704.2]
   input         clock, // @[:@705.4]
   input         reset, // @[:@706.4]
   input  [31:0] io_csr_dataOut, // @[:@707.4]
@@ -1319,7 +1319,7 @@ module ClearCSR_( // @[:@704.2]
     end
   end
 endmodule
-module StatusCSR_( // @[:@721.2]
+module Writer_StatusCSR( // @[:@721.2]
   input         clock, // @[:@722.4]
   output [31:0] io_csr_dataIn, // @[:@724.4]
   input  [31:0] io_value // @[:@724.4]
@@ -1361,7 +1361,7 @@ module StatusCSR_( // @[:@721.2]
     reg$ <= io_value;
   end
 endmodule
-module SimpleCSR_( // @[:@730.2]
+module Writer_SimpleCSR( // @[:@730.2]
   input         clock, // @[:@731.4]
   input         reset, // @[:@732.4]
   input  [31:0] io_csr_dataOut, // @[:@733.4]
@@ -1415,7 +1415,7 @@ module SimpleCSR_( // @[:@730.2]
     end
   end
 endmodule
-module SetCSR_( // @[:@742.2]
+module Writer_SetCSR( // @[:@742.2]
   input         clock, // @[:@743.4]
   input         reset, // @[:@744.4]
   input  [31:0] io_csr_dataOut, // @[:@745.4]
@@ -1480,7 +1480,7 @@ module SetCSR_( // @[:@742.2]
     end
   end
 endmodule
-module InterruptController_( // @[:@761.2]
+module Writer_InterruptController( // @[:@761.2]
   input         clock, // @[:@762.4]
   input         reset, // @[:@763.4]
   output        io_irq_readerDone, // @[:@764.4]
@@ -1530,7 +1530,7 @@ module InterruptController_( // @[:@761.2]
   wire  _T_67; // @[InterruptController.scala 51:43:@793.4]
   wire [1:0] irq; // @[Cat.scala 30:58:@795.4]
   wire [31:0] isr; // @[:@806.4 :@807.4]
-  SimpleCSR SimpleCSR ( // @[SimpleCSR.scala 48:21:@766.4]
+  Writer_SimpleCSR SimpleCSR ( // @[SimpleCSR.scala 48:21:@766.4]
     .clock(SimpleCSR_clock),
     .reset(SimpleCSR_reset),
     .io_csr_dataOut(SimpleCSR_io_csr_dataOut),
@@ -1538,7 +1538,7 @@ module InterruptController_( // @[:@761.2]
     .io_csr_dataIn(SimpleCSR_io_csr_dataIn),
     .io_value(SimpleCSR_io_value)
   );
-  SetCSR SetCSR ( // @[SetCSR.scala 51:21:@798.4]
+  Writer_SetCSR SetCSR ( // @[SetCSR.scala 51:21:@798.4]
     .clock(SetCSR_clock),
     .reset(SetCSR_reset),
     .io_csr_dataOut(SetCSR_io_csr_dataOut),
@@ -1638,7 +1638,7 @@ module InterruptController_( // @[:@761.2]
     end
   end
 endmodule
-module WorkerCSRWrapper_( // @[:@957.2]
+module Writer_WorkerCSRWrapper( // @[:@957.2]
   input         clock, // @[:@958.4]
   input         reset, // @[:@959.4]
   input  [31:0] io_csr_0_dataOut, // @[:@960.4]
@@ -1866,7 +1866,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
   wire  _T_220; // @[WorkerCSRWrapper.scala 71:50:@1038.4]
   wire  _T_221; // @[WorkerCSRWrapper.scala 71:75:@1039.4]
   wire  _T_222; // @[WorkerCSRWrapper.scala 71:65:@1040.4]
-  AddressGenerator_ addressGeneratorRead ( // @[WorkerCSRWrapper.scala 41:36:@962.4]
+  Writer_AddressGenerator addressGeneratorRead ( // @[WorkerCSRWrapper.scala 41:36:@962.4]
     .clock(addressGeneratorRead_clock),
     .reset(addressGeneratorRead_reset),
     .io_ctl_start(addressGeneratorRead_io_ctl_start),
@@ -1880,7 +1880,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_xfer_length(addressGeneratorRead_io_xfer_length),
     .io_xfer_valid(addressGeneratorRead_io_xfer_valid)
   );
-  TransferSplitter_ transferSplitterRead ( // @[WorkerCSRWrapper.scala 42:36:@965.4]
+  Writer_TransferSplitter transferSplitterRead ( // @[WorkerCSRWrapper.scala 42:36:@965.4]
     .io_xferIn_done(transferSplitterRead_io_xferIn_done),
     .io_xferIn_length(transferSplitterRead_io_xferIn_length),
     .io_xferIn_valid(transferSplitterRead_io_xferIn_valid),
@@ -1888,7 +1888,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_xferOut_length(transferSplitterRead_io_xferOut_length),
     .io_xferOut_valid(transferSplitterRead_io_xferOut_valid)
   );
-  AddressGenerator_ addressGeneratorWrite ( // @[WorkerCSRWrapper.scala 44:37:@968.4]
+  Writer_AddressGenerator addressGeneratorWrite ( // @[WorkerCSRWrapper.scala 44:37:@968.4]
     .clock(addressGeneratorWrite_clock),
     .reset(addressGeneratorWrite_reset),
     .io_ctl_start(addressGeneratorWrite_io_ctl_start),
@@ -1902,7 +1902,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_xfer_length(addressGeneratorWrite_io_xfer_length),
     .io_xfer_valid(addressGeneratorWrite_io_xfer_valid)
   );
-  TransferSplitter_1_ transferSplitterWrite ( // @[WorkerCSRWrapper.scala 45:37:@971.4]
+  Writer_TransferSplitter_1 transferSplitterWrite ( // @[WorkerCSRWrapper.scala 45:37:@971.4]
     .clock(transferSplitterWrite_clock),
     .reset(transferSplitterWrite_reset),
     .io_xferIn_done(transferSplitterWrite_io_xferIn_done),
@@ -1914,7 +1914,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_xferOut_length(transferSplitterWrite_io_xferOut_length),
     .io_xferOut_valid(transferSplitterWrite_io_xferOut_valid)
   );
-  ClearCSR_ ClearCSR ( // @[ClearCSR.scala 50:21:@989.4]
+  Writer_ClearCSR ClearCSR ( // @[ClearCSR.scala 50:21:@989.4]
     .clock(ClearCSR_clock),
     .reset(ClearCSR_reset),
     .io_csr_dataOut(ClearCSR_io_csr_dataOut),
@@ -1923,12 +1923,12 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_value(ClearCSR_io_value),
     .io_clear(ClearCSR_io_clear)
   );
-  StatusCSR_ StatusCSR ( // @[StatusCSR.scala 42:21:@998.4]
+  Writer_StatusCSR StatusCSR ( // @[StatusCSR.scala 42:21:@998.4]
     .clock(StatusCSR_clock),
     .io_csr_dataIn(StatusCSR_io_csr_dataIn),
     .io_value(StatusCSR_io_value)
   );
-  InterruptController_ InterruptController ( // @[InterruptController.scala 63:22:@1006.4]
+  Writer_InterruptController InterruptController ( // @[InterruptController.scala 63:22:@1006.4]
     .clock(InterruptController_clock),
     .reset(InterruptController_reset),
     .io_irq_readerDone(InterruptController_io_irq_readerDone),
@@ -1942,7 +1942,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_isr_dataWrite(InterruptController_io_isr_dataWrite),
     .io_isr_dataIn(InterruptController_io_isr_dataIn)
   );
-  SimpleCSR_ SimpleCSR ( // @[SimpleCSR.scala 48:21:@1043.4]
+  Writer_SimpleCSR SimpleCSR ( // @[SimpleCSR.scala 48:21:@1043.4]
     .clock(SimpleCSR_clock),
     .reset(SimpleCSR_reset),
     .io_csr_dataOut(SimpleCSR_io_csr_dataOut),
@@ -1950,7 +1950,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_io_csr_dataIn),
     .io_value(SimpleCSR_io_value)
   );
-  SimpleCSR_ SimpleCSR_1 ( // @[SimpleCSR.scala 48:21:@1051.4]
+  Writer_SimpleCSR SimpleCSR_1 ( // @[SimpleCSR.scala 48:21:@1051.4]
     .clock(SimpleCSR_1_clock),
     .reset(SimpleCSR_1_reset),
     .io_csr_dataOut(SimpleCSR_1_io_csr_dataOut),
@@ -1958,7 +1958,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_1_io_csr_dataIn),
     .io_value(SimpleCSR_1_io_value)
   );
-  SimpleCSR_ SimpleCSR_2 ( // @[SimpleCSR.scala 48:21:@1059.4]
+  Writer_SimpleCSR SimpleCSR_2 ( // @[SimpleCSR.scala 48:21:@1059.4]
     .clock(SimpleCSR_2_clock),
     .reset(SimpleCSR_2_reset),
     .io_csr_dataOut(SimpleCSR_2_io_csr_dataOut),
@@ -1966,7 +1966,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_2_io_csr_dataIn),
     .io_value(SimpleCSR_2_io_value)
   );
-  SimpleCSR_ SimpleCSR_3 ( // @[SimpleCSR.scala 48:21:@1067.4]
+  Writer_SimpleCSR SimpleCSR_3 ( // @[SimpleCSR.scala 48:21:@1067.4]
     .clock(SimpleCSR_3_clock),
     .reset(SimpleCSR_3_reset),
     .io_csr_dataOut(SimpleCSR_3_io_csr_dataOut),
@@ -1974,7 +1974,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_3_io_csr_dataIn),
     .io_value(SimpleCSR_3_io_value)
   );
-  SimpleCSR_ SimpleCSR_4 ( // @[SimpleCSR.scala 48:21:@1076.4]
+  Writer_SimpleCSR SimpleCSR_4 ( // @[SimpleCSR.scala 48:21:@1076.4]
     .clock(SimpleCSR_4_clock),
     .reset(SimpleCSR_4_reset),
     .io_csr_dataOut(SimpleCSR_4_io_csr_dataOut),
@@ -1982,7 +1982,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_4_io_csr_dataIn),
     .io_value(SimpleCSR_4_io_value)
   );
-  SimpleCSR_ SimpleCSR_5 ( // @[SimpleCSR.scala 48:21:@1084.4]
+  Writer_SimpleCSR SimpleCSR_5 ( // @[SimpleCSR.scala 48:21:@1084.4]
     .clock(SimpleCSR_5_clock),
     .reset(SimpleCSR_5_reset),
     .io_csr_dataOut(SimpleCSR_5_io_csr_dataOut),
@@ -1990,7 +1990,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_5_io_csr_dataIn),
     .io_value(SimpleCSR_5_io_value)
   );
-  SimpleCSR_ SimpleCSR_6 ( // @[SimpleCSR.scala 48:21:@1092.4]
+  Writer_SimpleCSR SimpleCSR_6 ( // @[SimpleCSR.scala 48:21:@1092.4]
     .clock(SimpleCSR_6_clock),
     .reset(SimpleCSR_6_reset),
     .io_csr_dataOut(SimpleCSR_6_io_csr_dataOut),
@@ -1998,7 +1998,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_6_io_csr_dataIn),
     .io_value(SimpleCSR_6_io_value)
   );
-  SimpleCSR_ SimpleCSR_7 ( // @[SimpleCSR.scala 48:21:@1100.4]
+  Writer_SimpleCSR SimpleCSR_7 ( // @[SimpleCSR.scala 48:21:@1100.4]
     .clock(SimpleCSR_7_clock),
     .reset(SimpleCSR_7_reset),
     .io_csr_dataOut(SimpleCSR_7_io_csr_dataOut),
@@ -2006,7 +2006,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_7_io_csr_dataIn),
     .io_value(SimpleCSR_7_io_value)
   );
-  SimpleCSR_ SimpleCSR_8 ( // @[SimpleCSR.scala 48:21:@1108.4]
+  Writer_SimpleCSR SimpleCSR_8 ( // @[SimpleCSR.scala 48:21:@1108.4]
     .clock(SimpleCSR_8_clock),
     .reset(SimpleCSR_8_reset),
     .io_csr_dataOut(SimpleCSR_8_io_csr_dataOut),
@@ -2014,7 +2014,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_8_io_csr_dataIn),
     .io_value(SimpleCSR_8_io_value)
   );
-  SimpleCSR_ SimpleCSR_9 ( // @[SimpleCSR.scala 48:21:@1115.4]
+  Writer_SimpleCSR SimpleCSR_9 ( // @[SimpleCSR.scala 48:21:@1115.4]
     .clock(SimpleCSR_9_clock),
     .reset(SimpleCSR_9_reset),
     .io_csr_dataOut(SimpleCSR_9_io_csr_dataOut),
@@ -2022,7 +2022,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_9_io_csr_dataIn),
     .io_value(SimpleCSR_9_io_value)
   );
-  SimpleCSR_ SimpleCSR_10 ( // @[SimpleCSR.scala 48:21:@1122.4]
+  Writer_SimpleCSR SimpleCSR_10 ( // @[SimpleCSR.scala 48:21:@1122.4]
     .clock(SimpleCSR_10_clock),
     .reset(SimpleCSR_10_reset),
     .io_csr_dataOut(SimpleCSR_10_io_csr_dataOut),
@@ -2030,7 +2030,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     .io_csr_dataIn(SimpleCSR_10_io_csr_dataIn),
     .io_value(SimpleCSR_10_io_value)
   );
-  SimpleCSR_ SimpleCSR_11 ( // @[SimpleCSR.scala 48:21:@1129.4]
+  Writer_SimpleCSR SimpleCSR_11 ( // @[SimpleCSR.scala 48:21:@1129.4]
     .clock(SimpleCSR_11_clock),
     .reset(SimpleCSR_11_reset),
     .io_csr_dataOut(SimpleCSR_11_io_csr_dataOut),
@@ -2240,7 +2240,7 @@ module WorkerCSRWrapper_( // @[:@957.2]
     end
   end
 endmodule
-module Queue_( // @[:@1157.2]
+module Writer_Queue( // @[:@1157.2]
   input         clock, // @[:@1158.4]
   input         reset, // @[:@1159.4]
   output        io_enq_ready, // @[:@1160.4]
@@ -2561,7 +2561,7 @@ module fastvdma_writer( // @[:@1208.2]
   wire  queue_io_deq_ready; // @[Decoupled.scala 294:21:@1228.4]
   wire  queue_io_deq_valid; // @[Decoupled.scala 294:21:@1228.4]
   wire [31:0] queue_io_deq_bits; // @[Decoupled.scala 294:21:@1228.4]
-  WishboneCSR_ csrFrontend ( // @[DMATop.scala 42:27:@1213.4]
+  Writer_WishboneCSR csrFrontend ( // @[DMATop.scala 42:27:@1213.4]
     .clock(csrFrontend_clock),
     .reset(csrFrontend_reset),
     .io_ctl_dat_i(csrFrontend_io_ctl_dat_i),
@@ -2606,7 +2606,7 @@ module fastvdma_writer( // @[:@1208.2]
     .io_xfer_length(writerFrontend_io_xfer_length),
     .io_xfer_valid(writerFrontend_io_xfer_valid)
   );
-  CSR_ csr ( // @[DMATop.scala 46:19:@1222.4]
+  Writer_CSR csr ( // @[DMATop.scala 46:19:@1222.4]
     .io_csr_0_dataOut(csr_io_csr_0_dataOut),
     .io_csr_0_dataWrite(csr_io_csr_0_dataWrite),
     .io_csr_0_dataIn(csr_io_csr_0_dataIn),
@@ -2659,7 +2659,7 @@ module fastvdma_writer( // @[:@1208.2]
     .io_bus_write(csr_io_bus_write),
     .io_bus_read(csr_io_bus_read)
   );
-  WorkerCSRWrapper_ ctl ( // @[DMATop.scala 48:19:@1225.4]
+  Writer_WorkerCSRWrapper ctl ( // @[DMATop.scala 48:19:@1225.4]
     .clock(ctl_clock),
     .reset(ctl_reset),
     .io_csr_0_dataOut(ctl_io_csr_0_dataOut),
@@ -2720,7 +2720,7 @@ module fastvdma_writer( // @[:@1208.2]
     .io_xferWrite_length(ctl_io_xferWrite_length),
     .io_xferWrite_valid(ctl_io_xferWrite_valid)
   );
-  Queue_ queue ( // @[Decoupled.scala 294:21:@1228.4]
+  Writer_Queue queue ( // @[Decoupled.scala 294:21:@1228.4]
     .clock(queue_clock),
     .reset(queue_reset),
     .io_enq_ready(queue_io_enq_ready),
