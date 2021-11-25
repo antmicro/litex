@@ -3,19 +3,16 @@ from migen import *
 from litex.soc.interconnect.csr import *
 from migen.genlib.cdc import MultiReg
 
-_ov2640_pads_layout = [
-    ("data",    8),
-    ("pclk",    1),
-    ("href",    1),
-    ("vsync",   1),
-]
+# OV2640 pads layout:
+# "data":  8
+# "pclk":  1
+# "href":  1
+# "vsync": 1
 
 class OV2640(Module, AutoCSR):
     def __init__(self, pads):
 
-        self.camera_pads = camera_pads = Record(_ov2640_pads_layout)
-
-        self.pclk_valid = pclk_valid = Signal ()
+        self.pclk_valid = pclk_valid = Signal()
 
         # delayed signals
         self.data  = data  = Signal(8)
@@ -24,29 +21,27 @@ class OV2640(Module, AutoCSR):
         self.vsync = vsync = Signal()
         self.vsync_d = vsync_d = Signal()
 
-        self.comb += [
-            camera_pads.data.eq(getattr(pads, "data")),
-            camera_pads.pclk.eq(getattr(pads, "pclk")),
-            camera_pads.href.eq(getattr(pads, "href")),
-            camera_pads.vsync.eq(getattr(pads, "vsync")),
-        ]
+        _data  = getattr(pads, "data")
+        _pclk  = getattr(pads, "pclk")
+        _href  = getattr(pads, "href")
+        _vsync = getattr(pads, "vsync")
 
         self.specials += [
-            MultiReg(camera_pads.pclk, pclk),
-            MultiReg(camera_pads.href, href),
-            MultiReg(camera_pads.vsync, vsync),
+            MultiReg(_pclk, pclk),
+            MultiReg(_href, href),
+            MultiReg(_vsync, vsync),
             MultiReg(vsync, vsync_d),
         ]
 
-        for i in range(8):
-            self.specials += MultiReg(camera_pads.data[i], data[i])
+        for i in range(len(data)):
+            self.specials += MultiReg(_data[i], data[i])
 
-        inner_valid = Signal ()
-        self.outer_valid = outer_valid = Signal ()
-        last_data = Signal (8)
-        counter = Signal (32)
-        self.pixel_rgb565 = pixel_rgb565 = Signal (16)
-        self.pixel_rgba   = pixel_rgba   = Signal (32)
+        self.outer_valid  = outer_valid  = Signal()
+        self.pixel_rgb565 = pixel_rgb565 = Signal(16)
+        self.pixel_rgba   = pixel_rgba   = Signal(32)
+        inner_valid = Signal()
+        last_data   = Signal(len(data))
+        counter     = Signal(32)
 
         # FSM
         self.submodules.fsm = fsm = FSM(reset_state="WAIT_END_VSYNC")
