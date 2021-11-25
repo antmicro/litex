@@ -12,13 +12,13 @@ _ov2640_pads_layout = [
 
 class OV2640(Module, AutoCSR):
     def __init__(self, pads):
-        _data = CSRStatus(8, description="Data input from camera")
 
         self.camera_pads = camera_pads = Record(_ov2640_pads_layout)
 
         self.pclk_valid = pclk_valid = Signal ()
 
         # delayed signals
+        self.data  = data  = Signal(8)
         self.pclk  = pclk  = Signal()
         self.href  = href  = Signal()
         self.vsync = vsync = Signal()
@@ -32,12 +32,14 @@ class OV2640(Module, AutoCSR):
         ]
 
         self.specials += [
-            MultiReg(camera_pads.data, _data.status),
             MultiReg(camera_pads.pclk, pclk),
             MultiReg(camera_pads.href, href),
             MultiReg(camera_pads.vsync, vsync),
             MultiReg(vsync, vsync_d),
         ]
+
+        for i in range(8):
+            self.specials += MultiReg(camera_pads.data[i], data[i])
 
         inner_valid = Signal ()
         self.outer_valid = outer_valid = Signal ()
@@ -65,14 +67,14 @@ class OV2640(Module, AutoCSR):
             inner_valid.eq(vsync & href & pclk & pclk_valid),
             If (inner_valid,
                 If(~counter & 1, #if counter % 2 == 0:
-                    NextValue(last_data, _data.status),
+                    NextValue(last_data, data),
                 ).Else(
-                    pixel_rgb565.eq((last_data << 8) | _data.status),
-                    pixel_rgba.eq(                                                  # Save RGBA pixel as Little Endian (ABGR32)
-                        (last_data[3:] << 3) |                                      # red   = pixel[11:16]
-                        ((last_data[:3] << 5) | (_data.status[5:] << 2)) << 8 |     # green = pixel[5:11]
-                        (_data.status[:5] << 3) << 16 |                             # blue  = pixel[:5]
-                        0xff << 24                                                  # alpha = 255 (not transparent)
+                    pixel_rgb565.eq((last_data << 8) | data),
+                    pixel_rgba.eq(                                          # Save RGBA pixel as Little Endian (ABGR32)
+                        (last_data[3:] << 3) |                              # red   = pixel[11:16]
+                        ((last_data[:3] << 5) | (data[5:] << 2)) << 8 |     # green = pixel[5:11]
+                        (data[:5] << 3) << 16 |                             # blue  = pixel[:5]
+                        0xff << 24                                          # alpha = 255 (not transparent)
                     ),
                     outer_valid.eq(1),
                 ),
