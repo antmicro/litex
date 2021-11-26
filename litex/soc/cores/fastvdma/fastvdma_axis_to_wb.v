@@ -1,4 +1,4 @@
-module OV2640_WishboneCSR( // @[:@3.2]
+module AXIS_to_WB_WishboneCSR( // @[:@3.2]
   input         clock, // @[:@4.4]
   input         reset, // @[:@5.4]
   input  [31:0] io_ctl_dat_i, // @[:@6.4]
@@ -468,7 +468,7 @@ module WishboneClassicWriter( // @[:@92.2]
     end
   end
 endmodule
-module OV2640_CSR( // @[:@155.2]
+module AXIS_to_WB_CSR( // @[:@155.2]
   output [31:0] io_csr_0_dataOut, // @[:@158.4]
   output        io_csr_0_dataWrite, // @[:@158.4]
   input  [31:0] io_csr_0_dataIn, // @[:@158.4]
@@ -677,7 +677,7 @@ module OV2640_CSR( // @[:@155.2]
   assign io_csr_15_dataWrite = _T_343 & io_bus_write; // @[CSR.scala 49:27:@461.6 CSR.scala 51:27:@464.6]
   assign io_bus_dataIn = _T_344 ? io_csr_15_dataIn : _GEN_56; // @[CSR.scala 37:17:@162.4]
 endmodule
-module OV2640_AddressGenerator( // @[:@468.2]
+module AXIS_to_WB_AddressGenerator( // @[:@468.2]
   input         clock, // @[:@469.4]
   input         reset, // @[:@470.4]
   input         io_ctl_start, // @[:@471.4]
@@ -955,7 +955,7 @@ module OV2640_AddressGenerator( // @[:@468.2]
     end
   end
 endmodule
-module OV2640_TransferSplitter( // @[:@541.2]
+module AXIS_to_WB_TransferSplitter( // @[:@541.2]
   output        io_xferIn_done, // @[:@544.4]
   input  [31:0] io_xferIn_length, // @[:@544.4]
   input         io_xferIn_valid, // @[:@544.4]
@@ -967,7 +967,7 @@ module OV2640_TransferSplitter( // @[:@541.2]
   assign io_xferOut_length = io_xferIn_length; // @[TransferSplitter.scala 132:16:@548.4]
   assign io_xferOut_valid = io_xferIn_valid; // @[TransferSplitter.scala 132:16:@547.4]
 endmodule
-module OV2640_TransferSplitter_1( // @[:@625.2]
+module AXIS_to_WB_TransferSplitter_1( // @[:@625.2]
   input         clock, // @[:@626.4]
   input         reset, // @[:@627.4]
   output        io_xferIn_done, // @[:@628.4]
@@ -1237,7 +1237,7 @@ module OV2640_TransferSplitter_1( // @[:@625.2]
     end
   end
 endmodule
-module OV2640_ClearCSR( // @[:@699.2]
+module AXIS_to_WB_ClearCSR( // @[:@699.2]
   input         clock, // @[:@700.4]
   input         reset, // @[:@701.4]
   input  [31:0] io_csr_dataOut, // @[:@702.4]
@@ -1298,7 +1298,7 @@ module OV2640_ClearCSR( // @[:@699.2]
     end
   end
 endmodule
-module OV2640_StatusCSR( // @[:@716.2]
+module AXIS_to_WB_StatusCSR( // @[:@716.2]
   input         clock, // @[:@717.4]
   output [31:0] io_csr_dataIn, // @[:@719.4]
   input  [31:0] io_value // @[:@719.4]
@@ -1340,7 +1340,7 @@ module OV2640_StatusCSR( // @[:@716.2]
     reg$ <= io_value;
   end
 endmodule
-module OV2640_SimpleCSR( // @[:@725.2]
+module AXIS_to_WB_SimpleCSR( // @[:@725.2]
   input         clock, // @[:@726.4]
   input         reset, // @[:@727.4]
   input  [31:0] io_csr_dataOut, // @[:@728.4]
@@ -1394,7 +1394,7 @@ module OV2640_SimpleCSR( // @[:@725.2]
     end
   end
 endmodule
-module OV2640_SetCSR( // @[:@737.2]
+module AXIS_to_WB_SetCSR( // @[:@737.2]
   input         clock, // @[:@738.4]
   input         reset, // @[:@739.4]
   input  [31:0] io_csr_dataOut, // @[:@740.4]
@@ -1459,7 +1459,7 @@ module OV2640_SetCSR( // @[:@737.2]
     end
   end
 endmodule
-module OV2640_InterruptController( // @[:@756.2]
+module AXIS_to_WB_InterruptController( // @[:@756.2]
   input         clock, // @[:@757.4]
   input         reset, // @[:@758.4]
   output        io_irq_readerDone, // @[:@759.4]
@@ -1509,7 +1509,7 @@ module OV2640_InterruptController( // @[:@756.2]
   wire  _T_67; // @[InterruptController.scala 51:43:@788.4]
   wire [1:0] irq; // @[Cat.scala 30:58:@790.4]
   wire [31:0] isr; // @[:@801.4 :@802.4]
-  OV2640_SimpleCSR SimpleCSR ( // @[SimpleCSR.scala 48:21:@761.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR ( // @[SimpleCSR.scala 48:21:@761.4]
     .clock(SimpleCSR_clock),
     .reset(SimpleCSR_reset),
     .io_csr_dataOut(SimpleCSR_io_csr_dataOut),
@@ -1517,7 +1517,7 @@ module OV2640_InterruptController( // @[:@756.2]
     .io_csr_dataIn(SimpleCSR_io_csr_dataIn),
     .io_value(SimpleCSR_io_value)
   );
-  OV2640_SetCSR SetCSR ( // @[SetCSR.scala 51:21:@793.4]
+  AXIS_to_WB_SetCSR SetCSR ( // @[SetCSR.scala 51:21:@793.4]
     .clock(SetCSR_clock),
     .reset(SetCSR_reset),
     .io_csr_dataOut(SetCSR_io_csr_dataOut),
@@ -1617,7 +1617,7 @@ module OV2640_InterruptController( // @[:@756.2]
     end
   end
 endmodule
-module OV2640_WorkerCSRWrapper( // @[:@952.2]
+module AXIS_to_WB_WorkerCSRWrapper( // @[:@952.2]
   input         clock, // @[:@953.4]
   input         reset, // @[:@954.4]
   input  [31:0] io_csr_0_dataOut, // @[:@955.4]
@@ -1845,7 +1845,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
   wire  _T_220; // @[WorkerCSRWrapper.scala 71:50:@1033.4]
   wire  _T_221; // @[WorkerCSRWrapper.scala 71:75:@1034.4]
   wire  _T_222; // @[WorkerCSRWrapper.scala 71:65:@1035.4]
-  OV2640_AddressGenerator addressGeneratorRead ( // @[WorkerCSRWrapper.scala 41:36:@957.4]
+  AXIS_to_WB_AddressGenerator addressGeneratorRead ( // @[WorkerCSRWrapper.scala 41:36:@957.4]
     .clock(addressGeneratorRead_clock),
     .reset(addressGeneratorRead_reset),
     .io_ctl_start(addressGeneratorRead_io_ctl_start),
@@ -1859,7 +1859,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_xfer_length(addressGeneratorRead_io_xfer_length),
     .io_xfer_valid(addressGeneratorRead_io_xfer_valid)
   );
-  OV2640_TransferSplitter transferSplitterRead ( // @[WorkerCSRWrapper.scala 42:36:@960.4]
+  AXIS_to_WB_TransferSplitter transferSplitterRead ( // @[WorkerCSRWrapper.scala 42:36:@960.4]
     .io_xferIn_done(transferSplitterRead_io_xferIn_done),
     .io_xferIn_length(transferSplitterRead_io_xferIn_length),
     .io_xferIn_valid(transferSplitterRead_io_xferIn_valid),
@@ -1867,7 +1867,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_xferOut_length(transferSplitterRead_io_xferOut_length),
     .io_xferOut_valid(transferSplitterRead_io_xferOut_valid)
   );
-  OV2640_AddressGenerator addressGeneratorWrite ( // @[WorkerCSRWrapper.scala 44:37:@963.4]
+  AXIS_to_WB_AddressGenerator addressGeneratorWrite ( // @[WorkerCSRWrapper.scala 44:37:@963.4]
     .clock(addressGeneratorWrite_clock),
     .reset(addressGeneratorWrite_reset),
     .io_ctl_start(addressGeneratorWrite_io_ctl_start),
@@ -1881,7 +1881,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_xfer_length(addressGeneratorWrite_io_xfer_length),
     .io_xfer_valid(addressGeneratorWrite_io_xfer_valid)
   );
-  OV2640_TransferSplitter_1 transferSplitterWrite ( // @[WorkerCSRWrapper.scala 45:37:@966.4]
+  AXIS_to_WB_TransferSplitter_1 transferSplitterWrite ( // @[WorkerCSRWrapper.scala 45:37:@966.4]
     .clock(transferSplitterWrite_clock),
     .reset(transferSplitterWrite_reset),
     .io_xferIn_done(transferSplitterWrite_io_xferIn_done),
@@ -1893,7 +1893,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_xferOut_length(transferSplitterWrite_io_xferOut_length),
     .io_xferOut_valid(transferSplitterWrite_io_xferOut_valid)
   );
-  OV2640_ClearCSR ClearCSR ( // @[ClearCSR.scala 50:21:@984.4]
+  AXIS_to_WB_ClearCSR ClearCSR ( // @[ClearCSR.scala 50:21:@984.4]
     .clock(ClearCSR_clock),
     .reset(ClearCSR_reset),
     .io_csr_dataOut(ClearCSR_io_csr_dataOut),
@@ -1902,12 +1902,12 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_value(ClearCSR_io_value),
     .io_clear(ClearCSR_io_clear)
   );
-  OV2640_StatusCSR StatusCSR ( // @[StatusCSR.scala 42:21:@993.4]
+  AXIS_to_WB_StatusCSR StatusCSR ( // @[StatusCSR.scala 42:21:@993.4]
     .clock(StatusCSR_clock),
     .io_csr_dataIn(StatusCSR_io_csr_dataIn),
     .io_value(StatusCSR_io_value)
   );
-  OV2640_InterruptController InterruptController ( // @[InterruptController.scala 63:22:@1001.4]
+  AXIS_to_WB_InterruptController InterruptController ( // @[InterruptController.scala 63:22:@1001.4]
     .clock(InterruptController_clock),
     .reset(InterruptController_reset),
     .io_irq_readerDone(InterruptController_io_irq_readerDone),
@@ -1921,7 +1921,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_isr_dataWrite(InterruptController_io_isr_dataWrite),
     .io_isr_dataIn(InterruptController_io_isr_dataIn)
   );
-  OV2640_SimpleCSR SimpleCSR ( // @[SimpleCSR.scala 48:21:@1038.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR ( // @[SimpleCSR.scala 48:21:@1038.4]
     .clock(SimpleCSR_clock),
     .reset(SimpleCSR_reset),
     .io_csr_dataOut(SimpleCSR_io_csr_dataOut),
@@ -1929,7 +1929,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_io_csr_dataIn),
     .io_value(SimpleCSR_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_1 ( // @[SimpleCSR.scala 48:21:@1046.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_1 ( // @[SimpleCSR.scala 48:21:@1046.4]
     .clock(SimpleCSR_1_clock),
     .reset(SimpleCSR_1_reset),
     .io_csr_dataOut(SimpleCSR_1_io_csr_dataOut),
@@ -1937,7 +1937,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_1_io_csr_dataIn),
     .io_value(SimpleCSR_1_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_2 ( // @[SimpleCSR.scala 48:21:@1054.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_2 ( // @[SimpleCSR.scala 48:21:@1054.4]
     .clock(SimpleCSR_2_clock),
     .reset(SimpleCSR_2_reset),
     .io_csr_dataOut(SimpleCSR_2_io_csr_dataOut),
@@ -1945,7 +1945,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_2_io_csr_dataIn),
     .io_value(SimpleCSR_2_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_3 ( // @[SimpleCSR.scala 48:21:@1062.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_3 ( // @[SimpleCSR.scala 48:21:@1062.4]
     .clock(SimpleCSR_3_clock),
     .reset(SimpleCSR_3_reset),
     .io_csr_dataOut(SimpleCSR_3_io_csr_dataOut),
@@ -1953,7 +1953,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_3_io_csr_dataIn),
     .io_value(SimpleCSR_3_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_4 ( // @[SimpleCSR.scala 48:21:@1071.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_4 ( // @[SimpleCSR.scala 48:21:@1071.4]
     .clock(SimpleCSR_4_clock),
     .reset(SimpleCSR_4_reset),
     .io_csr_dataOut(SimpleCSR_4_io_csr_dataOut),
@@ -1961,7 +1961,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_4_io_csr_dataIn),
     .io_value(SimpleCSR_4_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_5 ( // @[SimpleCSR.scala 48:21:@1079.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_5 ( // @[SimpleCSR.scala 48:21:@1079.4]
     .clock(SimpleCSR_5_clock),
     .reset(SimpleCSR_5_reset),
     .io_csr_dataOut(SimpleCSR_5_io_csr_dataOut),
@@ -1969,7 +1969,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_5_io_csr_dataIn),
     .io_value(SimpleCSR_5_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_6 ( // @[SimpleCSR.scala 48:21:@1087.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_6 ( // @[SimpleCSR.scala 48:21:@1087.4]
     .clock(SimpleCSR_6_clock),
     .reset(SimpleCSR_6_reset),
     .io_csr_dataOut(SimpleCSR_6_io_csr_dataOut),
@@ -1977,7 +1977,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_6_io_csr_dataIn),
     .io_value(SimpleCSR_6_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_7 ( // @[SimpleCSR.scala 48:21:@1095.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_7 ( // @[SimpleCSR.scala 48:21:@1095.4]
     .clock(SimpleCSR_7_clock),
     .reset(SimpleCSR_7_reset),
     .io_csr_dataOut(SimpleCSR_7_io_csr_dataOut),
@@ -1985,7 +1985,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_7_io_csr_dataIn),
     .io_value(SimpleCSR_7_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_8 ( // @[SimpleCSR.scala 48:21:@1103.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_8 ( // @[SimpleCSR.scala 48:21:@1103.4]
     .clock(SimpleCSR_8_clock),
     .reset(SimpleCSR_8_reset),
     .io_csr_dataOut(SimpleCSR_8_io_csr_dataOut),
@@ -1993,7 +1993,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_8_io_csr_dataIn),
     .io_value(SimpleCSR_8_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_9 ( // @[SimpleCSR.scala 48:21:@1110.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_9 ( // @[SimpleCSR.scala 48:21:@1110.4]
     .clock(SimpleCSR_9_clock),
     .reset(SimpleCSR_9_reset),
     .io_csr_dataOut(SimpleCSR_9_io_csr_dataOut),
@@ -2001,7 +2001,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_9_io_csr_dataIn),
     .io_value(SimpleCSR_9_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_10 ( // @[SimpleCSR.scala 48:21:@1117.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_10 ( // @[SimpleCSR.scala 48:21:@1117.4]
     .clock(SimpleCSR_10_clock),
     .reset(SimpleCSR_10_reset),
     .io_csr_dataOut(SimpleCSR_10_io_csr_dataOut),
@@ -2009,7 +2009,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     .io_csr_dataIn(SimpleCSR_10_io_csr_dataIn),
     .io_value(SimpleCSR_10_io_value)
   );
-  OV2640_SimpleCSR SimpleCSR_11 ( // @[SimpleCSR.scala 48:21:@1124.4]
+  AXIS_to_WB_SimpleCSR SimpleCSR_11 ( // @[SimpleCSR.scala 48:21:@1124.4]
     .clock(SimpleCSR_11_clock),
     .reset(SimpleCSR_11_reset),
     .io_csr_dataOut(SimpleCSR_11_io_csr_dataOut),
@@ -2219,7 +2219,7 @@ module OV2640_WorkerCSRWrapper( // @[:@952.2]
     end
   end
 endmodule
-module OV2640_Queue( // @[:@1152.2]
+module AXIS_to_WB_Queue( // @[:@1152.2]
   input         clock, // @[:@1153.4]
   input         reset, // @[:@1154.4]
   output        io_enq_ready, // @[:@1155.4]
@@ -2350,7 +2350,7 @@ module OV2640_Queue( // @[:@1152.2]
     end
   end
 endmodule
-module fastvdma_ov2640( // @[:@1203.2]
+module AXIS_to_WB( // @[:@1203.2]
   input         clock, // @[:@1204.4]
   input         reset, // @[:@1205.4]
   input  [31:0] io_control_dat_i, // @[:@1206.4]
@@ -2540,7 +2540,7 @@ module fastvdma_ov2640( // @[:@1203.2]
   wire  queue_io_deq_ready; // @[Decoupled.scala 294:21:@1223.4]
   wire  queue_io_deq_valid; // @[Decoupled.scala 294:21:@1223.4]
   wire [31:0] queue_io_deq_bits; // @[Decoupled.scala 294:21:@1223.4]
-  OV2640_WishboneCSR csrFrontend ( // @[DMATop.scala 42:27:@1208.4]
+  AXIS_to_WB_WishboneCSR csrFrontend ( // @[DMATop.scala 42:27:@1208.4]
     .clock(csrFrontend_clock),
     .reset(csrFrontend_reset),
     .io_ctl_dat_i(csrFrontend_io_ctl_dat_i),
@@ -2585,7 +2585,7 @@ module fastvdma_ov2640( // @[:@1203.2]
     .io_xfer_length(writerFrontend_io_xfer_length),
     .io_xfer_valid(writerFrontend_io_xfer_valid)
   );
-  OV2640_CSR csr ( // @[DMATop.scala 48:19:@1217.4]
+  AXIS_to_WB_CSR csr ( // @[DMATop.scala 48:19:@1217.4]
     .io_csr_0_dataOut(csr_io_csr_0_dataOut),
     .io_csr_0_dataWrite(csr_io_csr_0_dataWrite),
     .io_csr_0_dataIn(csr_io_csr_0_dataIn),
@@ -2638,7 +2638,7 @@ module fastvdma_ov2640( // @[:@1203.2]
     .io_bus_write(csr_io_bus_write),
     .io_bus_read(csr_io_bus_read)
   );
-  OV2640_WorkerCSRWrapper ctl ( // @[DMATop.scala 50:19:@1220.4]
+  AXIS_to_WB_WorkerCSRWrapper ctl ( // @[DMATop.scala 50:19:@1220.4]
     .clock(ctl_clock),
     .reset(ctl_reset),
     .io_csr_0_dataOut(ctl_io_csr_0_dataOut),
@@ -2699,7 +2699,7 @@ module fastvdma_ov2640( // @[:@1203.2]
     .io_xferWrite_length(ctl_io_xferWrite_length),
     .io_xferWrite_valid(ctl_io_xferWrite_valid)
   );
-  OV2640_Queue queue ( // @[Decoupled.scala 294:21:@1223.4]
+  AXIS_to_WB_Queue queue ( // @[Decoupled.scala 294:21:@1223.4]
     .clock(queue_clock),
     .reset(queue_reset),
     .io_enq_ready(queue_io_enq_ready),
