@@ -10,7 +10,9 @@ from migen.genlib.cdc import MultiReg
 # "vsync": 1
 
 class OV2640(Module, AutoCSR):
-    def __init__(self, pads):
+    def __init__(self, pads, mode="single_frame"):
+
+        assert mode in ["single_frame", "continous_stream"]
 
         self.pclk_valid = pclk_valid = Signal()
 
@@ -79,7 +81,18 @@ class OV2640(Module, AutoCSR):
             If(~pclk,
                 NextValue(pclk_valid, 1),
             ),
-            If(~vsync,
-                NextState("WAIT_END_VSYNC")
-            )
         )
+
+        if mode == "single_frame":
+            fsm.act("CAPTURE",
+                If(~vsync,
+                    NextState("WAIT_END_VSYNC")
+                )
+            )
+        elif mode == "continous_stream":
+            fsm.act("CAPTURE",
+                If(~vsync,
+                    NextValue(pclk_valid, 0),
+                    NextValue(counter, 0),
+                )
+            )
