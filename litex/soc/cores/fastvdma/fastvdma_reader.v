@@ -101,7 +101,7 @@ module Reader_WishboneCSR( // @[:@3.2]
     end
   end
 endmodule
-module WishboneClassicReader( // @[:@40.2]
+module Reader_WishboneClassicReader( // @[:@40.2]
   input         clock, // @[:@41.4]
   input         reset, // @[:@42.4]
   input  [31:0] io_bus_dat_i, // @[:@43.4]
@@ -301,7 +301,7 @@ module WishboneClassicReader( // @[:@40.2]
     end
   end
 endmodule
-module AXIStreamMaster( // @[:@107.2]
+module Reader_AXIStreamMaster( // @[:@107.2]
   input         clock, // @[:@108.4]
   input         reset, // @[:@109.4]
   output [31:0] io_bus_tdata, // @[:@110.4]
@@ -2654,7 +2654,7 @@ module fastvdma_reader( // @[:@1216.2]
     .io_bus_write(csrFrontend_io_bus_write),
     .io_bus_read(csrFrontend_io_bus_read)
   );
-  WishboneClassicReader readerFrontend ( // @[DMATop.scala 43:30:@1224.4]
+  Reader_WishboneClassicReader readerFrontend ( // @[DMATop.scala 43:30:@1224.4]
     .clock(readerFrontend_clock),
     .reset(readerFrontend_reset),
     .io_bus_dat_i(readerFrontend_io_bus_dat_i),
@@ -2670,7 +2670,7 @@ module fastvdma_reader( // @[:@1216.2]
     .io_xfer_length(readerFrontend_io_xfer_length),
     .io_xfer_valid(readerFrontend_io_xfer_valid)
   );
-  AXIStreamMaster writerFrontend ( // @[DMATop.scala 44:30:@1227.4]
+  Reader_AXIStreamMaster writerFrontend ( // @[DMATop.scala 44:30:@1227.4]
     .clock(writerFrontend_clock),
     .reset(writerFrontend_reset),
     .io_bus_tdata(writerFrontend_io_bus_tdata),

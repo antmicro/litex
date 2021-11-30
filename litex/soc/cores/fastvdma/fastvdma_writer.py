@@ -13,8 +13,7 @@ class FastVDMAWriter(Module):
         # Attach FastVDMA signals to Wishbone and AXI Stream ---------------------------------------
         self.wb_ctrl = wishbone.Interface(data_width, adr_width)
         self.wb_w = wishbone.Interface(data_width, adr_width)
-        self.axi_s = AXIStreamInterface()
-        self.axi_s_tuser = Signal()
+        self.axi_s = AXIStreamInterface(data_width=32, user_width=32)
 
         self.irq_readerDone = Signal()
         self.irq_writerDone = Signal()
@@ -50,7 +49,7 @@ class FastVDMAWriter(Module):
             i_io_read_tdata = self.axi_s.data,
             i_io_read_tvalid = self.axi_s.valid,
             o_io_read_tready = self.axi_s.ready,
-            i_io_read_tuser = self.axi_s_tuser,
+            i_io_read_tuser = self.axi_s.user,
             i_io_read_tlast = self.axi_s.last,
 
             o_io_irq_readerDone = self.irq_readerDone,

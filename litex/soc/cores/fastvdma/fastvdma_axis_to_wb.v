@@ -101,7 +101,7 @@ module AXIS_to_WB_WishboneCSR( // @[:@3.2]
     end
   end
 endmodule
-module AXIStreamSlave( // @[:@40.2]
+module AXIS_to_WB_AXIStreamSlave( // @[:@40.2]
   input         clock, // @[:@41.4]
   input         reset, // @[:@42.4]
   input  [31:0] io_bus_tdata, // @[:@43.4]
@@ -289,7 +289,7 @@ module AXIStreamSlave( // @[:@40.2]
     end
   end
 endmodule
-module WishboneClassicWriter( // @[:@92.2]
+module AXIS_to_WB_WishboneClassicWriter( // @[:@92.2]
   input         clock, // @[:@93.4]
   input         reset, // @[:@94.4]
   output [31:0] io_bus_dat_o, // @[:@95.4]
@@ -2556,7 +2556,7 @@ module AXIS_to_WB( // @[:@1203.2]
     .io_bus_write(csrFrontend_io_bus_write),
     .io_bus_read(csrFrontend_io_bus_read)
   );
-  AXIStreamSlave readerFrontend ( // @[DMATop.scala 44:30:@1211.4]
+  AXIS_to_WB_AXIStreamSlave readerFrontend ( // @[DMATop.scala 44:30:@1211.4]
     .clock(readerFrontend_clock),
     .reset(readerFrontend_reset),
     .io_bus_tdata(readerFrontend_io_bus_tdata),
@@ -2569,7 +2569,7 @@ module AXIS_to_WB( // @[:@1203.2]
     .io_xfer_length(readerFrontend_io_xfer_length),
     .io_xfer_valid(readerFrontend_io_xfer_valid)
   );
-  WishboneClassicWriter writerFrontend ( // @[DMATop.scala 46:30:@1214.4]
+  AXIS_to_WB_WishboneClassicWriter writerFrontend ( // @[DMATop.scala 46:30:@1214.4]
     .clock(writerFrontend_clock),
     .reset(writerFrontend_reset),
     .io_bus_dat_o(writerFrontend_io_bus_dat_o),
