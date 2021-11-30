@@ -41,6 +41,7 @@ class OV2640(Module, AutoCSR):
         self.outer_valid  = outer_valid  = Signal()
         self.pixel_rgb565 = pixel_rgb565 = Signal(16)
         self.pixel_rgba   = pixel_rgba   = Signal(32)
+        self.first_pixel  = first_pixel  = Signal()
         inner_valid = Signal()
         last_data   = Signal(len(data))
         counter     = Signal(32)
@@ -63,6 +64,9 @@ class OV2640(Module, AutoCSR):
         fsm.act("CAPTURE",
             inner_valid.eq(vsync & href & pclk & pclk_valid),
             If (inner_valid,
+                If(counter == 0,
+                    first_pixel.eq(1)
+                ),
                 If(~counter & 1, #if counter % 2 == 0:
                     NextValue(last_data, data),
                 ).Else(
