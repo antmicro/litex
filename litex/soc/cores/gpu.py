@@ -23,14 +23,14 @@ class GPU(Module, AutoCSR):
         self.axi_out = AXIStreamInterface()
         self.comb += [
             # Input 1
-            self.axi_in1.valid.eq(DMA[0].axi_m.valid),
-            DMA[0].axi_m.ready.eq(self.axi_in1.ready),
-            self.axi_in1.last.eq(DMA[0].axi_m.last),
+            self.axi_in1.valid.eq(DMA[0].valid),
+            DMA[0].ready.eq(self.axi_in1.ready),
+            self.axi_in1.last.eq(DMA[0].last),
 
             # Input 2
-            self.axi_in2.valid.eq(DMA[1].axi_m.valid),
-            DMA[1].axi_m.ready.eq(self.axi_in2.ready),
-            self.axi_in2.last.eq(DMA[1].axi_m.last),
+            self.axi_in2.valid.eq(DMA[1].valid),
+            DMA[1].ready.eq(self.axi_in2.ready),
+            self.axi_in2.last.eq(DMA[1].last),
 
             # Output
             DMA[2].axi_s.valid.eq(self.axi_out.valid),
@@ -45,8 +45,8 @@ class GPU(Module, AutoCSR):
         output_rdy = Signal()
 
         self.comb += [
-            input_rdy[0].eq(DMA[0].axi_m.valid & DMA[1].axi_m.valid
-                            & DMA[0].axi_m.ready & DMA[1].axi_m.ready),
+            input_rdy[0].eq(DMA[0].valid & DMA[1].valid
+                            & DMA[0].ready & DMA[1].ready),
             output_rdy.eq(self.axi_out.valid & self.axi_out.ready)
         ]
 
@@ -56,8 +56,8 @@ class GPU(Module, AutoCSR):
 
         self.comb += [
             If(input_rdy[0],
-                self.axi_in1.data.eq(DMA[0].axi_m.data),
-                self.axi_in2.data.eq(DMA[1].axi_m.data),
+                self.axi_in1.data.eq(DMA[0].data),
+                self.axi_in2.data.eq(DMA[1].data),
             ),
             If(output_rdy,
                 DMA[2].axi_s.data.eq(self.axi_out.data),
@@ -68,7 +68,7 @@ class GPU(Module, AutoCSR):
         # -| Alpha blender mode |-
         blender_rdy = Signal()
         self.comb += [
-            blender_rdy.eq(DMA[0].axi_m.valid & DMA[1].axi_m.valid & DMA[2].axi_s.ready),
+            blender_rdy.eq(DMA[0].valid & DMA[1].valid & DMA[2].axi_s.ready),
             If(self.ctrl_reg.storage == GPU_MODE.ALPHA_BLENDER,
                 # Input ready to process new pixels
                 If(blender_rdy,
