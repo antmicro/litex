@@ -4,6 +4,7 @@ from migen import *
 
 from litex.soc.interconnect import wishbone
 from litex.soc.interconnect.axi import *
+from litex.soc.interconnect.csr_eventmanager import *
 
 class FastVDMAWriter(Module):
     def __init__(self, platform, data_width=32, adr_width=30):
@@ -58,3 +59,12 @@ class FastVDMAWriter(Module):
             i_io_sync_readerSync = self.sync_readerSync,
             i_io_sync_writerSync = self.sync_writerSync,
         )
+
+        # Add IRQs
+        self.submodules.ev = EventManager()
+        self.ev.writerDone = EventSourceLevel()
+        self.ev.finalize()
+
+        self.comb += [
+            self.ev.writerDone.trigger.eq(self.irq_writerDone),
+        ]
