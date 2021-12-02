@@ -16,7 +16,7 @@ class FastVDMA_OV2640(Module, AutoCSR):
 
     Both modes use Wishbone to control FastVDMA CSRs
     """
-    def __init__(self, platform, mode):
+    def __init__(self, platform, mode="AXIS_to_WB"):
         assert mode in ["AXIS_to_WB", "AXIS_to_AXIS"]
 
         self.wb_slave_control = wishbone.Interface(data_width=32, adr_width=30)
