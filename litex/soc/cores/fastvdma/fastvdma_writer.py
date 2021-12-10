@@ -6,7 +6,7 @@ from litex.soc.interconnect import wishbone
 from litex.soc.interconnect.axi import *
 from litex.soc.interconnect.csr_eventmanager import *
 
-class FastVDMAWriter(Module):
+class FastVDMAWriter(Module, AutoCSR):
     def __init__(self, platform, data_width=32, adr_width=30):
         # Add verilog file with generated netlist for FastVDMA -------------------------------------
         platform.add_source(os.path.abspath(os.path.dirname(__file__)), "fastvdma_writer.v")
