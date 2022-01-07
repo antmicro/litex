@@ -37,6 +37,8 @@ class FastVDMA_OV2640(Module, AutoCSR):
 
         self.io_sync_readerSync  = Signal()
         self.io_sync_writerSync  = Signal()
+        self.io_sync_readerBusy  = Signal()
+        self.io_sync_writerBusy  = Signal()
 
         if mode == "AXIS_to_WB":
             self.specials += Instance("AXIS_to_WB",
@@ -74,6 +76,8 @@ class FastVDMA_OV2640(Module, AutoCSR):
 
                 i_io_sync_readerSync    = self.io_sync_readerSync,
                 i_io_sync_writerSync    = self.io_sync_writerSync,
+                o_io_sync_readerBusy    = self.io_sync_readerBusy,
+                o_io_sync_writerBusy    = self.io_sync_writerBusy,
             )
         elif mode == "AXIS_to_AXIS":
             self.specials += Instance("AXIS_to_AXIS",
@@ -107,6 +111,8 @@ class FastVDMA_OV2640(Module, AutoCSR):
 
                 i_io_sync_readerSync    = self.io_sync_readerSync,
                 i_io_sync_writerSync    = self.io_sync_writerSync,
+                o_io_sync_readerBusy    = self.io_sync_readerBusy,
+                o_io_sync_writerBusy    = self.io_sync_writerBusy,
             )
 
         # Add IRQs
