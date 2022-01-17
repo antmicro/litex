@@ -15,9 +15,8 @@ from litex.soc.cores.clock import *
 # "vsync": 1
 
 class OV2640(Module, AutoCSR):
-    def __init__(self, pads, dma_busy_signal, leds_pads=None, mode="single_frame", delay_pclk=0):
+    def __init__(self, pads, dma_busy_signal, leds_pads=None, delay_pclk=0):
 
-        assert mode in ["single_frame", "continous_stream"]
         assert isinstance(dma_busy_signal, Signal)
 
         self.pclk_valid = pclk_valid = Signal()
@@ -49,19 +48,43 @@ class OV2640(Module, AutoCSR):
         self.submodules.fsm = fsm = ClockDomainsRenamer("pclk")(FSM(reset_state="WAIT_START_DMA"))
         self.submodules.fifo = fifo = ClockDomainsRenamer({"write": "pclk", "read": "sys"})(AsyncFIFO([("data", 32)], depth=512))
 
-        if isinstance(leds_pads, Cat):
+        color_bar = [
+            0xffffffff, # White
+            0xff00ffff, # Yellow
+            0xffffff00, # Cyan
+            0xff00ff00, # Green
+            0xffff00ff, # Purple
+            0xff0000ff, # Red
+            0xffff0000, # Blue
+            0xff000000, # Black
+        ]
+        bar = Signal(3)
+        cases = {}
+        for i in range(8):
+            cases[i] = [
+                fifo.sink.data.eq(color_bar[i]),
+            ]
+        self.comb += Case(bar, cases)
+
+        print(type(leds_pads))
+        if isinstance(leds_pads, Record):
+            print("LEDs attached to FIFO")
             fifo_status = Signal(len(leds_pads))
-            self.comb += leds_pads.eq(fifo_status)
+            self.comb += [
+                leds_pads.r.eq(fifo_status),
+                leds_pads.g.eq(fifo_status),
+                leds_pads.b.eq(fifo_status),
+            ]
 
             fsm.act("WAIT_START_DMA",
-                If(fifo.source.valid,
+                If(fifo.sink.valid,
                     NextValue(fifo_status, 0xff),
                 ).Else(
                     NextValue(fifo_status, 0),
                 ),
             )
             fsm.act("CAPTURE",
-                If(fifo.source.valid,
+                If(fifo.sink.valid,
                     NextValue(fifo_status, 0xff),
                 ).Else(
                     NextValue(fifo_status, 0),
@@ -72,45 +95,40 @@ class OV2640(Module, AutoCSR):
             NextValue(fifo.sink.valid, 0),
             If(_vsync & dma_busy_signal,
                 NextValue(counter, 0),
-                NextState("CAPTURE")
+                NextValue(bar, 0),
+                NextState("CAPTURE"),
             )
         )
         fsm.act("CAPTURE",
             # inner_valid.eq(vsync[3] & href[3] & pclk[3 + delay_pclk] & pclk_valid),
             NextValue(first_pixel, 0),
             NextValue(fifo.sink.valid, 0),
-            If(~dma_busy_signal,
+            If(~dma_busy_signal | ~_vsync,
                 NextState("WAIT_START_DMA")
-            ),
-            If (_vsync & _href,
-                If(counter == 1,
-                    NextValue(first_pixel, 1),
-                ),
-                If(~counter & 1, #if counter % 2 == 0:
-                    NextValue(last_data, _data),
-                ).Else(
-                    NextValue(fifo.sink.valid, 1),
-                    NextValue(fifo.sink.data,                               # Save RGBA pixel as Little Endian (ABGR32)
-                        (last_data[3:] << 3) |                              # red   = pixel[11:16]
-                        ((last_data[:3] << 5) | (_data[5:] << 2)) << 8 |  # green = pixel[5:11]
-                        (_data[:5] << 3) << 16 |                          # blue  = pixel[:5]
-                        0xff << 24
+            ).Else(
+                If (_vsync & _href,
+                    NextValue(counter, counter + 1),
+                    If(counter == 1,
+                        NextValue(first_pixel, 1),
                     ),
-                ),
-                NextValue(counter, counter + 1),
-                NextValue(pclk_valid, 0),
-            ),
-        )
-
-        if mode == "single_frame":
-            fsm.act("CAPTURE",
-                If(~_vsync,
-                    NextState("WAIT_START_DMA")
-                )
-            )
-        elif mode == "continous_stream":
-            fsm.act("CAPTURE",
-                If(~_vsync,
+                    If(~counter & 1, #if counter % 2 == 0:
+                        NextValue(last_data, _data),
+                    ).Else(
+                        NextValue(fifo.sink.valid, 1),
+                        # NextValue(fifo.sink.data,                               # Save RGBA pixel as Little Endian (ABGR32)
+                        #     (last_data[3:] << 3) |                              # red   = pixel[11:16]
+                        #     ((last_data[:3] << 5) | (_data[5:] << 2)) << 8 |  # green = pixel[5:11]
+                        #     (_data[:5] << 3) << 16 |                          # blue  = pixel[:5]
+                        #     0xff << 24
+                        # ),
+                        If(counter == 127,
+                            NextValue(bar, bar + 1),
+                            NextValue(counter, 0),
+                        ),
+                    ),
+                ).Elif(~_href,
                     NextValue(counter, 0),
+                    NextValue(bar, 0),
                 )
             )
+        )
