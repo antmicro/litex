@@ -58,13 +58,13 @@ class OV2640(Module, AutoCSR):
             0xffff0000, # Blue
             0xff000000, # Black
         ]
-        bar = Signal(3)
-        cases = {}
-        for i in range(8):
-            cases[i] = [
-                fifo.sink.data.eq(color_bar[i]),
-            ]
-        self.comb += Case(bar, cases)
+        # bar = Signal(3)
+        # cases = {}
+        # for i in range(8):
+        #     cases[i] = [
+        #         fifo.sink.data.eq(color_bar[i]),
+        #     ]
+        # self.comb += Case(bar, cases)
 
         print(type(leds_pads))
         if isinstance(leds_pads, Record):
@@ -95,7 +95,7 @@ class OV2640(Module, AutoCSR):
             NextValue(fifo.sink.valid, 0),
             If(_vsync & dma_busy_signal,
                 NextValue(counter, 0),
-                NextValue(bar, 0),
+                # NextValue(bar, 0),
                 NextState("CAPTURE"),
             )
         )
@@ -115,20 +115,20 @@ class OV2640(Module, AutoCSR):
                         NextValue(last_data, _data),
                     ).Else(
                         NextValue(fifo.sink.valid, 1),
-                        # NextValue(fifo.sink.data,                               # Save RGBA pixel as Little Endian (ABGR32)
-                        #     (last_data[3:] << 3) |                              # red   = pixel[11:16]
-                        #     ((last_data[:3] << 5) | (_data[5:] << 2)) << 8 |  # green = pixel[5:11]
-                        #     (_data[:5] << 3) << 16 |                          # blue  = pixel[:5]
-                        #     0xff << 24
-                        # ),
-                        If(counter == 127,
-                            NextValue(bar, bar + 1),
-                            NextValue(counter, 0),
+                        NextValue(fifo.sink.data,                               # Save RGBA pixel as Little Endian (ABGR32)
+                            (last_data[3:] << 3) |                              # red   = pixel[11:16]
+                            ((last_data[:3] << 5) | (_data[5:] << 2)) << 8 |  # green = pixel[5:11]
+                            (_data[:5] << 3) << 16 |                          # blue  = pixel[:5]
+                            0xff << 24
                         ),
+                        # If(counter == 127,
+                        #     NextValue(bar, bar + 1),
+                        #     NextValue(counter, 0),
+                        # ),
                     ),
                 ).Elif(~_href,
                     NextValue(counter, 0),
-                    NextValue(bar, 0),
+                    # NextValue(bar, 0),
                 )
             )
         )
