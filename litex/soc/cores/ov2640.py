@@ -20,8 +20,8 @@ class OV2640(Module, AutoCSR):
         assert isinstance(_dma_busy_signal, Signal)
 
         self.vsync   = vsync   = [Signal()  for _ in range(2)] # Additional signal to check edge changes
-        href = Signal()
-        data = Signal(8)
+        href = [Signal()  for _ in range(2)]
+        data = [Signal(8) for _ in range(2)]
         dma_busy_signal = Signal()
 
         _data  = getattr(pads, "data")
@@ -33,11 +33,14 @@ class OV2640(Module, AutoCSR):
         self.specials += [
             MultiReg(_vsync, vsync[0], odomain="pclk"),
             MultiReg(vsync[0], vsync[1], odomain="pclk"),
-            MultiReg(_href, href, odomain="pclk"),
+            MultiReg(_href, href[0], odomain="pclk"),
+            MultiReg(href[0], href[1], odomain="pclk"),
             MultiReg(_dma_busy_signal, dma_busy_signal, odomain="pclk"),
         ]
         for i in range(8):
-            self.specials += MultiReg(_data[i], data[i], odomain="pclk"),
+            self.specials += MultiReg(_data[i], data[0][i], odomain="pclk"),
+            self.specials += MultiReg(data[0][i], data[1][i], odomain="pclk"),
+
 
         # Use PCLK as clock signal
         self.clock_domains.cd_pclk = ClockDomain()
@@ -98,7 +101,7 @@ class OV2640(Module, AutoCSR):
 
         fsm.act("WAIT_START_DMA",
             NextValue(fifo.sink.valid, 0),
-            If(vsync[0] & dma_busy_signal,
+            If(vsync[1] & dma_busy_signal,
                 NextValue(counter, 0),
                 # NextValue(bar, 0),
                 NextState("CAPTURE"),
@@ -107,22 +110,22 @@ class OV2640(Module, AutoCSR):
         fsm.act("CAPTURE",
             NextValue(first_pixel, 0),
             NextValue(fifo.sink.valid, 0),
-            If(~dma_busy_signal | ~vsync[0],
+            If(~dma_busy_signal | ~vsync[1],
                 NextState("WAIT_START_DMA")
             ).Else(
-                If (vsync[0] & href[0],
+                If (vsync[1] & href[1],
                     NextValue(counter, counter + 1),
                     If(counter == 1,
                         NextValue(first_pixel, 1),
                     ),
                     If(~counter & 1, #if counter % 2 == 0:
-                        NextValue(last_data, data),
+                        NextValue(last_data, data[1]),
                     ).Else(
                         NextValue(fifo.sink.valid, 1),
-                        NextValue(fifo.sink.data,                             # Save RGBA pixel as Little Endian (ABGR32)
-                            (last_data[3:] << 3) |                            # red   = pixel[11:16]
-                            ((last_data[:3] << 5) | (data[5:] << 2)) << 8 |  # green = pixel[5:11]
-                            (data[:5] << 3) << 16 |                          # blue  = pixel[:5]
+                        NextValue(fifo.sink.data,                               # Save RGBA pixel as Little Endian (ABGR32)
+                            (last_data[3:] << 3) |                              # red   = pixel[11:16]
+                            ((last_data[:3] << 5) | (data[1][5:] << 2)) << 8 |  # green = pixel[5:11]
+                            (data[1][:5] << 3) << 16 |                          # blue  = pixel[:5]
                             0xff << 24
                         ),
                         # If(counter == 127,
@@ -130,7 +133,7 @@ class OV2640(Module, AutoCSR):
                         #     NextValue(counter, 0),
                         # ),
                     ),
-                ).Elif(~href,
+                ).Elif(~href[1],
                     NextValue(counter, 0),
                     # NextValue(bar, 0),
                 )
