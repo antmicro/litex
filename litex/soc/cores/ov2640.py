@@ -1,10 +1,8 @@
-from litex.soc.cores import led
-from litex.soc.interconnect.stream import AsyncFIFO
 from migen import *
 from migen.genlib.cdc import MultiReg
-from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from litex.soc.interconnect.csr import *
+from litex.soc.interconnect.stream import AsyncFIFO
 
 from litex.soc.cores.clock import *
 
@@ -19,7 +17,7 @@ class OV2640(Module, AutoCSR):
 
         assert isinstance(_dma_busy_signal, Signal)
 
-        self.vsync   = vsync   = [Signal()  for _ in range(2)] # Additional signal to check edge changes
+        self.vsync = vsync = [Signal()  for _ in range(2)]
         href = [Signal()  for _ in range(2)]
         data = [Signal(8) for _ in range(2)]
         dma_busy_signal = Signal()
@@ -41,38 +39,19 @@ class OV2640(Module, AutoCSR):
             self.specials += MultiReg(_data[i], data[0][i], odomain="pclk"),
             self.specials += MultiReg(data[0][i], data[1][i], odomain="pclk"),
 
-
         # Use PCLK as clock signal
         self.clock_domains.cd_pclk = ClockDomain()
         self.specials += [
             Instance("IBUFG", i_I=_pclk, o_O=self.cd_pclk.clk),
         ]
 
-        self.first_pixel  = first_pixel  = Signal()
-        self.counter      = counter      = Signal(32)
+        self.first_pixel = first_pixel = Signal()
+        counter = Signal(32)
         last_data = Signal(len(_data))
 
         # FSM
         self.submodules.fsm = fsm = ClockDomainsRenamer("pclk")(FSM(reset_state="WAIT_START_DMA"))
         self.submodules.fifo = fifo = ClockDomainsRenamer({"write": "pclk", "read": "sys"})(AsyncFIFO([("data", 32)], depth=512))
-
-        color_bar = [
-            0xffffffff, # White
-            0xff00ffff, # Yellow
-            0xffffff00, # Cyan
-            0xff00ff00, # Green
-            0xffff00ff, # Purple
-            0xff0000ff, # Red
-            0xffff0000, # Blue
-            0xff000000, # Black
-        ]
-        # bar = Signal(3)
-        # cases = {}
-        # for i in range(8):
-        #     cases[i] = [
-        #         fifo.sink.data.eq(color_bar[i]),
-        #     ]
-        # self.comb += Case(bar, cases)
 
         print(type(leds_pads))
         if isinstance(leds_pads, Record):
@@ -103,7 +82,6 @@ class OV2640(Module, AutoCSR):
             NextValue(fifo.sink.valid, 0),
             If(vsync[1] & dma_busy_signal,
                 NextValue(counter, 0),
-                # NextValue(bar, 0),
                 NextState("CAPTURE"),
             )
         )
@@ -128,14 +106,7 @@ class OV2640(Module, AutoCSR):
                             (data[1][:5] << 3) << 16 |                          # blue  = pixel[:5]
                             0xff << 24
                         ),
-                        # If(counter == 127,
-                        #     NextValue(bar, bar + 1),
-                        #     NextValue(counter, 0),
-                        # ),
-                    ),
-                ).Elif(~href[1],
-                    NextValue(counter, 0),
-                    # NextValue(bar, 0),
+                    )
                 )
             )
         )
