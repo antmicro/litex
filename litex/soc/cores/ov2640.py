@@ -1,3 +1,6 @@
+# Copyright (c) 2021-2022 Antmicro <www.antmicro.com>
+# SPDX-License-Identifier: BSD-2-Clause
+
 from migen import *
 from migen.genlib.cdc import MultiReg
 

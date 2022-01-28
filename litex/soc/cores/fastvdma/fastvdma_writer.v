@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2021-2022 Antmicro
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 module Writer_WishboneCSR( // @[:@3.2]
   input         clock, // @[:@4.4]
   input         reset, // @[:@5.4]

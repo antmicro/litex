@@ -1,3 +1,6 @@
+# Copyright (c) 2021-2022 Antmicro <www.antmicro.com>
+# SPDX-License-Identifier: BSD-2-Clause
+
 from enum import IntEnum
 
 from migen import *
