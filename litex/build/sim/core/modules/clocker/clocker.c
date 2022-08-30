@@ -8,8 +8,8 @@
 struct session_s {
   char *clk;
   char *name;
-  uint32_t freq_hz;
-  uint16_t phase_deg;
+  uint64_t freq_hz;
+  double phase_deg;
 };
 
 static int litex_sim_module_pads_get( struct pad_s *pads, char *name, void **signal)
@@ -67,7 +67,7 @@ static int clocker_parse_args(struct session_s *s, const char *args)
   }
 
   s->freq_hz = json_object_get_int64(freq_json);
-  s->phase_deg = json_object_get_int64(phase_json);
+  s->phase_deg = json_object_get_double(phase_json);
 
   if (s->freq_hz == 0) {
     ret = RC_JSERROR;
@@ -75,7 +75,7 @@ static int clocker_parse_args(struct session_s *s, const char *args)
     goto out;
   }
 
-  if (s->phase_deg >= 360) {
+  if (s->phase_deg >= 360 || s->phase_deg < 0) {
     ret = RC_JSERROR;
     fprintf(stderr, "[clocker] \"phase_deg\" must be in range [0, 360)\n");
     goto out;
@@ -134,22 +134,22 @@ static int clocker_add_pads(void *sess, struct pad_list_s *plist)
 
   s->name = plist->name;
   *s->clk=0;
-  printf("[clocker] %s: freq_hz=%u, phase_deg=%u\n", s->name, s->freq_hz, s->phase_deg);
+  printf("[clocker] %s: freq_hz=%lu, phase_deg=%lf\n", s->name, s->freq_hz, s->phase_deg);
 out:
   return ret;
 }
 
-static int clocker_tick(void *sess, uint64_t time_ps)
+static int clocker_tick(void *sess, uint64_t time_fs)
 {
-  static const uint64_t ps_in_sec = 1000000000000ull;
+  static const uint64_t fs_in_sec = 1000000000000000ull;
   struct session_s *s = (struct session_s*) sess;
 
-  uint64_t period_ps = ps_in_sec / s->freq_hz;
-  uint64_t phase_shift_ps = period_ps * s->phase_deg / 360;
+  uint64_t period_fs = fs_in_sec / s->freq_hz;
+  uint64_t phase_shift_fs = period_fs * s->phase_deg / 360;
 
   // phase-shifted time relative to start of current period
-  uint64_t rel_time_ps = (time_ps - phase_shift_ps) % period_ps;
-  if (rel_time_ps < (period_ps/2)) {
+  uint64_t rel_time_fs = (time_fs - phase_shift_fs) % period_fs;
+  if (rel_time_fs < (period_fs/2)) {
     *s->clk = 1;
   } else {
     *s->clk = 0;

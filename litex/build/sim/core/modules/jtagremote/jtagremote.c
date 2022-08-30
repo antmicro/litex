@@ -208,7 +208,7 @@ out:
   return ret;
 
 }
-static int jtagremote_tick(void *sess, uint64_t time_ps)
+static int jtagremote_tick(void *sess, uint64_t time_fs)
 {
   static clk_edge_state_t edge;
 	char c, val;

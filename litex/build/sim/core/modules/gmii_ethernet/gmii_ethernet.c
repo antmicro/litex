@@ -116,7 +116,7 @@ static struct event_base *base = NULL;
  * transmitted.
  */
 static void gmii_ethernet_rx_adv(gmii_ethernet_state_t *s,
-                                 uint64_t time_ps) {
+                                 uint64_t time_fs) {
     // Check whether we are currently transmitting a packet over the GMII
     // interface (i.e. whether there are still bytes left in the packet input
     // buffer)
@@ -235,7 +235,7 @@ static void gmii_ethernet_rx_adv(gmii_ethernet_state_t *s,
  * This function will detect frames sent by the device and place them on the TAP
  * network interface.
  */
-static void gmii_ethernet_tx_adv(gmii_ethernet_state_t *s, uint64_t time_ps) {
+static void gmii_ethernet_tx_adv(gmii_ethernet_state_t *s, uint64_t time_fs) {
     // Check whether the device is currently transmitting a new packet or
     // continuing an old transmission based on the previous tx_en_signal value
     if (s->prev_tx_en == false && *s->tx_en_signal == true) {
@@ -349,15 +349,15 @@ static void gmii_ethernet_tx_adv(gmii_ethernet_state_t *s, uint64_t time_ps) {
     s->prev_tx_en = *s->tx_en_signal;
 }
 
-static int gmii_ethernet_tick(void *state, uint64_t time_ps) {
+static int gmii_ethernet_tick(void *state, uint64_t time_fs) {
     gmii_ethernet_state_t *s = (gmii_ethernet_state_t*) state;
 
     if (clk_pos_edge(&s->tx_clk_edge, *s->tx_clk)) {
-        gmii_ethernet_tx_adv(s, time_ps);
+        gmii_ethernet_tx_adv(s, time_fs);
     }
 
     if (clk_pos_edge(&s->rx_clk_edge, *s->rx_clk)) {
-        gmii_ethernet_rx_adv(s, time_ps);
+        gmii_ethernet_rx_adv(s, time_fs);
     }
 
     return RC_OK;

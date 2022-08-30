@@ -22,11 +22,11 @@ uint64_t tfp_end;
 uint64_t main_time = 0;
 Vsim *g_sim = nullptr;
 
-extern "C" void litex_sim_eval(void *vsim, uint64_t time_ps)
+extern "C" void litex_sim_eval(void *vsim, uint64_t time_fs)
 {
   Vsim *sim = (Vsim*)vsim;
   sim->eval();
-  main_time = time_ps;
+  main_time = time_fs;
 }
 
 extern "C" void litex_sim_init_cmdargs(int argc, char *argv[])
@@ -42,15 +42,17 @@ extern "C" void litex_sim_init_tracer(void *vsim, long start, long end)
   Verilated::traceEverOn(true);
 #ifdef TRACE_FST
       tfp = new VerilatedFstC;
+      tfp->set_time_unit("1fs");
+      tfp->set_time_resolution("1fs");
       sim->trace(tfp, 99);
       tfp->open("sim.fst");
 #else
       tfp = new VerilatedVcdC;
+      tfp->set_time_unit("1fs");
+      tfp->set_time_resolution("1fs");
       sim->trace(tfp, 99);
       tfp->open("sim.vcd");
 #endif
-  tfp->set_time_unit("1ps");
-  tfp->set_time_resolution("1ps");
   g_sim = sim;
 }
 
