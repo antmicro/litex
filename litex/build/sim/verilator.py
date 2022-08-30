@@ -274,8 +274,8 @@ def verilator_build_args(parser):
     toolchain_group.add_argument("--threads",      default=1,           help="Set number of simulation threads.")
     toolchain_group.add_argument("--trace",        action="store_true", help="Enable Tracing.")
     toolchain_group.add_argument("--trace-fst",    action="store_true", help="Enable FST tracing.")
-    toolchain_group.add_argument("--trace-start",  default="0",         help="Time to start tracing (ps).")
-    toolchain_group.add_argument("--trace-end",    default="-1",        help="Time to end tracing (ps).")
+    toolchain_group.add_argument("--trace-start",  default="0",         help="Time to start tracing (fs).")
+    toolchain_group.add_argument("--trace-end",    default="-1",        help="Time to end tracing (fs).")
     toolchain_group.add_argument("--opt-level",    default="O3",        help="Compilation optimization level.")
 
 def verilator_build_argdict(args):

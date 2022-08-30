@@ -28,8 +28,8 @@ class SimConfig():
 
     def _format_timebase(self):
         clockers = [m for m in self.modules if m["module"] == "clocker"]
-        timebase_ps = _calculate_timebase_ps(clockers)
-        return {"timebase": int(timebase_ps)}
+        timebase_fs = _calculate_timebase_fs(clockers)
+        return {"timebase": int(timebase_fs)}
 
     def add_clocker(self, clk, freq_hz, phase_deg=0):
         args = {"freq_hz": freq_hz, "phase_deg": phase_deg}
@@ -60,7 +60,7 @@ class SimConfig():
         config = self.modules + [self._format_timebase()]
         return json.dumps(config, indent=4)
 
-def _calculate_timebase_ps(clockers):
+def _calculate_timebase_fs(clockers):
     """Calculate timebase for a list of clocker modules
 
     Clock edges happen at time instants:
@@ -71,37 +71,37 @@ def _calculate_timebase_ps(clockers):
     In this function checks that:
         ((T/2) mod B = 0) AND ((P/360 * T) mod B = 0)
 
-    Currently we allow only for integer periods (in ps), which it's quite restrictive.
+    Currently we allow only for integer periods (in fs), which it's quite restrictive.
     """
-    # convert to picoseconds, 1ps is our finest timebase for dumping simulation data
-    periods_ps = [1e12 / c["args"]["freq_hz"] for c in clockers]
-    phase_shifts_ps = [p * c["args"]["phase_deg"]/360 for c, p in zip(clockers, periods_ps)]
+    # convert to picoseconds, 1fs is our finest timebase for dumping simulation data
+    periods_fs = [1e15 / c["args"]["freq_hz"] for c in clockers]
+    phase_shifts_fs = [int(p * c["args"]["phase_deg"]/360 + 0.5) for c, p in zip(clockers, periods_fs)]
 
     # calculate timebase as greatest common denominator
-    timebase_ps = None
-    for period, phase_shift in zip(periods_ps, phase_shifts_ps):
-        if timebase_ps is None:
-            timebase_ps = int(period/2)
-        timebase_ps = math.gcd(timebase_ps, int(period/2))
-        timebase_ps = math.gcd(timebase_ps, int(phase_shift))
+    timebase_fs = None
+    for period, phase_shift in zip(periods_fs, phase_shifts_fs):
+        if timebase_fs is None:
+            timebase_fs = int(period/2)
+        timebase_fs = math.gcd(timebase_fs, int(period/2))
+        timebase_fs = math.gcd(timebase_fs, int(phase_shift))
 
     # check correctness
-    for clocker, period, phase_shift in zip(clockers, periods_ps, phase_shifts_ps):
+    for clocker, period, phase_shift in zip(clockers, periods_fs, phase_shifts_fs):
         def error(description):
             return f"""
 SimConfig:
 {description}:
-  timebase = {timebase_ps}ps, period = {period}ps, phase_shift = {phase_shift}ps,
+  timebase = {timebase_fs}fs, period = {period}fs, phase_shift = {phase_shift}fs,
   clocker[args] = {clocker["args"]}
-Adjust clock definitions so that integer multiple of 1ps can be used as a timebase.
+Adjust clock definitions so that integer multiple of 1fs can be used as a timebase.
             """.strip()
 
         assert int(period) == period, error("Non-integer period")
         assert int(phase_shift) == phase_shift, error("Non-integer phase_shift")
 
-        assert (period/2 % timebase_ps) == 0, \
+        assert (period/2 % timebase_fs) == 0, \
             error("Could not find an integer timebase for period")
-        assert (phase_shift % timebase_ps) == 0, \
+        assert (phase_shift % timebase_fs) == 0, \
             error("Could not find an integer timebase for phase shift")
 
-    return timebase_ps
+    return timebase_fs
