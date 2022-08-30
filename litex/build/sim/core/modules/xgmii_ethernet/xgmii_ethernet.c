@@ -288,7 +288,7 @@ void xgmii_ethernet_rx_update_dic(xgmii_ethernet_state_t *s, size_t gen_ifg) {}
  * being transmitted.
  */
 static xgmii_bus_snapshot_t xgmii_ethernet_rx_adv(xgmii_ethernet_state_t *s,
-                                                 uint64_t time_ps) {
+                                                 uint64_t time_fs) {
     xgmii_bus_snapshot_t bus;
 
     // Check whether we are currently transmitting a packet over the XGMII
@@ -490,7 +490,7 @@ static xgmii_bus_snapshot_t xgmii_ethernet_rx_adv(xgmii_ethernet_state_t *s,
  * This function will detect frames sent by the device and place them on the TAP
  * network interface.
  */
-static void xgmii_ethernet_tx_adv(xgmii_ethernet_state_t *s, uint64_t time_ps,
+static void xgmii_ethernet_tx_adv(xgmii_ethernet_state_t *s, uint64_t time_fs,
                                   xgmii_bus_snapshot_t bus) {
     if (s->tx_state == XGMII_TX_STATE_IDLE) {
         // Idling until a XGMII start of packet control marker is detected. By
@@ -670,7 +670,7 @@ static void xgmii_ethernet_tx_adv(xgmii_ethernet_state_t *s, uint64_t time_ps,
     }
 }
 
-static int xgmii_ethernet_tick(void *state, uint64_t time_ps) {
+static int xgmii_ethernet_tick(void *state, uint64_t time_fs) {
     xgmii_ethernet_state_t *s = (xgmii_ethernet_state_t*) state;
 
     // ---------- TX BUS (Sim -> TAP) ----------
@@ -688,14 +688,14 @@ static int xgmii_ethernet_tick(void *state, uint64_t time_ps) {
             .ctl = *s->tx_ctl_signal & 0xF,
         };
 
-        xgmii_ethernet_tx_adv(s, time_ps, tx_bus_lower);
+        xgmii_ethernet_tx_adv(s, time_fs, tx_bus_lower);
 
         xgmii_bus_snapshot_t tx_bus_upper = {
             .data = (*s->tx_data_signal >> 32) & 0xFFFFFFFF,
             .ctl = (*s->tx_ctl_signal >> 4) & 0xF,
         };
 
-        xgmii_ethernet_tx_adv(s, time_ps, tx_bus_upper);
+        xgmii_ethernet_tx_adv(s, time_fs, tx_bus_upper);
     }
 #elif XGMII_WIDTH == 32
     // 32-bit bus.
@@ -704,7 +704,7 @@ static int xgmii_ethernet_tick(void *state, uint64_t time_ps) {
         .ctl = *s->tx_ctl_signal,
     };
 
-    xgmii_ethernet_tx_adv(s, time_ps, tx_bus);
+    xgmii_ethernet_tx_adv(s, time_fs, tx_bus);
 #endif
 
     // ---------- RX BUS (TAP -> Sim) ----------
@@ -720,8 +720,8 @@ static int xgmii_ethernet_tick(void *state, uint64_t time_ps) {
 #if XGMII_WIDTH == 64
         // 64-bit wide bus. We must transmit two XGMII 32-bit bus words in the
         // same cycle.
-        xgmii_bus_snapshot_t rx_bus_lower = xgmii_ethernet_rx_adv(s, time_ps);
-        xgmii_bus_snapshot_t rx_bus_upper = xgmii_ethernet_rx_adv(s, time_ps);
+        xgmii_bus_snapshot_t rx_bus_lower = xgmii_ethernet_rx_adv(s, time_fs);
+        xgmii_bus_snapshot_t rx_bus_upper = xgmii_ethernet_rx_adv(s, time_fs);
         *s->rx_data_signal =
             ((xgmii_data_signal_t) rx_bus_upper.data << 32)
             | (xgmii_data_signal_t) rx_bus_lower.data;
@@ -730,7 +730,7 @@ static int xgmii_ethernet_tick(void *state, uint64_t time_ps) {
             | (xgmii_ctl_signal_t) rx_bus_lower.ctl;
 #elif XGMII_WIDTH == 32
         // 32-bit wide bus.
-        xgmii_bus_snapshot_t rx_bus = xgmii_ethernet_rx_adv(s, time_ps);
+        xgmii_bus_snapshot_t rx_bus = xgmii_ethernet_rx_adv(s, time_fs);
         *s->rx_data_signal = rx_bus.data;
         *s->rx_ctl_signal = rx_bus.ctl;
 #endif
@@ -739,7 +739,7 @@ static int xgmii_ethernet_tick(void *state, uint64_t time_ps) {
 #if XGMII_WIDTH == 32
     if (rx_edge == CLK_EDGE_FALLING) {
         // 32-bit wide bus and negative clock edge.
-        xgmii_bus_snapshot_t rx_bus = xgmii_ethernet_rx_adv(s, time_ps);
+        xgmii_bus_snapshot_t rx_bus = xgmii_ethernet_rx_adv(s, time_fs);
         *s->rx_data_signal = rx_bus.data;
         *s->rx_ctl_signal = rx_bus.ctl;
     }
