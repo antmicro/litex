@@ -224,13 +224,14 @@ class NaxRiscv(CPU):
     # Netlist Generation.
     @staticmethod
     def generate_netlist(reset_address):
+        cdir = os.getcwd()
         vdir = get_data_mod("cpu", "naxriscv").data_location
         ndir = os.path.join(vdir, "ext", "NaxRiscv")
         sdir = os.path.join(vdir, "ext", "SpinalHDL")
 
         NaxRiscv.git_setup("NaxRiscv", ndir, "https://github.com/SpinalHDL/NaxRiscv.git"  , "main", "7c61b64")
         NaxRiscv.git_setup("SpinalHDL", sdir, "https://github.com/SpinalHDL/SpinalHDL.git", "dev" , "a130f7b7")
-
+        
         gen_args = []
         gen_args.append(f"--netlist-name={NaxRiscv.netlist_name}")
         gen_args.append(f"--netlist-directory={vdir}")
@@ -249,11 +250,13 @@ class NaxRiscv(CPU):
         for file in NaxRiscv.scala_paths:
             gen_args.append(f"--scala-file={file}")
 
-        cmd = f"""cd {ndir} && sbt "runMain naxriscv.platform.LitexGen {" ".join(gen_args)}\""""
+        cmd = f"""cd {ndir} && sbt "runMain naxriscv.platform.LitexGen {" ".join(gen_args)}\" && cd {cdir}"""
+        os.chdir(cdir)
         print("NaxRiscv generation command :")
         print(cmd)
         if os.system(cmd) != 0:
             raise OSError('Failed to run sbt')
+        
 
 
     def add_sources(self, platform):
