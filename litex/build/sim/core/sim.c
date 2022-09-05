@@ -209,6 +209,10 @@ static void cb(int sock, short which, void *arg)
   }
 }
 
+static void sigint_handler(int signo) {
+  litex_sim_tracer_close();
+}
+
 int main(int argc, char *argv[])
 {
   void *vsim=NULL;
@@ -221,6 +225,7 @@ int main(int argc, char *argv[])
   WSAStartup(0x0201, &wsa_data);
 #endif
 
+  signal(SIGINT, sigint_handler);
 
   base = event_base_new();
   if(!base)
@@ -250,5 +255,6 @@ int main(int argc, char *argv[])
   litex_sim_coverage_dump();
 #endif
 out:
+  litex_sim_tracer_close();
   return ret;
 }

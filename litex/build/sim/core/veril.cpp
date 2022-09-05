@@ -71,7 +71,7 @@ extern "C" void litex_sim_tracer_dump()
     last_enabled = (int) dump_enabled;
   }
 
-  if (dump_enabled && tfp_start <= main_time && main_time <= tfp_end) {
+  if (tfp_start <= main_time && main_time <= tfp_end) {
     tfp->dump((vluint64_t) main_time);
   }
 }
@@ -79,6 +79,11 @@ extern "C" void litex_sim_tracer_dump()
 extern "C" int litex_sim_got_finish()
 {
   return Verilated::gotFinish();
+}
+
+extern "C" void litex_sim_tracer_close()
+{
+  tfp->close();
 }
 
 #if VM_COVERAGE
