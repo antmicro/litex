@@ -300,10 +300,11 @@ static void print_scan_errors(unsigned int errors) {
 #define READ_CHECK_TEST_PATTERN_MAX_ERRORS (8*SDRAM_PHY_PHASES*DFII_PIX_DATA_BYTES/SDRAM_PHY_MODULES)
 #define MODULE_BITMASK ((1<<SDRAM_PHY_DQ_DQS_RATIO)-1)
 
-static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int seed) {
-	int p, i;
+static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int seed, int dq_line) {
+	int p, i, bit;
 	unsigned int errors;
 	unsigned int prv;
+	unsigned char value;
 	unsigned char tst[DFII_PIX_DATA_BYTES];
 	unsigned char prs[SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
 
@@ -311,8 +312,12 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 	prv = seed;
 	for(p=0;p<SDRAM_PHY_PHASES;p++) {
 		for(i=0;i<DFII_PIX_DATA_BYTES;i++) {
-			prv = lfsr(32, prv);
-			prs[p][i] = prv;
+			value = 0;
+			for (bit=0;bit<8;bit++) {
+				prv = lfsr(32, prv);
+				value |= (prv&1) << bit;
+			}
+			prs[p][i] = value;
 		}
 	}
 
@@ -346,25 +351,34 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 		/* Read back test pattern */
 		csr_rd_buf_uint8(sdram_dfii_pix_rddata_addr(p), tst, DFII_PIX_DATA_BYTES);
 		/* Verify bytes matching current 'module' */
-		int positive_edge_byte_offset, negative_edge_byte_offset, in_byte_offset;
+		int positive_edge_byte_offset;
+		int negative_edge_byte_offset;
+		int in_byte_offset;
+		int mask;
+
+#ifdef SDRAM_DELAY_PER_DQ
+		mask = 1 << dq_line;
+#else
+		mask = MODULE_BITMASK;
+#endif
 
 		/* Values written into CSR are Big Endian */
 		positive_edge_byte_offset = (DFII_PIX_DATA_BYTES/2) - 1 - (module * SDRAM_PHY_DQ_DQS_RATIO)/8;
 		negative_edge_byte_offset = positive_edge_byte_offset + DFII_PIX_DATA_BYTES / 2;
 		in_byte_offset = (module * SDRAM_PHY_DQ_DQS_RATIO)%8;
-		errors += popcount((prs[p][positive_edge_byte_offset] & (MODULE_BITMASK << in_byte_offset)) ^
-		                   (tst[positive_edge_byte_offset] & (MODULE_BITMASK << in_byte_offset)));
+		errors += popcount((prs[p][positive_edge_byte_offset] & (mask << in_byte_offset)) ^
+		                   (tst[positive_edge_byte_offset] & (mask << in_byte_offset)));
 		if (SDRAM_PHY_DQ_DQS_RATIO == 16)
-			errors += popcount(prs[p][positive_edge_byte_offset+1] ^
-			                   tst[positive_edge_byte_offset+1]);
+			errors += popcount((prs[p][positive_edge_byte_offset+1] & (mask << in_byte_offset)) ^
+			                   (tst[positive_edge_byte_offset+1] & (mask << in_byte_offset)));
 
 		if (DFII_PIX_DATA_BYTES == 1) // Special case for x4 single IC
 			in_byte_offset = 0x4;
-		errors += popcount((prs[p][negative_edge_byte_offset] & (MODULE_BITMASK << in_byte_offset)) ^
-		                   (tst[negative_edge_byte_offset] & (MODULE_BITMASK << in_byte_offset)));
+		errors += popcount((prs[p][negative_edge_byte_offset] & (mask << in_byte_offset)) ^
+		                   (tst[negative_edge_byte_offset] & (mask << in_byte_offset)));
 		if (SDRAM_PHY_DQ_DQS_RATIO == 16)
-			errors += popcount(prs[p][negative_edge_byte_offset+1] ^
-			                   tst[negative_edge_byte_offset+1]);
+			errors += popcount((prs[p][negative_edge_byte_offset+1] & (mask << in_byte_offset)) ^
+			                   (tst[negative_edge_byte_offset+1] & (mask << in_byte_offset)));
 	}
 
 #ifdef SDRAM_PHY_ECP5DDRPHY
@@ -378,22 +392,30 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 static void sdram_leveling_center_module(
 	int module, int show_short, int show_long, delay_callback rst_delay, delay_callback inc_delay)
 {
+	int dq_line;
 	int i;
 	int show;
 	int working;
 	unsigned int errors;
 	int delay, delay_mid, delay_range;
 	int delay_min = -1, delay_max = -1;
+	dq_line = 0;
 
 	if (show_long)
+#ifdef SDRAM_DELAY_PER_DQ
+		printf("m%d dq_line:%d: |", module, dq_line);
+#else
 		printf("m%d: |", module);
+#endif
 
 	/* Find smallest working delay */
 	delay = 0;
 	rst_delay(module);
 	while(1) {
-		errors  = sdram_write_read_check_test_pattern(module, 42);
-		errors += sdram_write_read_check_test_pattern(module, 84);
+		errors  = sdram_write_read_check_test_pattern(module, 42, dq_line);
+		errors += sdram_write_read_check_test_pattern(module, 84, dq_line);
+		errors += sdram_write_read_check_test_pattern(module, 36, dq_line);
+		errors += sdram_write_read_check_test_pattern(module, 72, dq_line);
 		working = errors == 0;
 		show = show_long;
 #if SDRAM_PHY_DELAYS > 32
@@ -412,6 +434,7 @@ static void sdram_leveling_center_module(
 	}
 
 	/* Get a bit further into the working zone */
+/*
 #if SDRAM_PHY_DELAYS > 32
 	#define	SDRAM_PHY_DELAY_JUMP 16
 #elif SDRAM_PHY_DELAYS > 8
@@ -423,11 +446,13 @@ static void sdram_leveling_center_module(
 		delay += 1;
 		inc_delay(module);
 	}
-
+*/
 	/* Find largest working delay */
 	while(1) {
-		errors  = sdram_write_read_check_test_pattern(module, 42);
-		errors += sdram_write_read_check_test_pattern(module, 84);
+		errors  = sdram_write_read_check_test_pattern(module, 42, dq_line);
+		errors += sdram_write_read_check_test_pattern(module, 84, dq_line);
+		errors += sdram_write_read_check_test_pattern(module, 36, dq_line);
+		errors += sdram_write_read_check_test_pattern(module, 72, dq_line);
 		working = errors == 0;
 		show = show_long;
 #if SDRAM_PHY_DELAYS > 32
@@ -475,8 +500,10 @@ static void sdram_leveling_center_module(
 			}
 
 			/* Check */
-			errors  = sdram_write_read_check_test_pattern(module, 42);
-			errors += sdram_write_read_check_test_pattern(module, 84);
+			errors  = sdram_write_read_check_test_pattern(module, 42, dq_line);
+			errors += sdram_write_read_check_test_pattern(module, 84, dq_line);
+			errors += sdram_write_read_check_test_pattern(module, 36, dq_line);
+			errors += sdram_write_read_check_test_pattern(module, 72, dq_line);
 			if (errors == 0)
 				break;
 			retries--;
@@ -952,8 +979,10 @@ static unsigned int sdram_read_leveling_scan_module(int module, int bitslip, int
 {
 	const unsigned int max_errors = 2*READ_CHECK_TEST_PATTERN_MAX_ERRORS;
 	int i;
+	int dq_line;
 	unsigned int score;
 	unsigned int errors;
+	dq_line = 0;
 
 	/* Check test pattern for each delay value */
 	score = 0;
@@ -966,8 +995,10 @@ static unsigned int sdram_read_leveling_scan_module(int module, int bitslip, int
 #if SDRAM_PHY_DELAYS > 32
 		_show = (i%16 == 0) & show;
 #endif
-		errors  = sdram_write_read_check_test_pattern(module, 42);
-		errors += sdram_write_read_check_test_pattern(module, 84);
+		errors  = sdram_write_read_check_test_pattern(module, 42, dq_line);
+		errors += sdram_write_read_check_test_pattern(module, 84, dq_line);
+		errors += sdram_write_read_check_test_pattern(module, 36, dq_line);
+		errors += sdram_write_read_check_test_pattern(module, 72, dq_line);
 		working = errors == 0;
 		/* When any scan is working then the final score will always be higher then if no scan was working */
 		score += (working * max_errors*SDRAM_PHY_DELAYS) + (max_errors - errors);
