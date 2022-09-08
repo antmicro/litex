@@ -29,7 +29,8 @@ GCC_FLAGS = {
     #                       ||||/--- Single-Precision Floating-Point
     #                       |||||/-- Double-Precision Floating-Point
     #                       imacfd
-    "standard": "-march=rv32imc    -mabi=ilp32 ",
+    "standard": "-march=rv32im    -mabi=ilp32 ",
+    "full":     "-march=rv32imc   -mabi=ilp32 ",
 }
 
 # OBI / APB / Trace Layouts ------------------------------------------------------------------------
