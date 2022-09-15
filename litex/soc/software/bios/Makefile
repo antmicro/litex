@@ -51,6 +51,10 @@ else
 LSCRIPT = linker.ld
 endif
 
+ifeq ($(CPU), blackparrot)
+OBJECTS += mul.o
+endif
+
 all: bios.bin
 	$(PYTHON) -m litex.soc.software.memusage bios.elf $(CURDIR)/../include/generated/regions.ld $(TRIPLE)
 

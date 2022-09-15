@@ -9,10 +9,13 @@
 #include <irq.h>
 #include <libbase/uart.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #if defined(__microwatt__)
 void isr(uint64_t vec);
 void isr_dec(void);
+#elif defined(__blackparrot__)
+void isr(uint64_t*);
 #else
 void isr(void);
 #endif
@@ -243,6 +246,55 @@ void isr(void)
 
 #if defined(__microwatt__)
 void isr(uint64_t vec){};
+#elif defined(__blackparrot__)
+
+#define OPCODE(x)  ((x >> 0) & 0x7F)
+#define RD(x)      ((x >> 7) & 0x1F)
+#define FUNCT3(x)  ((x >> 12) & 0x7)
+#define RS1(x)     ((x >> 15) & 0x1F)
+#define RS2(x)     ((x >> 20) & 0x1F)
+
+#define RISCV_INVINSTR 0x2
+#define RISCV_OPCODE_MULDIV 0b0110011
+#define RISCV_FUNCT3_MULH 	0b001
+#define RISCV_FUNCT3_MULHU 	0b011
+#define RISCV_FUNCT3_MULHSU 0b010
+
+extern uint64_t mul_mulh(uint64_t, uint64_t);
+extern uint64_t mul_mulhu(uint64_t, uint64_t);
+extern uint64_t mul_mulhsu(uint64_t, uint64_t);
+
+void isr(uint64_t* regs)
+{ 
+  uint64_t _mcause = csrr(mcause);
+  uint32_t* _mepc  = csrr(mepc);
+
+  uint8_t rs2_addr = RS2(*_mepc);
+  uint8_t rs1_addr = RS1(*_mepc);
+  uint8_t funct3 = FUNCT3(*_mepc);
+  uint8_t rd_addr = RD(*_mepc);
+  uint8_t opcode = OPCODE(*_mepc);
+  
+  uint64_t rs1_data = regs[rs1_addr];
+  uint64_t rs2_data = regs[rs2_addr];
+
+  if (_mcause == RISCV_INVINSTR && opcode == RISCV_OPCODE_MULDIV) {
+	switch(funct3) {
+		case RISCV_FUNCT3_MULH:
+			regs[rd_addr] = mul_mulh(rs1_data, rs2_data);
+			break;
+		case RISCV_FUNCT3_MULHU:
+			regs[rd_addr] = mul_mulhu(rs1_data, rs2_data);
+			break;
+		case RISCV_FUNCT3_MULHSU:
+			regs[rd_addr] = mul_mulhsu(rs1_data, rs2_data);
+			break;
+		default:
+			return;
+	}
+	csrw(mepc, csrr(mepc)+4);
+  }
+}
 #else
 void isr(void){};
 #endif
