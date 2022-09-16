@@ -119,7 +119,7 @@ git_repos = {
     "pythondata-cpu-cv32e40p":     GitRepo(url="https://github.com/litex-hub/", clone="recursive"),
     "pythondata-cpu-cv32e41p":     GitRepo(url="https://github.com/litex-hub/", clone="recursive"),
     "pythondata-cpu-cva5":         GitRepo(url="https://github.com/litex-hub/"),
-    "pythondata-cpu-cva6":         GitRepo(url="https://github.com/litex-hub/", clone="recursive"),
+    "pythondata-cpu-cva6":         GitRepo(url="https://github.com/sergachev/", clone="recursive", branch="fix/settings"),
     "pythondata-cpu-ibex":         GitRepo(url="https://github.com/litex-hub/", clone="recursive", sha1=0xd3d53df),
     "pythondata-cpu-minerva":      GitRepo(url="https://github.com/litex-hub/"),
     "pythondata-cpu-naxriscv":     GitRepo(url="https://github.com/litex-hub/", sha1=0x8b808becb503),
