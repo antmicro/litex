@@ -37,6 +37,8 @@
 #define MEMTEST_ADDR_SIZE (32*1024)
 #endif
 #define MEMTEST_ADDR_RANDOM 0
+#define MEMTEST_BUS_DEBUG
+#define MEMTEST_DATA_DEBUG
 
 static unsigned int seed_to_data_32(unsigned int seed, int random)
 {
