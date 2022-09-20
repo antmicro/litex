@@ -365,6 +365,10 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 		/* Values written into CSR are Big Endian */
 		positive_edge_byte_offset = (DFII_PIX_DATA_BYTES/2) - 1 - (module * SDRAM_PHY_DQ_DQS_RATIO)/8;
 		negative_edge_byte_offset = positive_edge_byte_offset + DFII_PIX_DATA_BYTES / 2;
+		if ((DFII_PIX_DATA_BYTES/2) == 0) {
+			positive_edge_byte_offset = 0;
+			negative_edge_byte_offset = 0;
+		}
 		in_byte_offset = (module * SDRAM_PHY_DQ_DQS_RATIO)%8;
 		errors += popcount((prs[p][positive_edge_byte_offset] & (mask << in_byte_offset)) ^
 		                   (tst[positive_edge_byte_offset] & (mask << in_byte_offset)));
