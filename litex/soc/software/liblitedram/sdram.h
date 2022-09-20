@@ -7,6 +7,25 @@ extern "C" {
 
 #include <generated/csr.h>
 
+
+/*---------*/
+/* Timings */
+/*---------*/
+struct sdram_timings_s {
+    uint32_t trp;
+    uint32_t trcd;
+    uint32_t twr;
+    uint32_t twtr;
+    uint32_t trefi;
+    uint32_t trfc;
+    uint32_t tfaw;
+    uint32_t tccd;
+    uint32_t trrd;
+    uint32_t trc;
+    uint32_t tras;
+    uint32_t tzqcs;
+};
+
 /*-----------------------------------------------------------------------*/
 /* Constants                                                             */
 /*-----------------------------------------------------------------------*/
@@ -47,6 +66,7 @@ int sdram_leveling(void);
 /* Initialization                                                        */
 /*-----------------------------------------------------------------------*/
 int sdram_init(void);
+int sdram_set_timings(struct sdram_timings_s timings);
 
 /*-----------------------------------------------------------------------*/
 /* Debugging                                                             */
