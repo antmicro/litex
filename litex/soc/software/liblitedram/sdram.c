@@ -961,9 +961,9 @@ static void sdram_read_leveling_rst_delay(int module, int dq_line) {
 	/* Select module */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dly_sel_write(1 << module);
+		ddrphy_A_dly_sel_write(1 << module);
 	else
-		ddrphy_B__dly_sel_write(1 << (module/2));
+		ddrphy_B_dly_sel_write(1 << (module/2));
 #else
 	ddrphy_dly_sel_write(1 << module);
 #endif
@@ -972,9 +972,9 @@ static void sdram_read_leveling_rst_delay(int module, int dq_line) {
 	/* Select DQ line */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dq_dly_sel_write(1 << dq_line);
+		ddrphy_A_dq_dly_sel_write(1 << dq_line);
 	else
-		ddrphy_B__dq_dly_sel_write(1 << dq_line);
+		ddrphy_B_dq_dly_sel_write(1 << dq_line);
 #else
 	ddrphy_dq_dly_sel_write(1 << dq_line);
 #endif
@@ -986,9 +986,9 @@ static void sdram_read_leveling_rst_delay(int module, int dq_line) {
 	/* Un-select module */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dly_sel_write(0);
+		ddrphy_A_dly_sel_write(0);
 	else
-		ddrphy_B__dly_sel_write(0);
+		ddrphy_B_dly_sel_write(0);
 #else
 	ddrphy_dly_sel_write(0);
 #endif
@@ -997,9 +997,9 @@ static void sdram_read_leveling_rst_delay(int module, int dq_line) {
 	/* Un-select DQ line */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dq_dly_sel_write(0);
+		ddrphy_A_dq_dly_sel_write(0);
 	else
-		ddrphy_B__dq_dly_sel_write(0);
+		ddrphy_B_dq_dly_sel_write(0);
 #else
 	ddrphy_dq_dly_sel_write(0);
 #endif
@@ -1016,9 +1016,9 @@ static void sdram_read_leveling_inc_delay(int module, int dq_line) {
 	/* Select module */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dly_sel_write(1 << module);
+		ddrphy_A_dly_sel_write(1 << module);
 	else
-		ddrphy_B__dly_sel_write(1 << (module/2));
+		ddrphy_B_dly_sel_write(1 << (module/2));
 #else
 	ddrphy_dly_sel_write(1 << module);
 #endif
@@ -1027,9 +1027,9 @@ static void sdram_read_leveling_inc_delay(int module, int dq_line) {
 	/* Select DQ line */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dq_dly_sel_write(1 << dq_line);
+		ddrphy_A_dq_dly_sel_write(1 << dq_line);
 	else
-		ddrphy_B__dq_dly_sel_write(1 << dq_line);
+		ddrphy_B_dq_dly_sel_write(1 << dq_line);
 #else
 	ddrphy_dq_dly_sel_write(1 << dq_line);
 #endif
@@ -1041,9 +1041,9 @@ static void sdram_read_leveling_inc_delay(int module, int dq_line) {
 	/* Un-select module */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dly_sel_write(0);
+		ddrphy_A_dly_sel_write(0);
 	else
-		ddrphy_B__dly_sel_write(0);
+		ddrphy_B_dly_sel_write(0);
 #else
 	ddrphy_dly_sel_write(0);
 #endif
@@ -1052,9 +1052,9 @@ static void sdram_read_leveling_inc_delay(int module, int dq_line) {
 	/* Un-select DQ line */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dq_dly_sel_write(0);
+		ddrphy_A_dq_dly_sel_write(0);
 	else
-		ddrphy_B__dq_dly_sel_write(0);
+		ddrphy_B_dq_dly_sel_write(0);
 #else
 	ddrphy_dq_dly_sel_write(0);
 #endif
@@ -1072,9 +1072,9 @@ static void sdram_read_leveling_rst_bitslip(int module, int dq_line)
 	/* Select module */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dly_sel_write(1 << module);
+		ddrphy_A_dly_sel_write(1 << module);
 	else
-		ddrphy_B__dly_sel_write(1 << (module/2));
+		ddrphy_B_dly_sel_write(1 << (module/2));
 #else
 	ddrphy_dly_sel_write(1 << module);
 #endif
@@ -1083,9 +1083,9 @@ static void sdram_read_leveling_rst_bitslip(int module, int dq_line)
 	/* Select DQ line */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dq_dly_sel_write(1 << dq_line);
+		ddrphy_A_dq_dly_sel_write(1 << dq_line);
 	else
-		ddrphy_B__dq_dly_sel_write(1 << dq_line);
+		ddrphy_B_dq_dly_sel_write(1 << dq_line);
 #else
 	ddrphy_dq_dly_sel_write(1 << dq_line);
 #endif
@@ -1094,9 +1094,9 @@ static void sdram_read_leveling_rst_bitslip(int module, int dq_line)
 	/* Reset delay */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__rdly_dq_bitslip_rst_write(1);
+		ddrphy_A_rdly_dq_bitslip_rst_write(1);
 	else
-		ddrphy_B__rdly_dq_bitslip_rst_write(1);
+		ddrphy_B_rdly_dq_bitslip_rst_write(1);
 #else
 	ddrphy_rdly_dq_bitslip_rst_write(1);
 #endif
@@ -1104,9 +1104,9 @@ static void sdram_read_leveling_rst_bitslip(int module, int dq_line)
 	/* Un-select module */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dly_sel_write(0);
+		ddrphy_A_dly_sel_write(0);
 	else
-		ddrphy_B__dly_sel_write(0);
+		ddrphy_B_dly_sel_write(0);
 #else
 	ddrphy_dly_sel_write(0);
 #endif
@@ -1115,9 +1115,9 @@ static void sdram_read_leveling_rst_bitslip(int module, int dq_line)
 	/* Un-select DQ line */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dq_dly_sel_write(0);
+		ddrphy_A_dq_dly_sel_write(0);
 	else
-		ddrphy_B__dq_dly_sel_write(0);
+		ddrphy_B_dq_dly_sel_write(0);
 #else
 	ddrphy_dq_dly_sel_write(0);
 #endif
@@ -1130,9 +1130,9 @@ static void sdram_read_leveling_inc_bitslip(int module, int dq_line)
 	/* Select module */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dly_sel_write(1 << module);
+		ddrphy_A_dly_sel_write(1 << module);
 	else
-		ddrphy_B__dly_sel_write(1 << (module/2));
+		ddrphy_B_dly_sel_write(1 << (module/2));
 #else
 	ddrphy_dly_sel_write(1 << module);
 #endif
@@ -1141,9 +1141,9 @@ static void sdram_read_leveling_inc_bitslip(int module, int dq_line)
 	/* Select DQ line */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dq_dly_sel_write(1 << dq_line);
+		ddrphy_A_dq_dly_sel_write(1 << dq_line);
 	else
-		ddrphy_B__dq_dly_sel_write(1 << dq_line);
+		ddrphy_B_dq_dly_sel_write(1 << dq_line);
 #else
 	ddrphy_dq_dly_sel_write(1 << dq_line);
 #endif
@@ -1152,9 +1152,9 @@ static void sdram_read_leveling_inc_bitslip(int module, int dq_line)
 	/* Increment delay */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__rdly_dq_bitslip_write(1);
+		ddrphy_A_rdly_dq_bitslip_write(1);
 	else
-		ddrphy_B__rdly_dq_bitslip_write(1);
+		ddrphy_B_rdly_dq_bitslip_write(1);
 #else
 	ddrphy_rdly_dq_bitslip_write(1);
 #endif
@@ -1162,9 +1162,9 @@ static void sdram_read_leveling_inc_bitslip(int module, int dq_line)
 	/* Un-select module */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dly_sel_write(0);
+		ddrphy_A_dly_sel_write(0);
 	else
-		ddrphy_B__dly_sel_write(0);
+		ddrphy_B_dly_sel_write(0);
 #else
 	ddrphy_dly_sel_write(0);
 #endif
@@ -1173,9 +1173,9 @@ static void sdram_read_leveling_inc_bitslip(int module, int dq_line)
 	/* Un-select DQ line */
 #ifdef SRAM_PHY_SUBCHANNELS
 	if (module < SDRAM_PHY_MODULES/2)
-		ddrphy_A__dq_dly_sel_write(0);
+		ddrphy_A_dq_dly_sel_write(0);
 	else
-		ddrphy_B__dq_dly_sel_write(0);
+		ddrphy_B_dq_dly_sel_write(0);
 #else
 	ddrphy_dq_dly_sel_write(0);
 #endif
