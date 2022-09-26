@@ -66,7 +66,8 @@ int sdram_leveling(void);
 /* Initialization                                                        */
 /*-----------------------------------------------------------------------*/
 int sdram_init(void);
-int sdram_set_timings(struct sdram_timings_s timings);
+int sdram_set_timings(struct sdram_timings_s *timings);
+int sdram_timings_init(void);
 
 /*-----------------------------------------------------------------------*/
 /* Debugging                                                             */
