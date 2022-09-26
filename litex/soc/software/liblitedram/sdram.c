@@ -20,6 +20,8 @@
 #include <libbase/lfsr.h>
 
 #include <generated/sdram_phy.h>
+#include <generated/sdram_timings.h>
+
 #include <generated/mem.h>
 #include <system.h>
 
@@ -1143,6 +1145,7 @@ int sdram_leveling(void) {
 /*-----------------------------------------------------------------------*/
 
 int sdram_init(void) {
+	sdram_timings_init();
 	/* Reset Cmd/Dat delays */
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
 	int i;
@@ -1199,20 +1202,40 @@ int sdram_init(void) {
 	return 1;
 }
 
-int sdram_set_timings(struct sdram_timings_s timings)
+int sdram_timings_init(void)
 {
-	sdram_controller_tRP_write(timings.trp);
-	sdram_controller_tRCD_write(timings.trcd);
-	sdram_controller_tWR_write(timings.twr);
-	sdram_controller_tWTR_write(timings.twtr);
-	sdram_controller_tREFI_write(timings.trefi);
-	sdram_controller_tRFC_write(timings.trfc);
-	sdram_controller_tFAW_write(timings.tfaw);
-	sdram_controller_tCCD_write(timings.tccd);
-	sdram_controller_tRRD_write(timings.trrd);
-	sdram_controller_tRC_write(timings.trc);
-	sdram_controller_tRAS_write(timings.tras);
-	sdram_controller_tZQCS_write(timings.tzqcs);
+	struct sdram_timings_s timings = {
+		.trp = SDRAM_TIMINGS_DEFAULT_TRP,
+		.trcd = SDRAM_TIMINGS_DEFAULT_TRCD,
+		.twr = SDRAM_TIMINGS_DEFAULT_TWR,
+		.twtr = SDRAM_TIMINGS_DEFAULT_TWTR,
+		.trefi = SDRAM_TIMINGS_DEFAULT_TREFI,
+		.trfc = SDRAM_TIMINGS_DEFAULT_TRFC,
+		.tfaw = SDRAM_TIMINGS_DEFAULT_TFAW,
+		.tccd = SDRAM_TIMINGS_DEFAULT_TCCD,
+		.trrd = SDRAM_TIMINGS_DEFAULT_TRRD,
+		.trc = SDRAM_TIMINGS_DEFAULT_TRC,
+		.tras = SDRAM_TIMINGS_DEFAULT_TRAS,
+		.tzqcs = SDRAM_TIMINGS_DEFAULT_TZQCS
+	};
+
+	return sdram_set_timings(&timings);
+}
+
+int sdram_set_timings(struct sdram_timings_s *timings)
+{
+	sdram_controller_tRP_write(timings->trp);
+	sdram_controller_tRCD_write(timings->trcd);
+	sdram_controller_tWR_write(timings->twr);
+	sdram_controller_tWTR_write(timings->twtr);
+	sdram_controller_tREFI_write(timings->trefi);
+	sdram_controller_tRFC_write(timings->trfc);
+	sdram_controller_tFAW_write(timings->tfaw);
+	sdram_controller_tCCD_write(timings->tccd);
+	sdram_controller_tRRD_write(timings->trrd);
+	sdram_controller_tRC_write(timings->trc);
+	sdram_controller_tRAS_write(timings->tras);
+	sdram_controller_tZQCS_write(timings->tzqcs);
 
 	return 0;
 }
