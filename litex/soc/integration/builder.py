@@ -222,11 +222,14 @@ class Builder:
 
         # Generate LiteDRAM C header to sdram_phy.h when the SoC use it
         if hasattr(self.soc, "sdram"):
-            from litedram.init import get_sdram_phy_c_header
+            from litedram.init import get_sdram_phy_c_header, get_sdram_timings_c_header
             sdram_contents = get_sdram_phy_c_header(
                 self.soc.sdram.controller.settings.phy,
                 self.soc.sdram.controller.settings.timing)
             write_to_file(os.path.join(self.generated_dir, "sdram_phy.h"), sdram_contents)
+            timings_contents = get_sdram_timings_c_header(
+                self.soc.sdram.controller.settings.timing)
+            write_to_file(os.path.join(self.generated_dir, "sdram_timings.h"), timings_contents)
 
     def _generate_csr_map(self):
         # JSON Export.
