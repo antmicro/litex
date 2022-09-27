@@ -87,6 +87,10 @@ bss_done:
                  // NOTE: must still enable mstatus.MIE!
   csrw mie,t0
 
+  // enable FPU
+  li t0, 0x2000
+  csrs mstatus, t0
+
   call main
 inf_loop:
   j inf_loop
