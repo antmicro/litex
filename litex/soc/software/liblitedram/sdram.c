@@ -27,6 +27,7 @@
 
 #include <liblitedram/sdram.h>
 #include <liblitedram/sdram_dbg.h>
+#include <liblitedram/sdram_spd.h>
 
 //#define SDRAM_TEST_DISABLE
 //#define SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
