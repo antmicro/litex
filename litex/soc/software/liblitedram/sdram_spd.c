@@ -6,11 +6,13 @@
 
 #include <libbase/memtest.h>
 #include <libbase/lfsr.h>
+#include <libbase/i2c.h>
 
 #ifdef CSR_SDRAM_BASE
 #include <generated/sdram_phy.h>
 #include <generated/sdram_timings.h>
 #endif
+#include <generated/soc.h>
 #include <generated/mem.h>
 #include <system.h>
 
@@ -66,7 +68,9 @@ int sdram_spd_parse_timebase_ddr4(struct sdram_spd_ctx_s *ctx, uint8_t *spd)
 
 int sdram_spd_txx_ps(struct sdram_spd_ctx_s *ctx, uint16_t mtb, int8_t ftb)
 {
-    return (mtb * ctx->medium_timebase_ps) + (ftb * ctx->fine_timebase_ps);
+    int medium = ctx->medium_timebase_ps * mtb;
+    int fine = ctx->fine_timebase_ps * ftb;
+    return medium + fine;
 }
 
 int sdram_spd_parse_timings_ddr4(struct sdram_spd_ctx_s *ctx, uint8_t *spd)
@@ -78,21 +82,21 @@ int sdram_spd_parse_timings_ddr4(struct sdram_spd_ctx_s *ctx, uint8_t *spd)
     /* Read raw values from SPD */
     int trefi_1x = 7812500; // 64e9/8192
     int tckavg_min = sdram_spd_txx_ps(ctx, spd[18], spd[125]);
-    int tckavg_max = sdram_spd_txx_ps(ctx, spd[19], spd[124]);
-    int taa_min = sdram_spd_txx_ps(ctx, spd[24], spd[123]);
+    //int tckavg_max = sdram_spd_txx_ps(ctx, spd[19], spd[124]);
+    //int taa_min = sdram_spd_txx_ps(ctx, spd[24], spd[123]);
     int trcd_min = sdram_spd_txx_ps(ctx, spd[25], spd[122]);
     int trp_min = sdram_spd_txx_ps(ctx, spd[26], spd[121]);
     int tras_min = sdram_spd_txx_ps(ctx, WORD(LSN(spd[27]), spd[28]), 0);
-    int trc_min = sdram_spd_txx_ps(ctx, WORD(MSN(spd[27]), spd[29]), spd[120]);
+    //int trc_min = sdram_spd_txx_ps(ctx, WORD(MSN(spd[27]), spd[29]), spd[120]);
     int trfc1_min = sdram_spd_txx_ps(ctx, WORD(spd[31], spd[30]), 0);
     int trfc2_min = sdram_spd_txx_ps(ctx, WORD(spd[33], spd[32]), 0);
     int trfc4_min = sdram_spd_txx_ps(ctx, WORD(spd[35], spd[34]), 0);
     int tfaw_min = sdram_spd_txx_ps(ctx, WORD(LSN(spd[36]), spd[37]), 0);
-    int trrd_s_min = sdram_spd_txx_ps(ctx, spd[38], spd[119]);
+    //int trrd_s_min = sdram_spd_txx_ps(ctx, spd[38], spd[119]);
     int trrd_l_min = sdram_spd_txx_ps(ctx, spd[39], spd[118]);
     int tccd_l_min = sdram_spd_txx_ps(ctx, spd[40], spd[117]);
     int twr_min = sdram_spd_txx_ps(ctx, WORD(LSN(spd[41]), spd[42]), 0);
-    int twtr_s_min = sdram_spd_txx_ps(ctx, WORD(LSN(spd[43]), spd[44]), 0);
+    //int twtr_s_min = sdram_spd_txx_ps(ctx, WORD(LSN(spd[43]), spd[44]), 0);
     int twtr_l_min = sdram_spd_txx_ps(ctx, WORD(MSN(spd[43]), spd[45]), 0);
 
     int sdram_device_widths[] = {4, 8, 16, 32};
@@ -118,7 +122,7 @@ int sdram_spd_parse_timings_ddr4(struct sdram_spd_ctx_s *ctx, uint8_t *spd)
     struct sdram_spd_timings_s min_timings = {
         /* technology timings */
         .tck = tckavg_min,
-        .trefi = {trefi_x1, trefi_x1<<1, trefi_x1<<2},
+        .trefi = {trefi_1x, trefi_1x<<1, trefi_1x<<2},
         .twtr = {4, twtr_l_min},
         .tccd = {4, tccd_l_min},
         .trrd = {4, trrd_l_min},
@@ -137,20 +141,89 @@ int sdram_spd_parse_timings_ddr4(struct sdram_spd_ctx_s *ctx, uint8_t *spd)
     return 1;
 }
 
-int sdram_spd_parse(struct sdram_spd_ctx_s *ctx, uint8_t *spd) {
-    /* currently hardcoded for DDR4 */
+int sdram_spd_parse(struct sdram_spd_ctx_s *ctx, uint8_t *spd, unsigned int fine_refresh_mode) {
+    if ((ctx == NULL) || (spd == NULL)) {
+        return 0;
+    }
+
+    ctx->clk_period_ps = 1000000000000/CONFIG_CLOCK_FREQUENCY; /* hertz to picoseconds */
     ctx->rate_frac_num = 1;
-    ctx->rate_frac_denom = 4;
-    ctx->margin = 0;
+    ctx->rate_frac_denom = SDRAM_PHY_PHASES;
+    ctx->margin = ctx->clk_period_ps * (ctx->rate_frac_denom - ctx->rate_frac_num) / ctx->rate_frac_denom;
+    if (fine_refresh_mode > SDRAM_SPD_FINE_REFRESH_MODE_MAX) ctx->fine_refresh_mode = SDRAM_SPD_FINE_REFRESH_MODE_MAX;
+    else ctx->fine_refresh_mode = fine_refresh_mode;
+
+    sdram_spd_parse_geometry_ddr4(ctx, spd);
+    sdram_spd_parse_timebase_ddr4(ctx, spd);
+    sdram_spd_parse_timings_ddr4(ctx, spd);
 
     return 1;
+}
+
+int sdram_spd_read_i2c(struct sdram_spd_ctx_s *ctx, unsigned int fine_refresh_mode, uint8_t spdaddr, bool send_stop)
+{
+    unsigned char buf[256];
+	int len = sizeof(buf);
+
+	if (spdaddr > 0b111) {
+		/* SPD EEPROM max address is 0b111 (defined by A0, A1, A2 pins) */
+		return 0;
+	}
+
+	if (!i2c_read(SPD_RW_ADDR(spdaddr), 0, buf, len, send_stop)) {
+		/* Error when reading SPD EEPROM */
+		return 0;
+	}
+
+    return sdram_spd_parse(ctx, buf, fine_refresh_mode);
 }
 
 /*-----------------------------------------------------------------------*/
 /* SPD to controller timings                                             */
 /*-----------------------------------------------------------------------*/
 
-int sdram_set_spd_timings(struct sdram_spd_ctx_s *ctx)
+int sdram_spd_ps_to_cycles(struct sdram_spd_ctx_s *ctx, int time, bool use_margin)
+{
+    if (ctx == NULL) {
+        return -1;
+    }
+
+    if (use_margin == true) {
+        time += ctx->margin;
+    }
+
+    int cycles = time / ctx->clk_period_ps;
+    int cycles_mod = time % ctx->clk_period_ps;
+
+    if (cycles_mod > 0) cycles++;
+
+    return cycles;
+}
+
+int sdram_spd_ck_to_cycles(struct sdram_spd_ctx_s *ctx, int ck)
+{
+    if (ctx == NULL) {
+        return -1;
+    }
+
+    int cycles = ck / ctx->rate_frac_denom;
+    int cycles_mod = ck % ctx->rate_frac_denom;
+
+    if (cycles_mod > 0) cycles++;
+
+    return cycles;
+}
+
+int sdram_spd_ck_ps_to_cycles(struct sdram_spd_ctx_s *ctx, int ck_ps[2], bool use_margin)
+{
+    if (ctx == NULL) {
+        return -1;
+    }
+
+    return max(sdram_spd_ck_to_cycles(ctx, ck_ps[0]), sdram_spd_ps_to_cycles(ctx, ck_ps[1], use_margin));
+}
+
+int sdram_timings_spd(struct sdram_spd_ctx_s *ctx)
 {
     if (ctx == NULL) {
         return 0;
@@ -160,19 +233,19 @@ int sdram_set_spd_timings(struct sdram_spd_ctx_s *ctx)
 
     /* Convert SPD timings to controller timings */
     struct sdram_timings_s timings = {
-        .trp = ps_to_cycles(min_timings->trp, 0),
-        .trcd = ps_to_cycles(min_timings->trcd, 0),
-        .twr = ps_to_cycles(min_timings->twr, 0),
-        .trefi = ps_to_cycles(min_timings->trefi[ctx->fine_refresh_mode], 0),
-        .trfc = ps_to_cycles(min_timings->trfc[ctx->fine_refresh_mode], 1),
-        .twtr = ck_ps_to_cycles(min_timings->twtr, 0),
+        .trp = sdram_spd_ps_to_cycles(ctx, min_timings->trp, true),
+        .trcd = sdram_spd_ps_to_cycles(ctx, min_timings->trcd, true),
+        .twr = sdram_spd_ps_to_cycles(ctx, min_timings->twr, true),
+        .trefi = sdram_spd_ps_to_cycles(ctx, min_timings->trefi[ctx->fine_refresh_mode], false),
+        .trfc = sdram_spd_ps_to_cycles(ctx, min_timings->trfc[ctx->fine_refresh_mode], true),
+        .twtr = sdram_spd_ck_ps_to_cycles(ctx, min_timings->twtr, true),
         /* optional timings below (default to 0) */
-        .tfaw = ck_ps_to_cycles(min_timings->tfaw, 0),
-        .tccd = ck_ps_to_cycles(min_timings->tccd, 0),
-        .trrd = ck_ps_to_cycles(min_timings->trrd, 0),
-        .trc = ck_ps_to_cycles(min_timings->trp + min_timings->tras, 0),
-        .tras = ck_ps_to_cycles(min_timings->tras, 0),
-        .tzqcs = ck_ps_to_cycles(min_timings->tzqcs, 0)
+        .tfaw = sdram_spd_ck_ps_to_cycles(ctx, min_timings->tfaw, true),
+        .tccd = sdram_spd_ck_ps_to_cycles(ctx, min_timings->tccd, true),
+        .trrd = sdram_spd_ck_ps_to_cycles(ctx, min_timings->trrd, true),
+        .trc = sdram_spd_ps_to_cycles(ctx, (min_timings->trp) + (min_timings->tras), true),
+        .tras = sdram_spd_ps_to_cycles(ctx, min_timings->tras, true),
+        .tzqcs = sdram_spd_ck_ps_to_cycles(ctx, min_timings->tzqcs, true)
     };
 
     sdram_set_timings(&timings);

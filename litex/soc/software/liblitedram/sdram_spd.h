@@ -9,6 +9,12 @@
 #define MSN(b) FIELD(b, 4, 4)
 #define WORD(msb, lsb) ( (uint16_t) ((msb << 8) | lsb) )
 
+#define SPD_RW_PREAMBLE    0b1010
+#define SPD_RW_ADDR(a210)  ((SPD_RW_PREAMBLE << 3) | ((a210) & 0b111))
+
+#define SDRAM_SPD_FINE_REFRESH_MODE_MAX 2
+/* fine refresh mode: 2**value */
+
 struct sdram_spd_timings_s {
     int tck;
     int trefi[3];
@@ -31,11 +37,12 @@ struct sdram_spd_geometry_s {
 };
 
 struct sdram_spd_ctx_s {
+    int clk_period_ps;
     int rate_frac_num;
     int rate_frac_denom;
     int margin;
     int speedgrade;
-    int fine_refresh_mode;
+    unsigned int fine_refresh_mode;
     int medium_timebase_ps;
     int fine_timebase_ps;
     struct sdram_spd_geometry_s geometry;
@@ -46,7 +53,12 @@ int sdram_spd_parse_geometry_ddr4(struct sdram_spd_ctx_s *ctx, uint8_t *spd);
 int sdram_spd_parse_timebase_ddr4(struct sdram_spd_ctx_s *ctx, uint8_t *spd);
 int sdram_spd_txx_ps(struct sdram_spd_ctx_s *ctx, uint16_t mtb, int8_t ftb);
 int sdram_spd_parse_timings_ddr4(struct sdram_spd_ctx_s *ctx, uint8_t *spd);
-int sdram_set_spd_timings(struct sdram_spd_ctx_s *ctx);
+int sdram_spd_parse(struct sdram_spd_ctx_s *ctx, uint8_t *spd, unsigned int fine_refresh_mode);
+int sdram_spd_read_i2c(struct sdram_spd_ctx_s *ctx, unsigned int fine_refresh_mode, uint8_t spdaddr, bool send_stop);
+int sdram_spd_ps_to_cycles(struct sdram_spd_ctx_s *ctx, int time, bool use_margin);
+int sdram_spd_ck_to_cycles(struct sdram_spd_ctx_s *ctx, int ck);
+int sdram_spd_ck_ps_to_cycles(struct sdram_spd_ctx_s *ctx, int ck_ps[2], bool use_margin);
+int sdram_timings_spd(struct sdram_spd_ctx_s *ctx);
 
 
 #endif /* __SDRAM_SPD_H */

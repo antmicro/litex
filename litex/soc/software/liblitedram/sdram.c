@@ -1246,7 +1246,15 @@ int sdram_leveling(void)
 
 int sdram_init(void)
 {
+	/* Set timings (from SPD, if available) */
 	sdram_timings_init();
+#ifdef CONFIG_HAS_I2C
+	struct sdram_spd_ctx_s spd_ctx;
+	if (sdram_spd_read_i2c(&spd_ctx, 0, 0, 1) == 1) {
+		sdram_timings_spd(&spd_ctx);
+	}
+#endif
+
 	/* Reset Cmd/Dat delays */
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
 	int i;
