@@ -1539,6 +1539,8 @@ static void sdram_reset_cs_delay(int rank)
 /*-----------------------------------------------------------------------*/
 /* CS Training (CSTM)                                                    */
 /*-----------------------------------------------------------------------*/
+#define SDRAM_CS_TRAINING_DEBUG
+
 #ifdef SDRAM_DEBUG
 #define SDRAM_CS_TRAINING_DEBUG
 #endif
