@@ -17,6 +17,7 @@
 #include "../command.h"
 #include "../helpers.h"
 
+#if 0
 /**
  * Command "sdram_init"
  *
@@ -413,4 +414,6 @@ define_command(sdram_spd, sdram_spd_handler, "Read SDRAM SPD EEPROM", LITEDRAM_C
 
 #ifdef SDRAM_DEBUG
 define_command(sdram_debug, sdram_debug, "Run SDRAM debug tests", LITEDRAM_CMDS);
+#endif
+
 #endif

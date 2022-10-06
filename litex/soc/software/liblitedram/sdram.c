@@ -249,7 +249,7 @@ void sdram_mode_register_write(char reg, int value) {
 	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
 }
 
-#ifdef CSR_DDRPHY_BASE
+#if 0 && defined(CSR_DDRPHY_BASE)
 
 /*-----------------------------------------------------------------------*/
 /* Leveling Centering (Common for Read/Write Leveling)                   */
@@ -1226,7 +1226,7 @@ static unsigned int sdram_read_leveling_scan_module(int module, int bitslip, int
 
 #ifdef CSR_SDRAM_BASE
 
-#if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
+#if 0 && (defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE))
 
 void sdram_read_leveling(void)
 {
@@ -1486,6 +1486,10 @@ static void sdram_write_dq_dqs_training(void)
 
 #endif /* SDRAM_PHY_WRITE_DQ_DQS_TRAINING_CAPABLE */
 
+#endif
+
+#if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
+
 /*-----------------------------------------------------------------------*/
 /* Leveling                                                              */
 /*-----------------------------------------------------------------------*/
@@ -1496,6 +1500,7 @@ int sdram_leveling(void)
 	int dq_line;
 	sdram_software_control_on();
 
+#if 0
 	for(module=0; module<SDRAM_PHY_MODULES; module++) {
 #ifdef SDRAM_DELAY_PER_DQ
 		for (dq_line = 0; dq_line < SDRAM_PHY_DQ_DQS_RATIO; dq_line++) {
@@ -1530,6 +1535,8 @@ int sdram_leveling(void)
 	sdram_read_leveling();
 #endif
 
+#endif
+
 	sdram_software_control_off();
 
 	return 1;
@@ -1542,12 +1549,14 @@ int sdram_leveling(void)
 
 int sdram_init(void)
 {
+#if 0
 	/* Reset Cmd/Dat delays */
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
 	int i;
 	sdram_write_leveling_rst_cmd_delay(0);
 	for (i=0; i<16; i++) sdram_write_leveling_rst_dat_delay(i, 0);
 	for (i=0; i<16; i++) sdram_write_leveling_rst_bitslip(i, 0);
+#endif
 #endif
 	/* Reset Read/Write phases */
 #ifdef CSR_DDRPHY_RDPHASE_ADDR
