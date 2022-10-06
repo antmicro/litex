@@ -1491,6 +1491,370 @@ static void sdram_write_dq_dqs_training(void)
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 
 /*-----------------------------------------------------------------------*/
+/* DDR5 Training                                                         */
+/*-----------------------------------------------------------------------*/
+
+#define DDR5_NOP_COMMAND		(0x001F) /* CA[4:0]  = 0b11111 */
+
+#ifdef SDRAM_PHY_SUBCHANNELS
+#define SAMPLED_RDDATA_SIZE		CSR_SDRAM_DFII_A_CMDINJECTOR_SAMPLED_RDDATA_SIZE
+#else
+#define SAMPLED_RDDATA_SIZE		CSR_SDRAM_DFII_CMDINJECTOR_SAMPLED_RDDATA_SIZE
+#endif
+
+/* Save state of rddata and copy it to provided buffer.
+ * Use this function only if DQ state will be the same over many cycles,
+ * as software overhead is high compared to speed of the memory. */
+static void sdram_sample_rddata(
+	uint32_t out_buffer[SAMPLED_RDDATA_SIZE],
+	uint32_t cmdinjector_sample_rddata_addr,
+	uint32_t cmdinjector_sampled_rddata_addr)
+{
+	csr_wr_uint32(1, cmdinjector_sample_rddata_addr);
+	csr_rd_buf_uint32(cmdinjector_sampled_rddata_addr, out_buffer, SAMPLED_RDDATA_SIZE);
+}
+
+static void sdram_increase_cs_delay(int rank)
+{
+	/* Select which signal we will work on.
+	 * There is one CS_n signal for each rank */
+	ddrphy_dly_sel_write(1 << rank);
+	/* Increase CS delay for selected signal */
+	ddrphy_csdly_inc_write(1);
+	/* Deselect all signals */
+	ddrphy_dly_sel_write(0);
+}
+
+static void sdram_reset_cs_delay(int rank)
+{
+	/* Select which signal we will work on.
+	 * There is one CS_n signal for each rank */
+	ddrphy_dly_sel_write(1 << rank);
+	/* Reset CS delay for selected signal */
+	ddrphy_csdly_rst_write(1);
+	/* Deselect all signals */
+	ddrphy_dly_sel_write(0);
+}
+
+/*-----------------------------------------------------------------------*/
+/* CS Training (CSTM)                                                    */
+/*-----------------------------------------------------------------------*/
+#ifdef SDRAM_DEBUG
+#define SDRAM_CS_TRAINING_DEBUG
+#endif
+
+#define DDR5_MPC_ENTER_CS_TRAINING	(0x01)
+#define DDR5_MPC_EXIT_CS_TRAINING	(0x00)
+
+/* CS training works by toggling CS value each cycle.
+ * It doesn't matter what's on CA bus when CS is low (deselect),
+ * so we leave NOP command there. */
+static void sdram_cstm_enable_toggling_cs(
+	int rank,
+	uint32_t cmdinjector_flag,
+	uint32_t cmdinjector_cs0_addr,
+	uint32_t cmdinjector_cs1_addr,
+	uint32_t cmdinjector_cs2_addr,
+	uint32_t cmdinjector_cs3_addr,
+	uint32_t cmdinjector_ca0_addr,
+	uint32_t cmdinjector_ca1_addr,
+	uint32_t cmdinjector_ca2_addr,
+	uint32_t cmdinjector_ca3_addr)
+{
+	csr_wr_uint32(DDR5_NOP_COMMAND, cmdinjector_ca0_addr);
+	csr_wr_uint32(DDR5_NOP_COMMAND, cmdinjector_ca1_addr);
+	csr_wr_uint32(DDR5_NOP_COMMAND, cmdinjector_ca2_addr);
+	csr_wr_uint32(DDR5_NOP_COMMAND, cmdinjector_ca3_addr);
+
+	csr_wr_uint32(1 << rank, cmdinjector_cs0_addr); /* CS_N LOW */
+	csr_wr_uint32(0 << rank, cmdinjector_cs1_addr); /* CS_N HIGH -> deselect*/
+	csr_wr_uint32(1 << rank, cmdinjector_cs2_addr); /* CS_N LOW */
+	csr_wr_uint32(0 << rank, cmdinjector_cs3_addr); /* CS_N HIGH -> deselect*/
+
+	sdram_dfii_control_write(DFII_CONTROL_SOFTWARE|DFII_CONTROL_DDR5|cmdinjector_flag);
+
+	cdelay(200);
+}
+
+/* When clock and CS are aligned, then DDR5 die will output 0s on all DQ pins */
+static bool sdram_cstm_verify_rddata(uint32_t rddata[SAMPLED_RDDATA_SIZE])
+{
+	/* Check if all sampled bits are 0 */
+	uint32_t any_non_zero_dq = 0;
+	for (int i = 0; i < SAMPLED_RDDATA_SIZE; i++) {
+		any_non_zero_dq |= rddata[i];
+#ifdef SDRAM_CS_TRAINING_DEBUG
+		printf("rddata[%d] = %lX\n", i, rddata[i]);
+#endif
+	}
+
+	return !any_non_zero_dq;
+}
+
+/* MPC Command has one cycle, but we send it every cycle as CS_n and CA lanes
+ * aren't trained yet. It's a concatenation of command code (CA[4:0] = 01111)
+ * and 8-bit MPC opcode. */
+static void sdram_cstm_send_mpc(
+	int rank,
+	uint8_t command,
+	uint32_t cmdinjector_flag,
+	uint32_t cmdinjector_cs0_addr,
+	uint32_t cmdinjector_cs1_addr,
+	uint32_t cmdinjector_cs2_addr,
+	uint32_t cmdinjector_cs3_addr,
+	uint32_t cmdinjector_ca0_addr,
+	uint32_t cmdinjector_ca1_addr,
+	uint32_t cmdinjector_ca2_addr,
+	uint32_t cmdinjector_ca3_addr)
+{
+	csr_wr_uint32(command << 5 | 0x0f, cmdinjector_ca0_addr);
+	csr_wr_uint32(command << 5 | 0x0f, cmdinjector_ca1_addr);
+	csr_wr_uint32(command << 5 | 0x0f, cmdinjector_ca2_addr);
+	csr_wr_uint32(command << 5 | 0x0f, cmdinjector_ca3_addr);
+
+	csr_wr_uint32(1 << rank, cmdinjector_cs0_addr);
+	csr_wr_uint32(1 << rank, cmdinjector_cs1_addr);
+	csr_wr_uint32(1 << rank, cmdinjector_cs2_addr);
+	csr_wr_uint32(1 << rank, cmdinjector_cs3_addr);
+
+	sdram_dfii_control_write(DFII_CONTROL_SOFTWARE|DFII_CONTROL_DDR5|cmdinjector_flag);
+
+	cdelay(100);
+}
+
+/* Core part of CS training
+ * It takes many arguments to make it usable when subchannels are enabled.
+ * 
+ * High level description:
+ *
+ * 1. Enter CS training mode
+ * 2. Iterate over all possible delays and check which work
+ * 3. Choose midpoint between shortest and longest working delay
+ *    and use it as final delay
+ * 4. Double check that selected delay works
+ * 5. Exit CS training mode */
+static void sdram_cstm_core(
+	int rank,
+	uint32_t nopinjector_flag,
+	uint32_t cmdinjector_flag,
+	uint32_t cmdinjector_sample_rddata_addr,
+	uint32_t cmdinjector_sampled_rddata_addr,
+	uint32_t cmdinjector_wrdata_addr,
+	uint32_t cmdinjector_wrdata_en0_addr,
+	uint32_t cmdinjector_wrdata_en1_addr,
+	uint32_t cmdinjector_wrdata_en2_addr,
+	uint32_t cmdinjector_wrdata_en3_addr,
+	uint32_t cmdinjector_cs0_addr,
+	uint32_t cmdinjector_cs1_addr,
+	uint32_t cmdinjector_cs2_addr,
+	uint32_t cmdinjector_cs3_addr,
+	uint32_t cmdinjector_ca0_addr,
+	uint32_t cmdinjector_ca1_addr,
+	uint32_t cmdinjector_ca2_addr,
+	uint32_t cmdinjector_ca3_addr)
+{
+	uint32_t sampled_rddata[SAMPLED_RDDATA_SIZE];
+
+	int current_series_of_0s_start, current_series_of_0s_end, current_series_length;
+	int longest_series_of_0s_start = 0, longest_series_of_0s_end = 0, longest_series_length = 0;
+	bool in_series_of_0s = false;
+
+	sdram_reset_cs_delay(rank);
+
+	sdram_cstm_send_mpc(
+		rank,
+		DDR5_MPC_ENTER_CS_TRAINING,
+		cmdinjector_flag,
+		cmdinjector_cs0_addr,
+		cmdinjector_cs1_addr,
+		cmdinjector_cs2_addr,
+		cmdinjector_cs3_addr,
+		cmdinjector_ca0_addr,
+		cmdinjector_ca1_addr,
+		cmdinjector_ca2_addr,
+		cmdinjector_ca3_addr);
+
+	/* Normally you would expect to get following values on DQ pins
+	 * for subsequent delays 1111111110000000111111111 (<- example).
+	 * So first for some delays you get all 1s, then for some you get all 0s
+	 * and then again you get all 1s.  But because you can start with already
+	 * good delay, we need to go through the delays second time.  This way we
+	 * can just search for longest series of working delays and at the end
+	 * calculate midpoint delay as:
+	 *	 'middle of longest series of 0s' % 'number of supported delays'. */
+	for (int current_delay = 0; current_delay < SDRAM_PHY_DELAYS * 2; current_delay++) {
+#ifdef SDRAM_CS_TRAINING_DEBUG
+		printf("Testing delay %d\n", current_delay);
+#endif
+		sdram_dfii_control_write(DFII_CONTROL_SOFTWARE|DFII_CONTROL_DDR5|nopinjector_flag);
+
+		sdram_cstm_enable_toggling_cs(
+			rank,
+			cmdinjector_flag,
+			cmdinjector_cs0_addr,
+			cmdinjector_cs1_addr,
+			cmdinjector_cs2_addr,
+			cmdinjector_cs3_addr,
+			cmdinjector_ca0_addr,
+			cmdinjector_ca1_addr,
+			cmdinjector_ca2_addr,
+			cmdinjector_ca3_addr);
+
+		sdram_sample_rddata(
+			sampled_rddata,
+			cmdinjector_sample_rddata_addr,
+			cmdinjector_sampled_rddata_addr);
+
+		bool delay_is_ok = sdram_cstm_verify_rddata(sampled_rddata);
+		if (delay_is_ok && !in_series_of_0s) {
+			in_series_of_0s = true;
+			current_series_of_0s_start = current_delay;
+		} else if (!delay_is_ok && in_series_of_0s) {
+			in_series_of_0s = false;
+			current_series_of_0s_end = current_delay - 1;
+			current_series_length = current_series_of_0s_end - current_series_of_0s_start;
+			if (current_series_length > longest_series_length) {
+				longest_series_of_0s_start = current_series_of_0s_start;
+				longest_series_of_0s_end = current_series_of_0s_end;
+				longest_series_length = longest_series_of_0s_end - longest_series_of_0s_start;
+			}
+		}
+
+		sdram_increase_cs_delay(rank);
+	}
+
+	/* Calculate midpoint. We need to calculate remainder of division,
+	 * beacuse midpoint could land in repeated part of the checked delays. */
+	int midpoint_delay = ((longest_series_length / 2) + longest_series_of_0s_start) % SDRAM_PHY_DELAYS;
+
+	/* Reset delay and set it to selected value */
+	sdram_reset_cs_delay(rank);
+	for (int i = 0; i < midpoint_delay; i++)
+		sdram_increase_cs_delay(rank);
+
+#ifdef SDRAM_CS_TRAINING_DEBUG
+	printf("Selected CS delay: %d\n", midpoint_delay);
+#endif
+
+	/* Verify selected delay. Just in case */
+	sdram_dfii_control_write(DFII_CONTROL_SOFTWARE|DFII_CONTROL_DDR5|nopinjector_flag);
+
+	sdram_cstm_enable_toggling_cs(
+		rank,
+		cmdinjector_flag,
+		cmdinjector_cs0_addr,
+		cmdinjector_cs1_addr,
+		cmdinjector_cs2_addr,
+		cmdinjector_cs3_addr,
+		cmdinjector_ca0_addr,
+		cmdinjector_ca1_addr,
+		cmdinjector_ca2_addr,
+		cmdinjector_ca3_addr);
+
+	sdram_sample_rddata(
+		sampled_rddata,
+		cmdinjector_sample_rddata_addr,
+		cmdinjector_sampled_rddata_addr);
+
+	if (!sdram_cstm_verify_rddata(sampled_rddata)) {
+		printf("There was a problem with CS training. Selected delay of %d didn't pass verification\n", midpoint_delay);
+	}
+
+	sdram_dfii_control_write(DFII_CONTROL_SOFTWARE|DFII_CONTROL_DDR5|nopinjector_flag);
+
+	/* Send MPC 'CS Training Mode Exit' command */
+	sdram_cstm_send_mpc(
+		rank,
+		DDR5_MPC_EXIT_CS_TRAINING,
+		cmdinjector_flag,
+		cmdinjector_cs0_addr,
+		cmdinjector_cs1_addr,
+		cmdinjector_cs2_addr,
+		cmdinjector_cs3_addr,
+		cmdinjector_ca0_addr,
+		cmdinjector_ca1_addr,
+		cmdinjector_ca2_addr,
+		cmdinjector_ca3_addr);
+
+	sdram_dfii_control_write(DFII_CONTROL_SOFTWARE);
+}
+
+static void sdram_cs_training(void)
+{
+	for (int rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
+#ifdef SDRAM_PHY_SUBCHANNELS
+#ifdef SDRAM_CS_TRAINING_DEBUG
+		printf("Training CS for subchannel A\n");
+#endif
+		sdram_cstm_core(
+			rank,
+			DFII_CONTROL_A_NOPINJECTOR,
+			DFII_CONTROL_A_CMDINJECTOR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_SAMPLE_RDDATA_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_SAMPLED_RDDATA_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_WRDATA_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_WRDATA_EN0_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_WRDATA_EN1_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_WRDATA_EN2_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_WRDATA_EN3_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_CS0_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_CS1_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_CS2_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_CS3_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_CA0_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_CA1_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_CA2_ADDR,
+			CSR_SDRAM_DFII_A_CMDINJECTOR_CA3_ADDR
+		);
+#ifdef SDRAM_CS_TRAINING_DEBUG
+		printf("Training CS for subchannel B\n");
+#endif
+		sdram_cstm_core(
+			rank,
+			DFII_CONTROL_B_NOPINJECTOR,
+			DFII_CONTROL_B_CMDINJECTOR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_SAMPLE_RDDATA_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_SAMPLED_RDDATA_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_WRDATA_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_WRDATA_EN0_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_WRDATA_EN1_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_WRDATA_EN2_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_WRDATA_EN3_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_CS0_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_CS1_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_CS2_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_CS3_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_CA0_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_CA1_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_CA2_ADDR,
+			CSR_SDRAM_DFII_B_CMDINJECTOR_CA3_ADDR
+		);
+#else
+		sdram_cstm_core(
+			rank,
+			DFII_CONTROL_NOPINJECTOR,
+			DFII_CONTROL_CMDINJECTOR,
+			CSR_SDRAM_DFII_CMDINJECTOR_SAMPLE_RDDATA_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_SAMPLED_RDDATA_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_WRDATA_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_WRDATA_EN0_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_WRDATA_EN1_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_WRDATA_EN2_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_WRDATA_EN3_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_CS0_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_CS1_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_CS2_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_CS3_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_CA0_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_CA1_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_CA2_ADDR,
+			CSR_SDRAM_DFII_CMDINJECTOR_CA3_ADDR
+		);
+#endif
+	}
+}
+
+/*-----------------------------------------------------------------------*/
 /* Leveling                                                              */
 /*-----------------------------------------------------------------------*/
 
@@ -1536,6 +1900,9 @@ int sdram_leveling(void)
 #endif
 
 #endif
+
+	printf("CS training\n");
+	sdram_cs_training();
 
 	sdram_software_control_off();
 
