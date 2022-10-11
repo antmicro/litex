@@ -12,6 +12,7 @@ import time
 import threading
 import argparse
 import socket
+import sys
 
 from litex.tools.remote.etherbone import EtherbonePacket, EtherboneRecord
 from litex.tools.remote.etherbone import EtherboneReads, EtherboneWrites
@@ -71,7 +72,15 @@ class RemoteClient(EtherboneIPC, CSRBuilder):
         self.send_packet(self.socket, packet)
 
         # Receive response
-        packet = EtherbonePacket(self.receive_packet(self.socket))
+        try:
+            response = self.receive_packet(self.socket)
+            if response == 0:
+                raise Exception()
+        except Exception as e:
+            print("Didn't get a reponse from the board. Check connection?")
+            sys.exit(1)
+
+        packet = EtherbonePacket(response)
         packet.decode()
         datas = packet.records.pop().writes.get_datas()
         if self.debug:
