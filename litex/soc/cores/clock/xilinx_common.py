@@ -42,7 +42,9 @@ class XilinxClocking(Module, AutoCSR):
         self.clkin_freq = freq
         register_clkin_log(self.logger, clkin, freq)
 
-    def create_clkout(self, cd, freq, phase=0, buf="bufg", margin=1e-2, with_reset=True, ce=None):
+    def create_clkout(self, cd, freq, phase=0, buf="bufg", margin=1e-2,
+                      with_reset=True, ce=None, bypass=False, name="",
+                      platform=None):
         assert self.nclkouts < self.nclkouts_max
         clkout = Signal()
         self.clkouts[self.nclkouts] = (clkout, freq, phase, margin)
@@ -54,15 +56,30 @@ class XilinxClocking(Module, AutoCSR):
             clkout_buf = Signal()
             self.comb += cd.clk.eq(clkout_buf)
             if buf == "bufg":
-                self.specials += Instance("BUFG", i_I=clkout, o_O=clkout_buf)
+                self.specials += Instance(
+                    "BUFG", i_I=clkout, o_O=clkout_buf, name=name,
+                )
             elif buf == "bufr":
-                self.specials += Instance("BUFR", i_I=clkout, o_O=clkout_buf)
+                self.specials += Instance(
+                    "BUFR", i_I=clkout, o_O=clkout_buf,
+                    **(dict(p_BUFR_DIVIDE="BYPASS") if bypass else dict()),
+                    name=name
+                )
             elif buf == "bufgce":
                 if ce is None:
                     raise ValueError("BUFGCE requires user to provide a clock enable ce Signal")
-                self.specials += Instance("BUFGCE", i_I=clkout, o_O=clkout_buf, i_CE=ce)
+                self.specials += Instance(
+                    "BUFGCE", i_I=clkout, o_O=clkout_buf, i_CE=ce,
+                    name=name,
+                )
             elif buf == "bufio":
-                self.specials += Instance("BUFIO", i_I=clkout, o_O=clkout_buf)
+                self.specials += Instance(
+                    "BUFIO", i_I=clkout, o_O=clkout_buf,
+                    name=name
+                )
+                if bypass:
+                    assert name != "", "BUFIO has to have uniq name if in bypass mode"
+                    platform.add_platform_command(f"set_property DELAY_BYPASS TRUE [get_cells {name}]")
             else:
                 raise ValueError("Unsupported clock buffer: {}".format(buf))
         create_clkout_log(self.logger, cd.name, freq, margin, self.nclkouts)
