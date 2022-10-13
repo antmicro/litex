@@ -153,7 +153,9 @@ class NEORV32(CPU):
         for directory, vhds in sources.items():
             for vhd in vhds:
                 if not os.path.exists(os.path.join(cdir, vhd)):
-                    os.system(f"wget https://raw.githubusercontent.com/stnolting/neorv32/main/rtl/{directory}/{vhd} -P {cdir}")
+                    # commit hash or branch name
+                    sha1 = "0e28bc06428712c7ac9207ee98e5836649a7f5f3"
+                    os.system(f"wget https://raw.githubusercontent.com/stnolting/neorv32/{sha1}/rtl/{directory}/{vhd} -P {cdir}")
 
         def configure_litex_core_complex(filename, variant):
             # Read Wrapper.
