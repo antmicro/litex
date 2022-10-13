@@ -370,6 +370,19 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 	return errors;
 }
 
+static int _seed_array[] = {42, 84, 36, 72, 24, 48};
+static int _seed_array_length = sizeof(_seed_array) / sizeof(_seed_array[0]);
+
+
+static int run_test_pattern(int module, int dq_line)
+{
+	int errors = 0;
+	for (int i = 0; i < _seed_array_length; i++) {
+		errors += sdram_write_read_check_test_pattern(module, _seed_array[i], dq_line);
+	}
+	return errors;
+}
+
 static void sdram_leveling_center_module(
 	int module, int show_short, int show_long, delay_callback rst_delay, delay_callback inc_delay)
 {
@@ -387,8 +400,7 @@ static void sdram_leveling_center_module(
 	delay = 0;
 	rst_delay(module);
 	while(1) {
-		errors  = sdram_write_read_check_test_pattern(module, 42);
-		errors += sdram_write_read_check_test_pattern(module, 84);
+		errors = run_test_pattern(module, dq_line);
 		working = errors == 0;
 		show = show_long;
 #if SDRAM_PHY_DELAYS > 32
@@ -421,8 +433,7 @@ static void sdram_leveling_center_module(
 
 	/* Find largest working delay */
 	while(1) {
-		errors  = sdram_write_read_check_test_pattern(module, 42);
-		errors += sdram_write_read_check_test_pattern(module, 84);
+		errors = run_test_pattern(module, dq_line);
 		working = errors == 0;
 		show = show_long;
 #if SDRAM_PHY_DELAYS > 32
@@ -470,8 +481,7 @@ static void sdram_leveling_center_module(
 			}
 
 			/* Check */
-			errors  = sdram_write_read_check_test_pattern(module, 42);
-			errors += sdram_write_read_check_test_pattern(module, 84);
+			errors = run_test_pattern(module, dq_line);
 			if (errors == 0)
 				break;
 			retries--;
@@ -945,7 +955,7 @@ static void sdram_read_leveling_inc_bitslip(char m)
 
 static unsigned int sdram_read_leveling_scan_module(int module, int bitslip, int show)
 {
-	const unsigned int max_errors = 2*READ_CHECK_TEST_PATTERN_MAX_ERRORS;
+	const unsigned int max_errors = _seed_array_length * READ_CHECK_TEST_PATTERN_MAX_ERRORS;
 	int i;
 	unsigned int score;
 	unsigned int errors;
@@ -961,8 +971,7 @@ static unsigned int sdram_read_leveling_scan_module(int module, int bitslip, int
 #if SDRAM_PHY_DELAYS > 32
 		_show = (i%16 == 0) & show;
 #endif
-		errors  = sdram_write_read_check_test_pattern(module, 42);
-		errors += sdram_write_read_check_test_pattern(module, 84);
+		errors = run_test_pattern(module, dq_line);
 		working = errors == 0;
 		/* When any scan is working then the final score will always be higher then if no scan was working */
 		score += (working * max_errors*SDRAM_PHY_DELAYS) + (max_errors - errors);
