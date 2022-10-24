@@ -57,6 +57,72 @@ class TestWishbone(unittest.TestCase):
         dut = DUT()
         run_simulation(dut, generator(dut))
 
+    def test_cache_32_128(self):
+        def generator(dut):
+            yield from dut.wb32.read(0x0010)
+            yield from dut.wb32.read(0x0011)
+            yield from dut.wb32.write(0x0000, 0x12345678)
+            yield from dut.wb32.write(0x0001, 0xdeadbeef)
+            yield from dut.wb32.read(0x0010)
+            self.assertEqual((yield from dut.wb32.read(0x0000)), 0x12345678)
+            self.assertEqual((yield from dut.wb32.read(0x0001)), 0xdeadbeef)
+
+        class DUT(Module):
+            def __init__(self):
+                self.wb32 = wishbone.Interface(data_width=32)
+                wb128     = wishbone.Interface(data_width=128)
+                cache     = wishbone.Cache(4, self.wb32, wb128)
+                self.submodules += cache
+                wishbone_mem = wishbone.SRAM(256, bus=wb128)
+                self.submodules += wishbone_mem
+
+        dut = DUT()
+        run_simulation(dut, generator(dut), vcd_name="test_cache_32_128.vcd")
+
+    def test_cache_128_32(self):
+        def generator(dut):
+            yield from dut.wb128.read(0x0010)
+            yield from dut.wb128.read(0x0011)
+            yield from dut.wb128.write(0x0000, 0x0123456789ABCDEF0123456789ABCDEF)
+            yield from dut.wb128.write(0x0001, 0xdeadbeefdeadbeefdeadbeefdeadbeef)
+            yield from dut.wb128.read(0x0010)
+            self.assertEqual((yield from dut.wb128.read(0x0000)), 0x0123456789ABCDEF0123456789ABCDEF)
+            self.assertEqual((yield from dut.wb128.read(0x0001)), 0xdeadbeefdeadbeefdeadbeefdeadbeef)
+
+        class DUT(Module):
+            def __init__(self):
+                self.wb128 = wishbone.Interface(data_width=128)
+                wb32       = wishbone.Interface(data_width=32)
+                cache      = wishbone.Cache(4, self.wb128, wb32)
+                self.submodules += cache
+                wishbone_mem = wishbone.SRAM(256, bus=wb32)
+                self.submodules += wishbone_mem
+
+        dut = DUT()
+        run_simulation(dut, generator(dut), vcd_name="test_cache_128_32.vcd")
+
+    def test_cache_32_32(self):
+        def generator(dut):
+            yield from dut.wb32.read(0x0010)
+            yield from dut.wb32.read(0x0011)
+            yield from dut.wb32.write(0x0000, 0x12345678)
+            yield from dut.wb32.write(0x0001, 0xdeadbeef)
+            yield from dut.wb32.read(0x0010)
+            self.assertEqual((yield from dut.wb32.read(0x0000)), 0x12345678)
+            self.assertEqual((yield from dut.wb32.read(0x0001)), 0xdeadbeef)
+
+        class DUT(Module):
+            def __init__(self):
+                self.wb32 = wishbone.Interface(data_width=32)
+                wb32      = wishbone.Interface(data_width=32)
+                cache     = wishbone.Cache(4, self.wb32, wb32)
+                self.submodules += cache
+                wishbone_mem = wishbone.SRAM(256, bus=wb32)
+                self.submodules += wishbone_mem
+
+        dut = DUT()
+        run_simulation(dut, generator(dut), vcd_name="test_cache_32_32.vcd")
+
     def test_sram_burst(self):
         def generator(dut):
             yield from dut.wb.write(0x0000, 0x01234567, cti=wishbone.CTI_BURST_INCREMENTING)

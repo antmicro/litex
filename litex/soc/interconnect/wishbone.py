@@ -542,7 +542,7 @@ class Cache(Module):
     """Cache
 
     This module is a write-back wishbone cache that can be used as a L2 cache.
-    Cachesize (in 32-bit words) is the size of the data store and must be a power of 2
+    Cachesize (in master words) is the size of the data store and must be a power of 2
     """
     def __init__(self, cachesize, master, slave, reverse=True):
         self.master = master
@@ -552,6 +552,9 @@ class Cache(Module):
 
         dw_from = len(master.dat_r)
         dw_to = len(slave.dat_r)
+        # dw_from - width from master
+        # dw_to   - width to slave
+
         if dw_to > dw_from and (dw_to % dw_from) != 0:
             raise ValueError("Slave data width must be a multiple of {dw}".format(dw=dw_from))
         if dw_to < dw_from and (dw_from % dw_to) != 0:
@@ -560,62 +563,142 @@ class Cache(Module):
         # Split address:
         # TAG | LINE NUMBER | LINE OFFSET
         offsetbits = log2_int(max(dw_to//dw_from, 1))
+        # master address used as offset in slave words (slave wider than master)
+
         addressbits = len(slave.adr) + offsetbits
+        # master address bits that can be mapped in l2 cache
+
         linebits = log2_int(cachesize) - offsetbits
+        # log2_int(number cache lines)
+
         tagbits = addressbits - linebits
+        # bits for tag
+
         wordbits = log2_int(max(dw_from//dw_to, 1))
+        # bits for number of slave words in master word
+
         adr_offset, adr_line, adr_tag = split(master.adr, offsetbits, linebits, tagbits)
+
         word = Signal(wordbits) if wordbits else None
+        word_lookahead = Signal.like(word) if wordbits else None
+        if wordbits:
+            self.comb += word_lookahead.eq(word + 1)
 
         # Data memory
-        data_mem = Memory(dw_to*2**wordbits, 2**linebits)
+        # depth must be at least 2, otherwise Memory class breaks
+        data_mem = Memory(dw_to*2**wordbits, 2**linebits if linebits > 0 else 2)
+        # size = dw_to * max(dw_from//dw_to, 1) * (cachesize/max(dw_to//dw_from, 1))
+        # dw_to < dw_from
+        # size = dw_to * dw_from//dw_to * cachesize = dw_from * cachesize (bits)
+        # dw_to == dw_from
+        # size = dw_to * cachesize = dw_from * cachesize (bits)
+        # dw_to > dw_from
+        # size = dw_to * cachesize / dw_to * dw_from = dw_from * cachesize (bits)
+        # worst case size = 2 * dw_from (btis)
+
         data_port = data_mem.get_port(write_capable=True, we_granularity=8)
+        # port width = max(dw_to, dw_from)
+
         self.specials += data_mem, data_port
 
         write_from_slave = Signal()
-        if adr_offset is None:
+        if adr_offset is None: # dw_from > dw_to
             adr_offset_r = None
         else:
             adr_offset_r = Signal(offsetbits, reset_less=True)
             self.sync += adr_offset_r.eq(adr_offset)
 
-        self.comb += [
-            data_port.adr.eq(adr_line),
+        master_write = Signal()
+        slave_write_done = Signal()
+        if adr_line is not None:
+            adr_line_reg = Signal(linebits)
+        else:
+            adr_line_reg = None
+
+        data_r_reg = Signal.like(data_port.dat_r)
+        data_w_reg = Signal.like(data_port.dat_w)
+        data_we_reg = Signal.like(data_port.we)
+        slave_dat_w_reg  = Signal.like(slave.dat_w)
+        slave_dat_w_lookahead_reg = Signal.like(slave.dat_w)
+        master_dat_r_reg = Signal.like(master.dat_r)
+
+        if adr_line is not None:
+            self.sync += adr_line_reg.eq(adr_line)
+
+        self.sync += [
+            # delay write signal by 1 cycle
+            # improve high frequency performance
+            data_we_reg.eq(0),
             If(write_from_slave,
-                displacer(slave.dat_r, word, data_port.dat_w),
-                displacer(Replicate(1, dw_to//8), word, data_port.we)
+                displacer(slave.dat_r, word, data_w_reg),
+                displacer(Replicate(1, dw_to//8), word, data_we_reg)
             ).Else(
-                data_port.dat_w.eq(Replicate(master.dat_w, max(dw_to//dw_from, 1))),
-                If(master.cyc & master.stb & master.we & master.ack,
-                    displacer(master.sel, adr_offset, data_port.we, 2**offsetbits, reverse=reverse)
+                data_w_reg.eq(Replicate(master.dat_w, max(dw_to//dw_from, 1))),
+                If(master.cyc & master.stb & master.we & master_write,
+                    displacer(master.sel, adr_offset, data_we_reg, reverse=reverse)
                 )
             ),
-            chooser(data_port.dat_r, word, slave.dat_w),
-            slave.sel.eq(2**(dw_to//8)-1),
-            chooser(data_port.dat_r, adr_offset_r, master.dat_r, reverse=reverse)
+            # extra cycle for read
+            data_r_reg.eq(data_port.dat_r),
+            # extra cycle for data muxing
+            chooser(data_r_reg, word, slave_dat_w_reg),
+            chooser(data_r_reg, word_lookahead, slave_dat_w_lookahead_reg) if word is not None else slave_dat_w_lookahead_reg.eq(data_r_reg),
+            If(slave_write_done,
+                slave_dat_w_reg.eq(slave_dat_w_lookahead_reg),
+            ),
+            chooser(data_r_reg, adr_offset_r, master_dat_r_reg, reverse=reverse)
         ]
+
+        self.comb += data_port.dat_w.eq(data_w_reg)
+        self.comb += data_port.we.eq(data_we_reg)
+        self.comb += slave.dat_w.eq(slave_dat_w_reg)
+        self.comb += master.dat_r.eq(master_dat_r_reg)
+        if adr_line is not None:
+            self.comb += data_port.adr.eq(adr_line_reg)
+        else:
+            self.comb += data_port.adr.eq(0)
+        self.comb += slave.sel.eq(2**(dw_to//8)-1)
 
 
         # Tag memory
+        tag_valid_mem = Array([Signal(reset=0) for _ in range(2**linebits)])
+        tag_valid  = Signal()
+
         tag_layout = [("tag", tagbits), ("dirty", 1)]
-        tag_mem = Memory(layout_len(tag_layout), 2**linebits)
+        tag_mem = Memory(layout_len(tag_layout), 2**linebits if linebits > 0 else 2)
+
         tag_port = tag_mem.get_port(write_capable=True)
         self.specials += tag_mem, tag_port
+
         tag_do = Record(tag_layout)
         tag_di = Record(tag_layout)
-        self.comb += [
+        tag_di_reg = Record(tag_layout)
+
+        adr_tag_reg = Signal.like(adr_tag)
+
+        # Access tag memory
+        self.sync += [
+            adr_tag_reg.eq(adr_tag),
             tag_do.raw_bits().eq(tag_port.dat_r),
-            tag_port.dat_w.eq(tag_di.raw_bits())
+            tag_di_reg.raw_bits().eq(tag_di.raw_bits())
         ]
 
         self.comb += [
-            tag_port.adr.eq(adr_line),
-            tag_di.tag.eq(adr_tag)
+            tag_port.dat_w.eq(tag_di_reg.raw_bits()),
+            tag_di.tag.eq(adr_tag_reg)
         ]
-        if word is not None:
-            self.comb += slave.adr.eq(Cat(word, adr_line, tag_do.tag))
+        if adr_line is not None:
+            self.comb += tag_port.adr.eq(adr_line_reg)
         else:
-            self.comb += slave.adr.eq(Cat(adr_line, tag_do.tag))
+            self.comb += tag_port.adr.eq(0)
+
+        t = [tag_do.tag]
+        if adr_line_reg is not None:
+            t.insert(0, adr_line_reg)
+        if word is not None:
+            t.insert(0, word)
+
+        self.comb += slave.adr.eq(Cat(t))
 
         # slave word computation, word_clr and word_inc will be simplified
         # at synthesis when wordbits=0
@@ -635,47 +718,173 @@ class Cache(Module):
             else:
                 return 1
 
+        #           control                             | tag_mems                          | data_mem
+        # -------------------------------------------------------------------------------------------------------------------------------
+        # READ TAG LINE VALID AND TAG HIT
+        # cycle 0 - master sends command                |                                   |
+        # edge  1 - address latched: adr_line, adr_tag  |                                   |
+        # cycle 1 - get tag line valid                  | address tag_mem                   | address data_mem
+        # edge  2 - cache line valid latched            | access  tag_mem                   | access  data_mem[adr_line]
+        # cycle 2 - cache line valid good               | tag_mem propagation               | data_mem propagation
+        # edge  3 -                                     | tag_mem output latched in tag_do  | data_mem latched in data_r_reg
+        # cycle 3 - tag_do checks good                  |                                   | data_r_reg propagation through chooser
+        # edge  4 -                                     |                                   | data latched in bus registers
+        # cycle 4 - ack master                          |                                   |
+        # -------------------------------------------------------------------------------------------------------------------------------
+        # WRITE TAG LINE VALID AND TAG HIT
+        # cycle 0 - master sends command                |                                   | propagate master dat_w
+        # edge  1 - address latched: adr_line, adr_tag  |                                   | dat_w latched in dat_w_reg
+        # cycle 1 - get tag line valid                  | address tag_mem                   | propagate dat_w_reg to data_mem
+        # edge  2 - cache line valid latched            | access  tag_mem                   |
+        # cycle 2 - cache line valid good               | tag_mem propagation               |
+        # edge  3 -                                     | tag_mem output latched in tag_do  |
+        # cycle 3 - tag_do checks good                  | propagate dirty                   | propagate master sel
+        # edge  4 -                                     | new tag latch in tag_di_reg       | sel latched in dat_we_reg
+        # cycle 4 -                                     | tag_di_reg propagation to tag_mem | propagate dat_we_reg to data_mem
+        # edge  5 -                                     | tag_di latch in tag_mem           | data latched in data_mem
+        # cycle 5 - ack master                          |                                   |
+        # -------------------------------------------------------------------------------------------------------------------------------
+        # READ TAG LINE INVALID OR TAG INVALID AND NOT DIRTY (Assuming 0 cycle slave, invalid tag adds 1 cycle delay more)
+        # cycle 0 - master sends command                |                                   |
+        # edge  1 - address latched: adr_line, adr_tag  |                                   |
+        # cycle 1 - get tag line valid                  | propagate adr_tag                 |
+        # edge  2 - cache line valid latched            | adr_tag latched in tag_di_reg     |
+        # cycle 2 - cache line valid bad                | propagate tag_di_reg              |
+        # edge  3 -                                     | latch tag_di_reg in tag_mem       |
+        # cycle 3 -                                     | tag_mem propagation               |
+        # edge  4 -                                     | tag_mem output latched in tag_do  |
+        # cycle 4 - access slave, slave ack             |                                   |
+        # edge  5 -                                     |                                   | dat_w, sel latched in dat_w_reg, dat_we_reg
+        # cycle 5 - access slave, slave ack             |                                   | propagation to memory
+        # edge  6 -                                     |                                   | dat_w_reg latched in data_mem
+        #                                               |                                   | dat_w, sel latched in dat_w_reg, dat_we_reg
+        # cycle k - last slave access, slave ack        |                                   | propagation to memory
+        # edge  k -                                     |                                   | dat_w_reg latched in data_mem
+        #                                               |                                   | dat_w, sel latched in dat_w_reg, dat_we_reg
+        # cycle k+1 - propagate tag line valid          |                                   | propagation to memory
+        # edge k+1 - latch tag line valid               |                                   | dat_w_reg latched in data_mem
+        # cycle k+2 -                                   |                                   | propagation for data_mem to dat_r_reg
+        # edge k+2 -                                    |                                   | latched dat_r_reg
+        # cycle k+3 - tag_do checks good                |                                   | data_r_reg propagation through chooser
+        # edge k+3 -                                    |                                   | data latched in bus registers
+        # cycle k+4 - ack master                        |                                   |
+        # -------------------------------------------------------------------------------------------------------------------------------
+        # WRITE TAG LINE INVALID OR TAG INVALID AND NOT DIRTY (Assuming 0 cycle slave)
+        # cycle 0 - master sends command                |                                   |
+        # edge  1 - address latched: adr_line, adr_tag  |                                   |
+        # cycle 1 - get tag line valid                  | propagate adr_tag                 |
+        # edge  2 - cache line valid latched            | adr_tag latched in tag_di_reg     |
+        # cycle 2 - cache line valid bad                | propagate tag_di_reg              |
+        # edge  3 -                                     | latch tag_di_reg in tag_mem       |
+        # cycle 3 -                                     | tag_mem propagation               |
+        # edge  4 -                                     | tag_mem output latched in tag_do  |
+        # cycle 4 - access slave, slave ack             |                                   |
+        # edge  5 -                                     |                                   | dat_w, sel latched in dat_w_reg, dat_we_reg
+        # cycle 6 - access slave, slave ack             |                                   | propagation to memory
+        # edge  6 -                                     |                                   | dat_w_reg latched in data_mem
+        #                                               |                                   | dat_w, sel latched in dat_w_reg, dat_we_reg
+        # cycle k - last slave access, slave ack        |                                   | propagation to memory
+        # edge  k -                                     |                                   | dat_w_reg latched in data_mem
+        #                                               |                                   | dat_w, sel latched in dat_w_reg, dat_we_reg
+        # cycle k+1 - propagate tag line valid          |                                   | propagation to memory
+        # edge k+1 - latch tag line valid               |                                   | dat_w_reg latched in data_mem
+        # cycle k+2 - tag_do checks good                | propagate dirty                   | propagate master dat_w, sel
+        # edge k+2 -                                    | new tag latch in tag_di_reg       | dat_w latched in dat_w_reg, sel latched in
+        #                                               |                                   | data_we_reg
+        # cycle k+3 -                                   | tag_di_reg propagation to tag_mem | propagate dat_w_reg and data_we_reg
+        #                                               |                                   | to data_mem
+        # edge k+3 -                                    | tag_di latch in tag_mem           |
+        # cycle k+4 - ack master                        |                                   |
+        # -------------------------------------------------------------------------------------------------------------------------------
+        # READ/WRITE TAG INVALID AND DIRTY (Assuming 0 cycle slave)
+        # cycle 0 - master sends command                |                                   |
+        # edge  1 - address latched: adr_line, adr_tag  |                                   |
+        # cycle 1 - get tag line valid                  | address tag_mem                   | address data_mem
+        # edge  2 - cache line valid latched            | access  tag_mem                   | access  data_mem[adr_line]
+        # cycle 2 - cache line valid good               | tag_mem propagation               | data_mem propagation
+        # edge  3 -                                     | tag_mem output latched in tag_do  | data_mem latched in data_r_reg
+        # cycle 3 - tag_do checks bad                   |                                   | data_r_reg propagation through chooser
+        # edge  4 -                                     |                                   | data latched slave_dat_w_reg
+        #                                               |                                   | slave_dat_w_lookahead_reg
+        # cycle 4 - access slave, slave ack             |                                   | data propagate on bus
+        # edge  5 -                                     |                                   | slave_dat_w_lookahead_reg latched on
+        #                                               |                                   | slave_dat_w_reg, next data latched on
+        #                                               |                                   | slave_data_w_looahead
+        # cycle k - last slave access, slave ack        |                                   | data propagate on bus
+        # edge  k -                                     | latch tag_di_reg in tag_mem       |
+        # cycle k+1 -                                   | tag_mem propagation               |
+        # edge k+1 -                                    | tag_mem output latched in tag_do  |
+        # REFILL
+        # TEST_HIT
+        # -------------------------------------------------------------------------------------------------------------------------------
+
+        if adr_line_reg is None:
+            adr_line_reg = Signal()
+            self.comb += adr_line_reg.eq(0)
+
         # Control FSM
         self.submodules.fsm = fsm = FSM(reset_state="IDLE")
         fsm.act("IDLE",
             If(master.cyc & master.stb,
-                NextState("TEST_HIT")
+                NextState("GET_LINE_VALID")
             )
         )
-        fsm.act("TEST_HIT",
+        fsm.act("GET_LINE_VALID",
+            NextValue(tag_valid, tag_valid_mem[adr_line_reg]),
+            NextState("TEST_VALID_HIT"),
+        )
+        fsm.act("TEST_VALID_HIT",
+            If(tag_valid,
+                NextState("TEST_HIT"),
+            ).Else(
+                tag_port.we.eq(1),
+                NextState("WAIT_FOR_TAG_DO"),
+            ),
+        )
+        fsm.act("TEST_HIT", # tag line is valid
             word_clr.eq(1),
-            If(tag_do.tag == adr_tag,
-                master.ack.eq(1),
+            If(tag_do.tag == adr_tag_reg, # line is valid
                 If(master.we,
+                    master_write.eq(1),
                     tag_di.dirty.eq(1),
-                    tag_port.we.eq(1)
+                    NextState("SET_DIRTY"),
+                ).Else(
+                    NextState("ACK"),
                 ),
-                NextState("IDLE")
             ).Else(
                 If(tag_do.dirty,
                     NextState("EVICT")
                 ).Else(
-                    # Write the tag first to set the slave address
                     tag_port.we.eq(1),
-                    word_clr.eq(1),
-                    NextState("REFILL")
+                    NextState("WAIT_FOR_TAG_DO"),
                 )
             )
         )
-
+        fsm.act("SET_DIRTY",
+            tag_port.we.eq(1),
+            NextState("ACK"),
+        ),
+        fsm.act("ACK",
+            master.ack.eq(1),
+            NextState("IDLE"),
+        )
         fsm.act("EVICT",
             slave.stb.eq(1),
             slave.cyc.eq(1),
             slave.we.eq(1),
             If(slave.ack,
+                slave_dat_w_lookahead_reg.eq(1),
                 word_inc.eq(1),
-                 If(word_is_last(word),
+                If(word_is_last(word),
                     # Write the tag first to set the slave address
                     tag_port.we.eq(1),
                     word_clr.eq(1),
-                    NextState("REFILL")
+                    NextState("WAIT_FOR_TAG_DO"),
                 )
             )
+        )
+        fsm.act("WAIT_FOR_TAG_DO",
+            NextState("REFILL"),
         )
         fsm.act("REFILL",
             slave.stb.eq(1),
@@ -685,9 +894,21 @@ class Cache(Module):
                 write_from_slave.eq(1),
                 word_inc.eq(1),
                 If(word_is_last(word),
-                    NextState("TEST_HIT"),
+                    tag_port.we.eq(1),
+                    NextState("SET_LINE_VALID"),
                 ).Else(
                     NextState("REFILL")
                 )
             )
+        )
+        fsm.act("SET_LINE_VALID",
+            NextValue(tag_valid_mem[adr_line_reg], 1),
+            If(master.we,
+                NextState("TEST_HIT"),
+            ).Else(
+                NextState("DELAY"),
+            )
+        )
+        fsm.act("DELAY",
+            NextState("TEST_HIT"),
         )
