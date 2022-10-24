@@ -539,15 +539,16 @@ class Cache(Module):
         # Split address:
         # TAG | LINE NUMBER | LINE OFFSET
         offsetbits = log2_int(max(dw_to//dw_from, 1))
-        addressbits = len(slave.adr) + offsetbits
+        addressbits = len(slave.adr) - offsetbits
         linebits = log2_int(cachesize) - offsetbits
         tagbits = addressbits - linebits
         wordbits = log2_int(max(dw_from//dw_to, 1))
+
         adr_offset, adr_line, adr_tag = split(master.adr, offsetbits, linebits, tagbits)
         word = Signal(wordbits) if wordbits else None
 
         # Data memory
-        data_mem = Memory(dw_to*2**wordbits, 2**linebits)
+        data_mem = Memory(dw_to*2**wordbits, 2**linebits if linebits > 0 else 2)
         data_port = data_mem.get_port(write_capable=True, we_granularity=8)
         self.specials += data_mem, data_port
 
@@ -559,7 +560,7 @@ class Cache(Module):
             self.sync += adr_offset_r.eq(adr_offset)
 
         self.comb += [
-            data_port.adr.eq(adr_line),
+            data_port.adr.eq(adr_line) if adr_line is not None else  data_port.adr.eq(0),
             If(write_from_slave,
                 displacer(slave.dat_r, word, data_port.dat_w),
                 displacer(Replicate(1, dw_to//8), word, data_port.we)
@@ -577,7 +578,7 @@ class Cache(Module):
 
         # Tag memory
         tag_layout = [("tag", tagbits), ("dirty", 1)]
-        tag_mem = Memory(layout_len(tag_layout), 2**linebits)
+        tag_mem = Memory(layout_len(tag_layout), 2**linebits if linebits > 0 else 2)
         tag_port = tag_mem.get_port(write_capable=True)
         self.specials += tag_mem, tag_port
         tag_do = Record(tag_layout)
@@ -588,7 +589,7 @@ class Cache(Module):
         ]
 
         self.comb += [
-            tag_port.adr.eq(adr_line),
+            tag_port.adr.eq(adr_line) if adr_line is not None else tag_port.adr.eq(0),
             tag_di.tag.eq(adr_tag)
         ]
         if word is not None:
