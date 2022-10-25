@@ -117,7 +117,7 @@ static unsigned char sdram_dfii_get_wrphase(void) {
 	return SDRAM_PHY_WRPHASE;
 #endif // CSR_DDRPHY_WRPHASE_ADDR
 }
-
+#ifndef MEMORY_TYPE_DDR5
 static void sdram_dfii_pix_address_write(unsigned char phase, unsigned int value) {
 #if (SDRAM_PHY_PHASES > 8)
 	#error "More than 8 DFI phases not supported"
@@ -213,6 +213,7 @@ static void command_pwr(unsigned int value) {
 	unsigned char wrphase = sdram_dfii_get_wrphase();
 	command_px(wrphase, value);
 }
+#endif // ndef MEMORY_TYPE_DDR5
 #endif // CSR_DDRPHY_BASE
 
 /*-----------------------------------------------------------------------*/
@@ -255,13 +256,17 @@ void sdram_software_control_off(void) {
 /*  Mode Register                                                        */
 /*-----------------------------------------------------------------------*/
 
+#ifndef MEMORY_TYPE_DDR5
 void sdram_mode_register_write(char reg, int value) {
 	sdram_dfii_pi0_address_write(value);
 	sdram_dfii_pi0_baddress_write(reg);
 	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
 }
+#else
+void sdram_mode_register_write(char reg, int value) {}
+#endif
 
-#ifdef CSR_DDRPHY_BASE
+#if !defined(MEMORY_TYPE_DDR5) && defined(CSR_DDRPHY_BASE)
 
 /*-----------------------------------------------------------------------*/
 /* Leveling Centering (Common for Read/Write Leveling)                   */
@@ -969,7 +974,7 @@ void sdram_read_leveling(void) {
 
 #endif // SDRAM_PHY_READ_LEVELING_CAPABLE
 
-#endif /* CSR_DDRPHY_BASE */
+#endif /* !defined(MEMORY_TYPE_DDR5) && defined(CSR_DDRPHY_BASE) */
 
 /*-----------------------------------------------------------------------*/
 /* Write latency calibration                                             */
@@ -1108,7 +1113,7 @@ static void sdram_write_dq_dqs_training(void) {
 /* Leveling                                                              */
 /*-----------------------------------------------------------------------*/
 
-#if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE) || defined(SDRAM_PHY_WRITE_LATENCY_CALIBRATION_CAPABLE) || defined(SDRAM_PHY_WRITE_DQ_DQS_TRAINING_CAPABLE)
+#if !defined(MEMORY_TYPE_DDR5) && (defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE) || defined(SDRAM_PHY_WRITE_LATENCY_CALIBRATION_CAPABLE) || defined(SDRAM_PHY_WRITE_DQ_DQS_TRAINING_CAPABLE))
 
 int sdram_leveling(void) {
 	int module;
@@ -1150,7 +1155,13 @@ int sdram_leveling(void) {
 	return 1;
 }
 
-#endif /* defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE) || defined(SDRAM_PHY_WRITE_LATENCY_CALIBRATION_CAPABLE) || defined(SDRAM_PHY_WRITE_DQ_DQS_TRAINING_CAPABLE) */
+#else
+
+int sdram_leveling(void) {
+	return 1;
+}
+
+#endif /* !defined(MEMORY_TYPE_DDR5) && (defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE) || defined(SDRAM_PHY_WRITE_LATENCY_CALIBRATION_CAPABLE) || defined(SDRAM_PHY_WRITE_DQ_DQS_TRAINING_CAPABLE)) */
 
 /*-----------------------------------------------------------------------*/
 /* Initialization                                                        */
@@ -1190,6 +1201,12 @@ int sdram_init(void) {
 	ddrctrl_init_error_write(0);
 #endif // CSR_DDRCTRL_BASE
 	init_sequence();
+#ifdef MEMORY_TYPE_DDR5
+	//sdram_drr5_cs_training();
+	//sdram_ddr5_ca_training();
+	//sdram_ddr5_read_training();
+	//sdram_ddr5_write_training();
+#else
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 	sdram_leveling();
 #endif // defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
@@ -1207,6 +1224,7 @@ int sdram_init(void) {
 #ifdef CSR_DDRCTRL_BASE
 	ddrctrl_init_done_write(1);
 #endif // CSR_DDRCTRL_BASE
+#endif /* MEMORY_TYPE_DDR5 */
 
 	return 1;
 }
