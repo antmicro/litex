@@ -131,7 +131,7 @@ def _generate_sim_config(config):
     tools.write_to_file("sim_config.js", content)
 
 
-def _build_sim(build_name, sources, jobs, threads, coverage, opt_level="O3", trace_fst=False):
+def _build_sim(build_name, sources, jobs, threads, coverage, opt_level="O3", trace_fst=False, timing=False):
     makefile = os.path.join(core_directory, 'Makefile')
 
     cc_srcs = []
@@ -141,12 +141,13 @@ def _build_sim(build_name, sources, jobs, threads, coverage, opt_level="O3", tra
 
     build_script_contents = """\
 rm -rf obj_dir/
-make -C . -f {} {} {} {} {} {} {}
+make -C . -f {} {} {} {} {} {} {} {}
 """.format(makefile,
     "CC_SRCS=\"{}\"".format("".join(cc_srcs)),
     "JOBS={}".format(jobs) if jobs else "",
     "THREADS={}".format(threads) if int(threads) > 1 else "",
     "COVERAGE=1" if coverage else "",
+    "TIMING=1" if timing else "",
     "OPT_LEVEL={}".format(opt_level),
     "TRACE_FST=1" if trace_fst else "",
     )
@@ -208,6 +209,7 @@ class SimVerilatorToolchain:
             interactive      = True,
             pre_run_callback = None,
             extra_mods       = None,
+            timing           = False,
             extra_mods_path  = ""):
 
         # Create build directory
@@ -244,7 +246,7 @@ class SimVerilatorToolchain:
                 _generate_sim_config(sim_config)
 
             # Build
-            _build_sim(build_name, platform.sources, jobs, threads, coverage, opt_level, trace_fst)
+            _build_sim(build_name, platform.sources, jobs, threads, coverage, opt_level, trace_fst, timing)
 
         # Run
         if run:
