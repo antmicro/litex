@@ -22,11 +22,18 @@ uint64_t tfp_end;
 uint64_t main_time = 0;
 Vsim *g_sim = nullptr;
 
-extern "C" void litex_sim_eval(void *vsim, uint64_t time_fs)
+extern "C" uint64_t litex_sim_eval(void *vsim, uint64_t time_fs, uint64_t timebase_fs)
 {
   Vsim *sim = (Vsim*)vsim;
-  sim->eval();
   main_time = time_fs;
+  sim->eval();
+  uint64_t next_timestamp = (time_fs/timebase_fs)*timebase_fs + timebase_fs;
+  while(sim->eventsPending() && sim->nextTimeSlot() == time_fs)
+    sim->eval();
+  if (sim->eventsPending() && sim->nextTimeSlot() < next_timestamp) {
+    next_timestamp = sim->nextTimeSlot();
+  }
+  return next_timestamp;
 }
 
 extern "C" void litex_sim_init_cmdargs(int argc, char *argv[])

@@ -178,7 +178,7 @@ static void cb(int sock, short which, void *arg)
   tv.tv_usec = 0;
   int i;
 
-  for(i = 0; i < 1000; i++)
+  for(i = 0; i < 10000; i++)
   {
     for(s = sesslist; s; s=s->next)
     {
@@ -186,7 +186,8 @@ static void cb(int sock, short which, void *arg)
         s->module->tick(s->session, sim_time_fs);
     }
 
-    litex_sim_eval(vsim, sim_time_fs);
+    uint64_t next_sim_time_fs;
+    next_sim_time_fs = litex_sim_eval(vsim, sim_time_fs, timebase_fs);
     litex_sim_dump();
 
     for(s = sesslist; s; s=s->next)
@@ -195,7 +196,7 @@ static void cb(int sock, short which, void *arg)
         s->module->tick(s->session, sim_time_fs);
     }
 
-    sim_time_fs += timebase_fs;
+    sim_time_fs = next_sim_time_fs;
 
     if (litex_sim_got_finish()) {
         event_base_loopbreak(base);
