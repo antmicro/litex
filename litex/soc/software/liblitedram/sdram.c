@@ -28,6 +28,10 @@
 
 #include <liblitedram/accessors.h>
 
+#ifdef MEMORY_TYPE_DDR5
+#include <liblitedram/ddr5_training.h>
+#endif
+
 //#define SDRAM_TEST_DISABLE
 //#define SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
 //#define SDRAM_WRITE_LATENCY_CALIBRATION_DEBUG
@@ -227,10 +231,18 @@ void sdram_software_control_on(void) {
 	unsigned int previous;
 	previous = sdram_dfii_control_read();
 	/* Switch DFII to software control */
+#ifndef MEMORY_TYPE_DDR5
 	if (previous != DFII_CONTROL_SOFTWARE) {
 		sdram_dfii_control_write(DFII_CONTROL_SOFTWARE);
 		printf("Switching SDRAM to software control.\n");
 	}
+#else
+	if (previous | DFII_CONTROL_SEL) {
+		previous &= ~DFII_CONTROL_SEL;
+		sdram_dfii_control_write(previous);
+		printf("Switching SDRAM to software control.\n");
+	}
+#endif // MEMORY_TYPE_DDR5
 
 #if CSR_DDRPHY_EN_VTC_ADDR
 		/* Disable Voltage/Temperature compensation */
@@ -242,10 +254,18 @@ void sdram_software_control_off(void) {
 	unsigned int previous;
 	previous = sdram_dfii_control_read();
 	/* Switch DFII to hardware control */
+#ifndef MEMORY_TYPE_DDR5
 	if (previous != DFII_CONTROL_HARDWARE) {
 		sdram_dfii_control_write(DFII_CONTROL_HARDWARE);
 		printf("Switching SDRAM to hardware control.\n");
 	}
+#else
+	if (!(previous & DFII_CONTROL_SEL)) {
+		previous |= DFII_CONTROL_SEL;
+		sdram_dfii_control_write(previous);
+		printf("Switching SDRAM to hardware control.\n");
+	}
+#endif
 #if CSR_DDRPHY_EN_VTC_ADDR
 		/* Enable Voltage/Temperature compensation */
 		ddrphy_en_vtc_write(1);
@@ -561,11 +581,9 @@ static unsigned int sdram_read_leveling_scan_module(int module, int bitslip, int
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
 
 int _sdram_tck_taps;
-int _sdram_write_leveling_bitslips[16];
 
 int _sdram_write_leveling_cmd_scan  = 1;
 int _sdram_write_leveling_cmd_delay = 0;
-int _sdram_write_leveling_dat_delays[16];
 
 int _sdram_write_leveling_cdly_range_start = -1;
 int _sdram_write_leveling_cdly_range_end   = -1;
@@ -617,30 +635,6 @@ void sdram_write_leveling_force_cmd_delay(int taps, int show) {
 		ddrphy_cdly_inc_write(1);
 		cdelay(100);
 	}
-}
-
-void sdram_write_leveling_rst_dat_delay(int module, int show) {
-	_sdram_write_leveling_dat_delays[module] = -1;
-	if (show)
-		printf("Reseting Dat delay of module %d\n", module);
-}
-
-void sdram_write_leveling_force_dat_delay(int module, int taps, int show) {
-	_sdram_write_leveling_dat_delays[module] = taps;
-	if (show)
-		printf("Forcing Dat delay of module %d to %d taps\n", module, taps);
-}
-
-void sdram_write_leveling_rst_bitslip(int module, int show) {
-	_sdram_write_leveling_bitslips[module] = -1;
-	if (show)
-		printf("Reseting Bitslip of module %d\n", module);
-}
-
-void sdram_write_leveling_force_bitslip(int module, int bitslip, int show) {
-	_sdram_write_leveling_bitslips[module] = bitslip;
-	if (show)
-		printf("Forcing Bitslip of module %d to %d\n", module, bitslip);
 }
 
 static int sdram_write_leveling_scan(int *delays, int loops, int show) {
@@ -1202,8 +1196,7 @@ int sdram_init(void) {
 #endif // CSR_DDRCTRL_BASE
 	init_sequence();
 #ifdef MEMORY_TYPE_DDR5
-	//sdram_drr5_cs_training();
-	//sdram_ddr5_ca_training();
+	sdram_ddr5_cs_ca_training();
 	//sdram_ddr5_read_training();
 	//sdram_ddr5_write_training();
 #else
