@@ -237,7 +237,7 @@ class Evaluator:
                         args.append(arg.reset.value)
                 print(s.s %(*args,))
             else:
-                raise NotImplementedError
+                raise NotImplementedError(f'{type(s)}')
 
 
 class DummyAsyncResetSynchronizerImpl(Module):

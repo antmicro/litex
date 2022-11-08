@@ -45,6 +45,7 @@ sim: $(OBJS_SIM) | mkdir
 		--trace \
 		$(if $(TRACE_FST), --trace-fst,) \
 		$(if $(COVERAGE), --coverage,) \
+		$(if $(TIMING), --timing) \
 		--unroll-count 256 \
 		--output-split 5000 \
 		--output-split-cfuncs 500 \
@@ -52,7 +53,10 @@ sim: $(OBJS_SIM) | mkdir
 		$(INC_DIR) \
 		-Wno-BLKANDNBLK \
 		-Wno-WIDTH \
-		--relative-includes
+		-Wno-UNOPTFLAT \
+		-Wno-ZERODLY \
+		--relative-includes \
+		--timescale-override 1fs/1fs
 	make -j$(JOBS) -C $(OBJ_DIR) -f Vsim.mk Vsim
 
 .PHONY: modules
