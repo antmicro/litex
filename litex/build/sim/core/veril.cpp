@@ -97,6 +97,12 @@ extern "C" void litex_sim_coverage_dump()
 }
 #endif
 
+extern "C" void litex_sim_trace_flush_and_close()
+{
+  tfp->flush();
+  tfp->close();
+}
+
 double sc_time_stamp()
 {
   return main_time;

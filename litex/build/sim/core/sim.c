@@ -6,10 +6,11 @@
 #include <signal.h>
 #ifndef _WIN32
 #include <netinet/in.h>
-# ifdef _XOPEN_SOURCE_EXTENDED
-#  include <arpa/inet.h>
-# endif
+#ifdef _XOPEN_SOURCE_EXTENDED
+#include <arpa/inet.h>
+#endif
 #include <sys/socket.h>
+#include <signal.h>
 #endif
 #include <stdlib.h>
 #include "error.h"
@@ -35,6 +36,14 @@ uint64_t timebase_fs = 1;
 uint64_t sim_time_fs = 0;
 struct session_list_s *sesslist=NULL;
 struct event_base *base=NULL;
+
+#ifndef _WIN32
+static volatile bool interrupt = 0;
+
+void intHandler(int arg) {
+  interrupt = 1;
+}
+#endif
 
 static int litex_sim_initialize_all(void **sim, void *base)
 {
@@ -204,6 +213,13 @@ static void cb(int sock, short which, void *arg)
     }
   }
 
+#ifndef _WIN32
+  if (interrupt) {
+    litex_sim_trace_flush_and_close();
+    exit(0);
+  }
+#endif
+
   if (!evtimer_pending(ev, NULL)) {
     event_del(ev);
     evtimer_add(ev, &tv);
@@ -241,6 +257,10 @@ int main(int argc, char *argv[])
   {
     goto out;
   }
+
+#ifndef _WIN32
+  signal(SIGINT, intHandler);
+#endif
 
   tv.tv_sec = 0;
   tv.tv_usec = 0;
