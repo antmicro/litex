@@ -13,9 +13,9 @@ ifeq ($(UNAME_S),Darwin)
 	LDFLAGS += -ljson-c
 	CFLAGS += -Wall -O3 -ggdb -fPIC
 else
-	CFLAGS += -Wall -O3 -ggdb -fPIC -Werror
+	CFLAGS += -Wall -O3 -ggdb -fPIC -Werror -flto
 endif
-LDFLAGS += -levent -shared -fPIC
+LDFLAGS += -levent -shared -fPIC -flto
 
 MOD_SRC_DIR=$(SRC_DIR)/modules/$(MOD)
 EXTRA_MOD_SRC_DIR=$(EXTRA_MOD_BASE_DIR)/$(MOD)
