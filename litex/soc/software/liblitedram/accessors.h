@@ -278,7 +278,7 @@ static void par_rst_delay(int channel) {
 static void cs_ca_select(int channel, int ca_cs_line) {
 #ifdef SDRAM_PHY_SUBCHANNELS
 	if (channel)
-		ddrphy_B_dly_sel_write(1 << ca_cs_line;
+		ddrphy_B_dly_sel_write(1 << ca_cs_line);
 	else
 		ddrphy_A_dly_sel_write(1 << ca_cs_line);
 #else

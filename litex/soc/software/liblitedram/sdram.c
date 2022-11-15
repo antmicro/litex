@@ -1203,6 +1203,7 @@ int sdram_init(void) {
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 	sdram_leveling();
 #endif // defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
+#endif /* MEMORY_TYPE_DDR5 */
 	sdram_software_control_off();
 #ifndef SDRAM_TEST_DISABLE
 	if(!memtest((unsigned int *) MAIN_RAM_BASE, MEMTEST_DATA_SIZE)) {
@@ -1217,7 +1218,6 @@ int sdram_init(void) {
 #ifdef CSR_DDRCTRL_BASE
 	ddrctrl_init_done_write(1);
 #endif // CSR_DDRCTRL_BASE
-#endif /* MEMORY_TYPE_DDR5 */
 
 	return 1;
 }
