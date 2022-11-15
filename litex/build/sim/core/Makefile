@@ -50,7 +50,7 @@ sim: $(OBJS_SIM) | mkdir
 		--output-split 5000 \
 		--output-split-cfuncs 500 \
 		--output-split-ctrace 500 \
-		--threads 4 \
+		--threads 1 \
 		$(INC_DIR) \
 		-Wno-BLKANDNBLK \
 		-Wno-WIDTH \
