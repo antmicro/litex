@@ -6,6 +6,10 @@
 #ifdef MEMORY_TYPE_DDR5
 #define DEBUG_DDR5
 
+#ifndef SDRAM_PHY_ADDRESS_LINES
+#define SDRAM_PHY_ADDRESS_LINES 13
+#endif
+
 static void cs_non_negative_tap(int channel, int rank, int offset, int32_t *left, int32_t *right, const char* format) {
     int _result, delay;
     cs_rst(channel, rank, 0);
@@ -16,12 +20,15 @@ static void cs_non_negative_tap(int channel, int rank, int offset, int32_t *left
     _result = 1;
     for (delay = 0; delay < SDRAM_PHY_DELAYS && (_result || *right == UNSET_DELAY); delay++) {
         _result =  or_sample(channel);
-        if (_result && *right == UNSET_DELAY)
+        if (_result && *right == UNSET_DELAY) {
             *right = delay;
-        else if (!_result && *right != UNSET_DELAY && *left == UNSET_DELAY)
+        }
+        else if (!_result && *right != UNSET_DELAY && *left == UNSET_DELAY) {
             *left = delay;
-        else if (_result && *left == UNSET_DELAY && delay+1 == SDRAM_PHY_DELAYS)
+        }
+        else if (_result && *left == UNSET_DELAY && delay+1 == SDRAM_PHY_DELAYS) {
             *left = delay + 1;
+        }
 #ifdef DEBUG_DDR5
         printf("%d", _result);
 #endif // DEBUG_DDR5
@@ -37,6 +44,7 @@ static void cs_on_edge(int channel, int rank, int32_t *left, int32_t *right, int
 #ifdef DEBUG_DDR5
     printf("CS right_edge|");
 #endif // DEBUG_DDR5
+    *right = 0;
     _result = 0;
     for (delay = 0; delay < SDRAM_PHY_DELAYS; delay++) {
         _result =  or_sample(channel);
@@ -47,7 +55,7 @@ static void cs_on_edge(int channel, int rank, int32_t *left, int32_t *right, int
 #endif // DEBUG_DDR5
         cs_inc(channel, rank, 0);
     }
-    cs_non_negative_tap(channel, rank, offset, left, right, "\n left_edge|");
+    cs_non_negative_tap(channel, rank, offset, left, right, "\n   left_edge|");
 #ifdef DEBUG_DDR5
     printf(";%"PRId32":%"PRId32"\n", *right, *left);
 #endif // DEBUG_DDR5
@@ -159,7 +167,7 @@ static void CS_training(int32_t channel, uint8_t *success, int debug) {
     }
 }
 
-static void CA_training(int32_t channel, int debug) {
+static void CA_training(int32_t channel, int debug, int limit) {
     int32_t left_side, right_side;
     int32_t rank, address;
     int32_t on_edge;
@@ -170,7 +178,7 @@ static void CA_training(int32_t channel, int debug) {
         // Enter CA training MPC
         enter_ca(channel, rank);
 
-        for (address = 0; address < SDRAM_PHY_ADDRESS_LINES; address++) {
+        for (address = 0; address < limit; address++) {
             // Reset CA delay
             ca_rst(channel, rank, address);
 
@@ -207,20 +215,22 @@ static void CA_training(int32_t channel, int debug) {
             }
         }
         // Exit CA training multiple NOPs
+        cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 0, 0);
         exit_ca(channel, rank);
     }
 }
 
-static void CA_setup_values(int32_t channel, uint8_t *success, int debug) {
+static void CA_setup_values(int32_t channel, uint8_t *success, int debug, int limit) {
     int32_t left_side, right_side;
     int32_t address;
-    for (address = 0; address < SDRAM_PHY_ADDRESS_LINES; address++) {
+    for (address = 0; address < limit; address++) {
         right_side = _ca_results[address][0];
         left_side  = _ca_results[address][1];
 
         if (left_side == UNSET_DELAY || right_side == UNSET_DELAY) {
             printf("CA:%02"PRId32" Eye width:0 Failed\n", address);
-            continue;
+            *success &= 0;
+            return;
         }
         ca_rst(channel, -1, address);
         mid_point_calc_and_set(success, "CA:%02d Eye width:%d ", channel, -1,
@@ -230,10 +240,10 @@ static void CA_setup_values(int32_t channel, uint8_t *success, int debug) {
 
 #if defined(SDRAM_PHY_ADDRESS_DELAY_CAPABLE)
 void sdram_ddr5_cs_ca_training(void) {
-    int32_t channel;
+    int32_t channel, rank;
     uint8_t CS_success, CA_success;
     int debug;
-    disable_2n_mode();
+    disable_dfi_2n_mode();
 
 #ifdef DEBUG_DDR5
     debug = 1;
@@ -253,17 +263,76 @@ void sdram_ddr5_cs_ca_training(void) {
         CS_training(channel, &CS_success, debug);
         printf("CA training\n");
         setup_ca_results();
-        CA_training(channel, debug);
-        CA_setup_values(channel, &CA_success, debug);
+        CA_training(channel, debug, SDRAM_PHY_ADDRESS_LINES);
+        CA_setup_values(channel, &CA_success, debug, SDRAM_PHY_ADDRESS_LINES);
     }
-    if (!(CS_success & CA_success))
-        enable_2n_mode();
+    if (!(CS_success & CA_success)) {
+        enable_dfi_2n_mode();
+    } else {
+#ifdef SDRAM_PHY_SUBCHANNELS
+        for (channel = 0; channel < 2; channel++) {
+#else
+        {channel = 0;
+#endif // SDRAM_PHY_SUBCHANNELS
+            for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
+                disable_dram_2n_mode(channel, rank);
+            }
+        }
+    }
     return;
 }
 #else
 void sdram_ddr5_cs_ca_training(void) {
+#ifndef SKIP_NO_DELAYS
+    printf("WARNING:\n"
+           "PHY does not have io delays on address lines!!!\n"
+           "BIOS will try to check if 1N mode is possible,\n"
+           "but it may be unstable.\n"
+           "Build bios with -DSKIP_NO_DELAYS, to stay in 2N mode.\n");
+    int32_t channel, rank;
+    uint8_t CS_success, CA_success;
+    int debug;
+    disable_dfi_2n_mode();
+
+#ifdef DEBUG_DDR5
+    debug = 1;
+#else
+    debug = 0;
+#endif // DEBUG_DDR5
+
+    CS_success = 1;
+    CA_success = 1;
+#ifdef SDRAM_PHY_SUBCHANNELS
+    for (channel = 0; channel < 2; channel++) {
+        printf("Subchannel:%c CS training\n", 'A'+channel);
+#else
+    {channel = 0;
+        printf("CS training\n");
+#endif // SDRAM_PHY_SUBCHANNELS
+        CS_training(channel, &CS_success, debug);
+        printf("CA training\n");
+        setup_ca_results();
+        CA_training(channel, debug, SDRAM_PHY_ADDRESS_LINES);
+        CA_setup_values(channel, &CA_success, debug, SDRAM_PHY_ADDRESS_LINES);
+    }
+    if (!(CS_success & CA_success)) {
+        enable_dfi_2n_mode();
+    } else {
+#ifdef SDRAM_PHY_SUBCHANNELS
+        for (channel = 0; channel < 2; channel++) {
+#else
+        {channel = 0;
+#endif // SDRAM_PHY_SUBCHANNELS
+            for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
+                disable_dram_2n_mode(channel, rank);
+            }
+        }
+    }
+#else
     printf("CS/CA training impossible\n"
            "Keeping DRAM in 2N mode\n");
+#endif
+    return;
 }
 #endif // defined(SDRAM_PHY_ADDRESS_DELAY_CAPABLE)
 #endif // MEMORY_TYPE_DDR5

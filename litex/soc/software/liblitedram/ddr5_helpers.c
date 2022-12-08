@@ -59,7 +59,7 @@ void store_payload(int channel, int single) {
 }
 
 void cmd_injector(int channel, int phases, int cs, int command,
-                         int wrdata_en, int wrdata_mask, int rddata_en, int single) {
+                  int wrdata_en, int wrdata_mask, int rddata_en, int single) {
     int payload = prep_payload(cs, command, wrdata_en, wrdata_mask, rddata_en);
     upload_payload(channel, phases, payload);
     store_payload(channel, single);
@@ -155,42 +155,56 @@ int and_sample(int channel) {
     return !!capture_result(channel);
 }
 
-void disable_2n_mode(void) {
+void disable_dfi_2n_mode(void) {
     int value = sdram_dfii_control_read();
     value &= ~DFII_CONTROL_2N_MODE;
     sdram_dfii_control_write(value);
-    printf("Switching to 1N mode\n");
+    printf("Switching DFI to 1N mode\n");
 }
 
-void enable_2n_mode(void) {
+void enable_dfi_2n_mode(void) {
     int value = sdram_dfii_control_read();
     value |= DFII_CONTROL_2N_MODE;
     sdram_dfii_control_write(value);
-    printf("Switching to 2N mode\n");
+    printf("Switching DFI to 2N mode\n");
+}
+
+void disable_dram_2n_mode(int channel, int rank) {
+    cmd_injector(channel, 1, 1<<rank, 0xf | 0b1001<<5, 0, 0, 0, 1);
+    issue_single(channel);
+    printf("Switching DRAM on channel:%c rank:%d to 1N mode\n", 'A'+channel, rank);
 }
 
 void cs_rst(int channel, int rank, int address) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     cs_ca_select(channel, rank);
     cs_rst_delay(channel);
     cs_ca_deselect(channel, rank);
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void cs_inc(int channel, int rank, int address) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     cs_ca_select(channel, rank);
     cs_inc_delay(channel);
     cs_ca_deselect(channel, rank);
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void ca_rst(int channel, int rank, int address) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     cs_ca_select(channel, address);
     ca_rst_delay(channel);
     cs_ca_deselect(channel, address);
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void ca_inc(int channel, int rank, int address) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     cs_ca_select(channel, address);
     ca_inc_delay(channel);
     cs_ca_deselect(channel, address);
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void enter_cs(int channel, int rank) {
@@ -208,8 +222,8 @@ void exit_cs(int channel, int rank) {
 }
 
 void cs_sample_prep(int channel, int rank, int address, int l2h) {
-    cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 0, 0);
-    cmd_injector(channel, 0xa>>l2h, 1<<rank, 0x1f, 0, 0, 0, 0);
+    cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 1, 0);
+    cmd_injector(channel, 0xa>>l2h, 1<<rank, 0x1f, 0, 0, 1, 0);
     cdelay(100);
 }
 
@@ -227,23 +241,23 @@ void exit_ca(int channel, int rank) {
 }
 
 void ca_sample_prep_current_period(int channel, int rank, int address, int l2h) {
-    cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 0, 0);
-    cmd_injector(channel, 0x1, 1<<rank, l2h<<address, 0, 0, 0, 0);
+    cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
+    cmd_injector(channel, 0x1, 1<<rank, l2h<<address, 0, 0, 1, 0);
     cdelay(100);
 }
 
 void ca_sample_prep_previous_period(int channel, int rank, int address, int l2h) {
-    cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 0, 0);
-    cmd_injector(channel, 0x1, 0, l2h<<address, 0, 0, 0, 0);
-    cmd_injector(channel, 0x2, 1<<rank, (!l2h)<<address, 0, 0, 0, 0);
+    cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
+    cmd_injector(channel, 0x1, 0, l2h<<address, 0, 0, 1, 0);
+    cmd_injector(channel, 0x2, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
     cdelay(100);
 }
 
-int32_t _ca_results[SDRAM_PHY_ADDRESS_LINES][2];
+int32_t _ca_results[14][2];
 
 void setup_ca_results(void) {
     int address;
-    for (address = 0; address < SDRAM_PHY_ADDRESS_LINES; address++) {
+    for (address = 0; address < 14; address++) {
         _ca_results[address][0] = -SDRAM_PHY_DELAYS; // right
         _ca_results[address][1] = SDRAM_PHY_DELAYS;  // left
     }
