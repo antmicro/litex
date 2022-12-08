@@ -14,6 +14,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import time
+import types
 import datetime
 
 from functools import partial
@@ -23,11 +24,29 @@ import collections
 from migen.fhdl.structure import *
 from migen.fhdl.structure import _Operator, _Slice, _Assign, _Fragment
 from migen.fhdl.tools import *
+from migen.fhdl.tools import _TargetLister
 from migen.fhdl.conv_output import ConvOutput
 from migen.fhdl.specials import Memory
 
 from litex.gen.fhdl.namer import build_namespace
 from litex.build.tools import get_litex_git_revision
+
+# ------------------------------------------------------------------------------------------------ #
+#                                   KEEP DISPLAYS IN COMB LOGIC                                    #
+# ------------------------------------------------------------------------------------------------ #
+
+def visit_with_display(self, node):
+    if isinstance(node, Display):
+        self.output_list.add(node)
+    else:
+        pass
+
+def list_targets_sim(node):
+    lister = _TargetLister()
+    lister.visit_unknown = types.MethodType(visit_with_display, lister)
+    lister.visit(node)
+    return lister.output_list
+
 
 # ------------------------------------------------------------------------------------------------ #
 #                                     BANNER/TRAILER/SEPARATORS                                    #
@@ -280,7 +299,7 @@ def _print_expression(ns, node):
 (_AT_BLOCKING, _AT_NONBLOCKING, _AT_SIGNAL) = range(3)
 
 def _print_node(ns, at, level, node, target_filter=None):
-    if target_filter is not None and target_filter not in list_targets(node):
+    if target_filter is not None and target_filter not in list_targets_sim(node):
         return ""
 
     # Assignment.
@@ -449,20 +468,22 @@ def _print_combinatorial_logic_sim(f, ns, blocking_assign):
         target_stmt_map = defaultdict(list)
 
         for statement in flat_iteration(f.comb):
-            targets = list_targets(statement)
+            targets = list_targets_sim(statement)
             for t in targets:
                 target_stmt_map[t].append(statement)
 
         groups = group_by_targets(f.comb)
 
         for n, (t, stmts) in enumerate(target_stmt_map.items()):
-            assert isinstance(t, Signal)
             if len(stmts) == 1 and isinstance(stmts[0], _Assign):
+                assert isinstance(t, Signal)
                 r += "assign " + _print_node(ns, _AT_BLOCKING, 0, stmts[0])
             else:
+                assert isinstance(t, Signal) or isinstance(t, Display)
                 r += "always @(*) begin\n"
                 if blocking_assign:
-                    r += "\t" + ns.get_name(t) + " = " + _print_expression(ns, t.reset)[0] + ";\n"
+                    if isinstance(t, Signal):
+                        r += "\t" + ns.get_name(t) + " = " + _print_expression(ns, t.reset)[0] + ";\n"
                     r += _print_node(ns, _AT_BLOCKING, 1, stmts, t)
                 else:
                     r += "\t" + ns.get_name(t) + " <= " + _print_expression(ns, t.reset)[0] + ";\n"
