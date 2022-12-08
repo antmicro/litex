@@ -36,10 +36,12 @@ jobs:
       # Install GCC Toolchains
       - name: Install GCC Toolchains
         run: |
-          python3 litex_setup.py --gcc=riscv
+          curl -L https://static.dev.sifive.com/dev-tools/freedom-tools/v2020.08/riscv64-unknown-elf-gcc-10.1.0-2020.08.2-x86_64-linux-ubuntu14.tar.gz | tar -xzf -
+          mv riscv64-unknown-elf-gcc-10.1.0-2020.08.2-x86_64-linux-ubuntu14 ../riscv64-unknown-elf-gcc
           sudo mkdir /usr/local/riscv
           sudo cp -r $PWD/../riscv64-*/* /usr/local/riscv
-          python3 litex_setup.py --gcc=openrisc
+          curl -L https://toolchains.bootlin.com/downloads/releases/toolchains/openrisc/tarballs/openrisc--musl--stable-2020.08-1.tar.bz2 | tar -xjf -
+          mv openrisc--musl--stable-2020.08-1 ../openrisc--musl--stable-2020.08-1
           sudo mkdir /usr/local/openrisc
           sudo cp -r $PWD/../openrisc-*/* /usr/local/openrisc
           sudo apt install gcc-powerpc64le-linux-gnu binutils-multiarch
