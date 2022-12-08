@@ -18,8 +18,9 @@ uint32_t capture_result(int channel);
 int or_sample(int channel);
 int and_sample(int channel);
 
-void disable_2n_mode(void);
-void enable_2n_mode(void);
+void enable_dfi_2n_mode(void);
+void disable_dfi_2n_mode(void);
+void disable_dram_2n_mode(int, int);
 
 #define UNSET_DELAY 0xffff
 
@@ -40,7 +41,7 @@ void exit_ca(int channel, int rank);
 void ca_sample_prep_current_period(int channel, int rank, int address, int l2h);
 void ca_sample_prep_previous_period(int channel, int rank, int address, int l2h);
 
-extern int32_t _ca_results[SDRAM_PHY_ADDRESS_LINES][2];
+extern int32_t _ca_results[14][2];
 void setup_ca_results(void);
 
 void mid_point_calc_and_set(uint8_t* success, const char* format_str, int channel,
