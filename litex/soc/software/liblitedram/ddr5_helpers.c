@@ -25,11 +25,11 @@ int prep_payload (int cs, int command, int wrdata_en,
 void upload_payload(int channel, int phases, int payload) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        sdram_dfii_B_cmdinjector_command_storage_write(payload);
-        sdram_dfii_B_cmdinjector_phase_addr_write(phases);
+        sdram_dfii_b_cmdinjector_command_storage_write(payload);
+        sdram_dfii_b_cmdinjector_phase_addr_write(phases);
     } else {
-        sdram_dfii_A_cmdinjector_command_storage_write(payload);
-        sdram_dfii_A_cmdinjector_phase_addr_write(phases);
+        sdram_dfii_a_cmdinjector_command_storage_write(payload);
+        sdram_dfii_a_cmdinjector_phase_addr_write(phases);
     }
 #else
     sdram_dfii_cmdinjector_command_storage_write(payload);
@@ -41,14 +41,14 @@ void store_payload(int channel, int single) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         if (single == 0)
-            sdram_dfii_cmdinjector_store_continuous_cmd_write(1);
+            sdram_dfii_b_cmdinjector_store_continuous_cmd_write(1);
         else
-            sdram_dfii_cmdinjector_store_singleshot_cmd_write(1);
+            sdram_dfii_b_cmdinjector_store_singleshot_cmd_write(1);
     } else {
         if (single == 0)
-            sdram_dfii_cmdinjector_store_continuous_cmd_write(1);
+            sdram_dfii_a_cmdinjector_store_continuous_cmd_write(1);
         else
-            sdram_dfii_cmdinjector_store_singleshot_cmd_write(1);
+            sdram_dfii_a_cmdinjector_store_singleshot_cmd_write(1);
     }
 #else
     if (single == 0)
@@ -68,13 +68,13 @@ void cmd_injector(int channel, int phases, int cs, int command,
 void issue_single(int channel) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        sdram_dfii_B_cmdinjector_single_shot_write(1);
-        sdram_dfii_B_cmdinjector_issue_command_write(1);
-        sdram_dfii_B_cmdinjector_single_shot_write(0);
+        sdram_dfii_b_cmdinjector_single_shot_write(1);
+        sdram_dfii_b_cmdinjector_issue_command_write(1);
+        sdram_dfii_b_cmdinjector_single_shot_write(0);
     } else {
-        sdram_dfii_A_cmdinjector_single_shot_write(1);
-        sdram_dfii_A_cmdinjector_issue_command_write(1);
-        sdram_dfii_A_cmdinjector_single_shot_write(0);
+        sdram_dfii_a_cmdinjector_single_shot_write(1);
+        sdram_dfii_a_cmdinjector_issue_command_write(1);
+        sdram_dfii_a_cmdinjector_single_shot_write(0);
     }
 #else
     sdram_dfii_cmdinjector_single_shot_write(1);
@@ -86,13 +86,13 @@ void issue_single(int channel) {
 void setup_capture(int channel, int setup) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        sdram_dfii_B_cmdinjector_sample_write(0);
-        sdram_dfii_B_cmdinjector_setup_write(setup);
-        sdram_dfii_B_cmdinjector_reset_write(1);
+        sdram_dfii_b_cmdinjector_sample_write(0);
+        sdram_dfii_b_cmdinjector_setup_write(setup);
+        sdram_dfii_b_cmdinjector_reset_write(1);
     } else {
-        sdram_dfii_A_cmdinjector_sample_write(0);
-        sdram_dfii_A_cmdinjector_setup_write(setup);
-        sdram_dfii_A_cmdinjector_reset_write(1);
+        sdram_dfii_a_cmdinjector_sample_write(0);
+        sdram_dfii_a_cmdinjector_setup_write(setup);
+        sdram_dfii_a_cmdinjector_reset_write(1);
     }
 #else
     sdram_dfii_cmdinjector_sample_write(0);
@@ -104,9 +104,9 @@ void setup_capture(int channel, int setup) {
 void start_capture(int channel) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        sdram_dfii_B_cmdinjector_sample_write(1);
+        sdram_dfii_b_cmdinjector_sample_write(1);
     } else {
-        sdram_dfii_A_cmdinjector_sample_write(1);
+        sdram_dfii_a_cmdinjector_sample_write(1);
     }
 #else
     sdram_dfii_cmdinjector_sample_write(1);
@@ -116,9 +116,9 @@ void start_capture(int channel) {
 void stop_capture(int channel) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        sdram_dfii_B_cmdinjector_sample_write(0);
+        sdram_dfii_b_cmdinjector_sample_write(0);
     } else {
-        sdram_dfii_A_cmdinjector_sample_write(0);
+        sdram_dfii_a_cmdinjector_sample_write(0);
     }
 #else
     sdram_dfii_cmdinjector_sample_write(0);
@@ -128,9 +128,9 @@ void stop_capture(int channel) {
 uint32_t capture_result(int channel) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        return sdram_dfii_B_cmdinjector_result_read();
+        return sdram_dfii_b_cmdinjector_result_read();
     } else {
-        return sdram_dfii_A_cmdinjector_result_read();
+        return sdram_dfii_a_cmdinjector_result_read();
     }
 #else
     return sdram_dfii_cmdinjector_result_read();

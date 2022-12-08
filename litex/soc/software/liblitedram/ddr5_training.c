@@ -304,7 +304,7 @@ void sdram_ddr5_cs_ca_training(void) {
     CA_success = 1;
 #ifdef SDRAM_PHY_SUBCHANNELS
     for (channel = 0; channel < 2; channel++) {
-        printf("Subchannel:%c CS training\n", 'A'+channel);
+        printf("Subchannel:%c CS training\n", (char)('A'+channel));
 #else
     {channel = 0;
         printf("CS training\n");
