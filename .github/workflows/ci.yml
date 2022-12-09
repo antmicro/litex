@@ -20,6 +20,7 @@ jobs:
       # Install Tools
       - name: Install Tools
         run: |
+          sudo apt-get update
           sudo apt-get install wget build-essential python3 ninja-build
           sudo apt-get install libevent-dev libjson-c-dev flex bison
           sudo apt-get install libfl-dev libfl2 zlibc zlib1g-dev
