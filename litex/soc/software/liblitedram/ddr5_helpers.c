@@ -1,5 +1,6 @@
 #include <liblitedram/accessors.h>
 #include <liblitedram/ddr5_helpers.h>
+#ifdef LIBLITEDRAM_DDR5_HELPERS_H
 #include <stdio.h>
 
 #ifdef MEMORY_TYPE_DDR5
@@ -353,3 +354,4 @@ void mid_point_calc_and_set(uint8_t* success, const char* format_str, int channe
     *success &= (left != UNSET_DELAY) && (right != UNSET_DELAY);
 }
 #endif // MEMORY_TYPE_DDR5
+#endif // LIBLITEDRAM_DDR5_HELPERS_H

@@ -1,3 +1,5 @@
+#include <generated/csr.h>
+#ifdef CSR_SDRAM_BASE
 #include <generated/sdram_phy.h>
 #ifndef LIBLITEDRAM_DDR5_HELPERS_H
 #define LIBLITEDRAM_DDR5_HELPERS_H
@@ -48,5 +50,5 @@ void mid_point_calc_and_set(uint8_t* success, const char* format_str, int channe
                             int rank, int address, int32_t index, int32_t left,
                             int32_t right, inc_func inc, int cs);
 #endif // MEMORY_TYPE_DDR5
-
 #endif // LIBLITEDRAM_DDR5_HELPERS_H
+#endif // CSR_SDRAM_BASE
