@@ -1,4 +1,5 @@
 #include <liblitedram/ddr5_training.h>
+#ifdef LIBLITEDRAM_DDR5_TRAINING_H
 #include <liblitedram/ddr5_helpers.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -336,3 +337,4 @@ void sdram_ddr5_cs_ca_training(void) {
 }
 #endif // defined(SDRAM_PHY_ADDRESS_DELAY_CAPABLE)
 #endif // MEMORY_TYPE_DDR5
+#endif // LIBLITEDRAM_DDR5_TRAINING_H

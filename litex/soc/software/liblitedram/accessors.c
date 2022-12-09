@@ -1,4 +1,5 @@
 #include <liblitedram/accessors.h>
+#ifdef LIBLITEDRAM_ACCESSORS_H
 #include <stdio.h>
 
 int _sdram_write_leveling_bitslips[16];
@@ -391,3 +392,4 @@ void sdram_write_leveling_force_bitslip(int module, int bitslip, int show) {
 	if (show)
 		printf("Forcing Bitslip of module %d to %d\n", module, bitslip);
 }
+#endif
