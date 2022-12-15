@@ -452,8 +452,8 @@ void sdram_ddr5_read_training(void) {
             }
             printf("m%d|cyc%d, dly%d: cyc%d, dly%d ", module, start_cycle, start_delay, end_cycle, end_delay);
             eye_width = (end_cycle-start_cycle)*SDRAM_PHY_DELAYS + end_delay - start_delay;
-            middle_cycle = start_cycle + (eye_width/2)/SDRAM_PHY_DELAYS;
-            middle_delay = (eye_width/2)%SDRAM_PHY_DELAYS;
+            middle_cycle = start_cycle + (start_delay + eye_width/2)/SDRAM_PHY_DELAYS;
+            middle_delay = (start_delay + eye_width/2)%SDRAM_PHY_DELAYS;
             printf("eye_width:%"PRIu32", chosen cyc:%d,dly:%d\n", eye_width, middle_cycle, middle_delay);
             rd_rst(channel, module);
             idly_rst(channel, module);
@@ -489,7 +489,7 @@ void sdram_ddr5_read_training(void) {
             for (module = 0; module < SDRAM_PHY_MODULES; module++) {
                 printf("Rank:%d module:%d serial number:", rank, module);
 #endif // SDRAM_PHY_SUBCHANNELS
-                for (i = 0; i < 6; ++i) {
+                for (i = 0; i < 5; ++i) {
                     send_mrr(channel, rank, 65+i);
                     printf("%02"PRIX8, recover_mrr_value(channel, module));
                 }
