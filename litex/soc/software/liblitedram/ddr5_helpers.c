@@ -100,7 +100,11 @@ void setup_rddata_cnt(int channel, int value) {
 #endif
 }
 
+#ifndef SDRAM_PHY_SUBCHANNELS
 #define DFII_CMDINJECTOR_DATA_BYTES SDRAM_PHY_DFI_DATABITS/8
+#else
+#define DFII_CMDINJECTOR_DATA_BYTES SDRAM_PHY_DFI_DATABITS/16
+#endif
 #define MODULE_BITMASK ((1<<SDRAM_PHY_DQ_DQS_RATIO)-1)
 
 uint16_t get_data_module_phase(int channel, int module, int phase) {
@@ -113,7 +117,7 @@ uint16_t get_data_module_phase(int channel, int module, int phase) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel) {
         sdram_dfii_b_cmdinjector_rddata_select_write(phase);
-        csr_rd_buf_uint8(CSR_SDRAM_DFII_A_CMDINJECTOR_RDDATA_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+        csr_rd_buf_uint8(CSR_SDRAM_DFII_B_CMDINJECTOR_RDDATA_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
     } else {
         sdram_dfii_a_cmdinjector_rddata_select_write(phase);
         csr_rd_buf_uint8(CSR_SDRAM_DFII_A_CMDINJECTOR_RDDATA_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
@@ -130,10 +134,10 @@ uint16_t get_data_module_phase(int channel, int module, int phase) {
         nebo = 0;
     }
     ibo = (module * SDRAM_PHY_DQ_DQS_RATIO)%8; // Non zero only if x4 ICs are used
-    ret_value |= data[pebo] & (MODULE_BITMASK << ibo);
+    ret_value |= (data[pebo] >> ibo) & MODULE_BITMASK;
     if (DFII_CMDINJECTOR_DATA_BYTES == 1) // Special case for x4 single IC
         ibo = 0x4;
-    ret_value |= (data[nebo] & (MODULE_BITMASK << ibo)) << SDRAM_PHY_DQ_DQS_RATIO;
+    ret_value |= ((data[nebo] >> ibo) & MODULE_BITMASK) << SDRAM_PHY_DQ_DQS_RATIO;
     return ret_value;
 }
 
