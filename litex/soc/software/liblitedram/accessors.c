@@ -5,7 +5,7 @@
 int _sdram_write_leveling_bitslips[16];
 int _sdram_write_leveling_dat_delays[16];
 
-#if defined(SDRAM_PHY_READ_LEVELING_CAPABLE) || defined(SDRAM_INPUT_DELAY_CAPABLE)
+#if defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 
 void read_inc_dq_delay(int module) {
 	/* Increment delay */
@@ -55,9 +55,9 @@ void read_rst_dq_bitslip(int module) {
 #endif //SDRAM_PHY_SUBCHANNELS
 }
 
-#endif // defined(SDRAM_PHY_READ_LEVELING_CAPABLE) || defined(SDRAM_INPUT_DELAY_CAPABLE)
+#endif // defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 
-#if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_FULL_OUTPUT_DELAY_CAPABLE)
+#if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE)
 
 void write_inc_dq_delay(int module) {
 	/* Increment DQ delay */
@@ -139,7 +139,7 @@ void write_rst_delay(int module) {
 	write_rst_dqs_delay(module);
 }
 
-#endif // defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_FULL_OUTPUT_DELAY_CAPABLE)
+#endif // defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE)
 
 #if defined(SDRAM_PHY_WRITE_LATENCY_CALIBRATION_CAPABLE) || defined(SDRAM_BITSLIP_CAPABLE)
 
