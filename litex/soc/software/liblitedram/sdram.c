@@ -109,6 +109,7 @@ int sdram_get_cwl(void) {
 /*-----------------------------------------------------------------------*/
 
 #ifdef CSR_DDRPHY_BASE
+#ifndef MEMORY_TYPE_DDR5
 static unsigned char sdram_dfii_get_rdphase(void) {
 #ifdef CSR_DDRPHY_RDPHASE_ADDR
 	return ddrphy_rdphase_read();
@@ -124,7 +125,7 @@ static unsigned char sdram_dfii_get_wrphase(void) {
 	return SDRAM_PHY_WRPHASE;
 #endif // CSR_DDRPHY_WRPHASE_ADDR
 }
-#ifndef MEMORY_TYPE_DDR5
+
 static void sdram_dfii_pix_address_write(unsigned char phase, unsigned int value) {
 #if (SDRAM_PHY_PHASES > 8)
 	#error "More than 8 DFI phases not supported"
@@ -1215,7 +1216,7 @@ int sdram_init(void) {
 	init_sequence();
 #ifdef MEMORY_TYPE_DDR5
 	sdram_ddr5_cs_ca_training();
-	//sdram_ddr5_read_training();
+	sdram_ddr5_read_training();
 	//sdram_ddr5_write_training();
 #else
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)

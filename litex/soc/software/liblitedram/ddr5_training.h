@@ -6,6 +6,7 @@
 
 #ifdef MEMORY_TYPE_DDR5
 void sdram_ddr5_cs_ca_training(void);
+void sdram_ddr5_read_training(void);
 #endif // MEMORY_TYPE_DDR5
 
 #endif // LIBLITEDRAM_DDR5_TRAINING_H
