@@ -11,7 +11,9 @@ void upload_payload(int channel, int phases, int payload);
 void store_payload(int channel, int single);
 void cmd_injector(int channel, int phases, int cs, int command,
                   int wrdata_en, int wrdata_mask, int rddata_en, int single);
+void setup_rddata_cnt(int channel, int value);
 void issue_single(int channel);
+uint16_t get_data_module_phase(int channel, int module, int phase);
 
 void setup_capture(int channel, int setup);
 void start_capture(int channel);
@@ -33,6 +35,24 @@ void cs_inc(int channel, int rank, int address);
 
 void ca_rst(int channel, int rank, int address);
 void ca_inc(int channel, int rank, int address);
+
+int compare(int channel, int module,
+            int data0, int data1,
+            int inv, int select);
+
+void rd_rst(int channel, int module);
+void rd_inc(int channel, int module);
+void idly_rst(int channel, int module);
+void idly_inc(int channel, int module);
+
+void wr_rst(int channel, int module);
+void wr_inc(int channel, int module);
+
+int captured_preamble(int channel, int module);
+uint8_t recover_mrr_value(int channel, int module);
+void send_mpc(int channel, int rank, int cmd);
+void send_mrw(int channel, int rank, int reg, int value);
+void send_mrr(int channel, int rank, int reg);
 
 void enter_cs(int channel, int rank);
 void exit_cs(int channel, int rank);
