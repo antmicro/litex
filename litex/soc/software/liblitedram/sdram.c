@@ -543,17 +543,11 @@ int _sdram_write_leveling_cmd_delay = 0;
 int _sdram_write_leveling_cdly_range_start = -1;
 int _sdram_write_leveling_cdly_range_end   = -1;
 
-static void sdram_write_leveling_on(void) {
-	// Flip write leveling bit in the Mode Register, as it is disabled by default
-	sdram_dfii_pi0_address_write(DDRX_MR_WRLVL_RESET ^ (1 << DDRX_MR_WRLVL_BIT));
+static void sdram_write_leveling_on(void)
+{
+	sdram_dfii_pi0_address_write(DDRX_MR_WRLVL_RESET | (1 << DDRX_MR_WRLVL_BIT));
 	sdram_dfii_pi0_baddress_write(DDRX_MR_WRLVL_ADDRESS);
 	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
-
-#ifdef SDRAM_PHY_DDR4_RDIMM
-	sdram_dfii_pi0_address_write((DDRX_MR_WRLVL_RESET ^ (1 << DDRX_MR_WRLVL_BIT)) ^ 0x2BF8) ;
-	sdram_dfii_pi0_baddress_write(DDRX_MR_WRLVL_ADDRESS ^ 0xF);
-	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
-#endif // SDRAM_PHY_DDR4_RDIMM
 
 	ddrphy_wlevel_en_write(1);
 }
@@ -562,12 +556,6 @@ static void sdram_write_leveling_off(void) {
 	sdram_dfii_pi0_address_write(DDRX_MR_WRLVL_RESET);
 	sdram_dfii_pi0_baddress_write(DDRX_MR_WRLVL_ADDRESS);
 	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
-
-#ifdef SDRAM_PHY_DDR4_RDIMM
-	sdram_dfii_pi0_address_write(DDRX_MR_WRLVL_RESET ^ 0x2BF8);
-	sdram_dfii_pi0_baddress_write(DDRX_MR_WRLVL_ADDRESS ^ 0xF);
-	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
-#endif // SDRAM_PHY_DDR4_RDIMM
 
 	ddrphy_wlevel_en_write(0);
 }
