@@ -52,6 +52,7 @@ sim: $(OBJS_SIM) | mkdir
 		$(INC_DIR) \
 		-Wno-BLKANDNBLK \
 		-Wno-WIDTH \
+		-Wno-ENUMVALUE \
 		--relative-includes
 	make -j 4 -C $(OBJ_DIR) -f Vsim.mk Vsim
 
