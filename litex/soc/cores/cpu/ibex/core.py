@@ -203,9 +203,6 @@ class Ibex(CPU):
             "prim_alert_pkg.sv",
             "prim_assert.sv",
             "prim_ram_1p_pkg.sv",
-            "prim_secded_pkg.sv",
-            "prim_util_pkg.sv",
-            "prim_cipher_pkg.sv",
         )
         platform.add_sources(os.path.join(ibexdir, "rtl"),
             "ibex_pkg.sv",
