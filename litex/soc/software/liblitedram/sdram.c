@@ -591,11 +591,13 @@ void sdram_write_leveling_force_cmd_delay(int taps, int show) {
 }
 
 static int sdram_write_leveling_scan(int *delays, int loops, int show) {
-	int i, j, k, dq_line;
-
-	int err_ddrphy_wdly;
+	int module, wdly, k, dq_line;
 
 	unsigned char taps_scan[SDRAM_PHY_DELAYS];
+
+	unsigned char all_modules_working[SDRAM_PHY_DELAYS];
+	for (wdly = 0; wdly < SDRAM_PHY_DELAYS; wdly++)
+		all_modules_working[wdly] = 1;
 
 	int one_window_active;
 	int one_window_start, one_window_best_start;
@@ -605,29 +607,26 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show) {
 
 	int ok;
 
-	err_ddrphy_wdly = SDRAM_PHY_DELAYS - _sdram_tck_taps/4;
-
 	sdram_write_leveling_on();
 	cdelay(100);
-	for(i=0;i<SDRAM_PHY_MODULES;i++) {
+	for(module = 0; module < SDRAM_PHY_MODULES; module++) {
 		for (dq_line = 0; dq_line < DQ_COUNT; dq_line++) {
 			if (show)
 #ifdef SDRAM_DELAY_PER_DQ
-				printf("  m%d dq%d: |", i, dq_line);
+				printf("  m%d dq%d: |", module, dq_line);
 #else
-				printf("  m%d: |", i);
+				printf("  m%d: |", module);
 #endif // SDRAM_DELAY_PER_DQ
 
 			/* Reset delay */
-			sdram_leveling_action(i, dq_line, write_rst_delay);
+			sdram_leveling_action(module, dq_line, write_rst_delay);
 			cdelay(100);
 
 			/* Scan write delay taps */
-			for(j=0;j<err_ddrphy_wdly;j++) {
+			for(wdly=0;wdly<SDRAM_PHY_DELAYS;wdly++) {
 				int zero_count = 0;
 				int one_count = 0;
-				int show_iter = (j%MODULO == 0) && show;
-
+				int show_iter = (wdly%MODULO == 0) && show;
 				for (k=0; k<loops; k++) {
 					ddrphy_wlevel_strobe_write(1);
 					cdelay(100);
@@ -636,25 +635,28 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show) {
 					/* For x4 memories, we need to test individual nibbles, not bytes */
 
 					/* Extract the byte containing the nibble from the tested module */
-					int module_byte = buf[SDRAM_PHY_MODULES-1-(i/2)];
+					int module_byte = buf[SDRAM_PHY_MODULES-1-(module/2)];
 					/* Shift the byte by 4 bits right if the module number is odd */
-					module_byte >>= 4 * (i % 2);
+					module_byte >>= 4 * (module % 2);
 					/* Extract the nibble from the tested module */
 					if ((module_byte & 0xf) != 0)
 #else // SDRAM_PHY_DQ_DQS_RATIO != 4
-					if (buf[SDRAM_PHY_MODULES-1-i] != 0)
+					if (buf[SDRAM_PHY_MODULES-1-module] != 0)
 #endif // SDRAM_PHY_DQ_DQS_RATIO == 4
 						one_count++;
 					else
 						zero_count++;
 				}
 				if (one_count > zero_count)
-					taps_scan[j] = 1;
+					taps_scan[wdly] = 1;
 				else
-					taps_scan[j] = 0;
+					taps_scan[wdly] = 0;
+
+				all_modules_working[wdly] &= !!(one_count > zero_count);
+
 				if (show_iter)
-					printf("%d", taps_scan[j]);
-				sdram_leveling_action(i, dq_line, write_inc_delay);
+					printf("%d", taps_scan[wdly]);
+				sdram_leveling_action(module, dq_line, write_inc_delay);
 				cdelay(100);
 			}
 			if (show)
@@ -666,36 +668,36 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show) {
 			one_window_count = 0;
 			one_window_best_start = 0;
 			one_window_best_count = -1;
-			delays[i] = -1;
-			for(j=0;j<err_ddrphy_wdly+1;j++) {
+			delays[module] = -1;
+			for(wdly=0;wdly<err_ddrphy_wdly+1;wdly++) {
 				if (one_window_active) {
-					if ((j == err_ddrphy_wdly) || (taps_scan[j] == 0)) {
+					if ((wdly == err_ddrphy_wdly) || (taps_scan[wdly] == 0)) {
 						one_window_active = 0;
-						one_window_count = j - one_window_start;
+						one_window_count = wdly - one_window_start;
 						if (one_window_count > one_window_best_count) {
 							one_window_best_start = one_window_start;
 							one_window_best_count = one_window_count;
 						}
 					}
 				} else {
-					if (j != err_ddrphy_wdly && taps_scan[j]) {
+					if (wdly != err_ddrphy_wdly && taps_scan[wdly]) {
 						one_window_active = 1;
-						one_window_start = j;
+						one_window_start = wdly;
 					}
 				}
 			}
 
 			/* Reset delay */
-			sdram_leveling_action(i, dq_line, write_rst_delay);
+			sdram_leveling_action(module, dq_line, write_rst_delay);
 			cdelay(100);
 
 			/* Use forced delay if configured */
-			if (_sdram_write_leveling_dat_delays[i] >= 0) {
-				delays[i] = _sdram_write_leveling_dat_delays[i];
+			if (_sdram_write_leveling_dat_delays[module] >= 0) {
+				delays[module] = _sdram_write_leveling_dat_delays[module];
 
 				/* Configure write delay */
-				for(j=0; j<delays[i]; j++)  {
-					sdram_leveling_action(i, dq_line, write_inc_delay);
+				for(wdly=0; wdly<delays[module]; wdly++)  {
+					sdram_leveling_action(module, dq_line, write_inc_delay);
 					cdelay(100);
 				}
 			/* Succeed only if the start of a 1s window has been found: */
@@ -709,42 +711,45 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show) {
 				/* Ensure write delay is just before transition */
 				one_window_start -= min(one_window_start, 16);
 #endif // SDRAM_PHY_DELAYS > 32
-				delays[i] = one_window_best_start;
+				delays[module] = one_window_best_start;
 
 				/* Configure write delay */
-				for(j=0; j<delays[i]; j++) {
-					sdram_leveling_action(i, dq_line, write_inc_delay);
+				for(wdly=0; wdly<delays[module]; wdly++) {
+					sdram_leveling_action(module, dq_line, write_inc_delay);
 					cdelay(100);
 				}
 			}
 			if (show) {
-				if (delays[i] == -1)
+				if (delays[module] == -1)
 					printf(" delay: -\n");
 				else
-					printf(" delay: %02d\n", delays[i]);
+					printf(" delay: %02d\n", delays[module]);
 			}
 		}
 	}
 
 	sdram_write_leveling_off();
 
-	ok = 1;
-	for(i=SDRAM_PHY_MODULES-1;i>=0;i--) {
-		if(delays[i] < 0)
-			ok = 0;
+	ok = 0;
+	if (show)
+		printf(" AMW: |");
+	for (wdly = 0; wdly < SDRAM_PHY_DELAYS; wdly++) {
+		if (show)
+			printf("%d", all_modules_working[wdly]);
+		ok += all_modules_working[wdly];
 	}
+	if (show)
+		printf("| total: %d\n", ok);
 
 	return ok;
 }
 
 static void sdram_write_leveling_find_cmd_delay(
 	unsigned int *best_error, unsigned int *best_count, int *best_cdly,
-	int cdly_start, int cdly_stop, int cdly_step) {
+	int *cdly_scores, int cdly_start, int cdly_stop, int cdly_step) {
 	int cdly;
 	int delays[SDRAM_PHY_MODULES];
-#ifndef SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
 	int ok;
-#endif // SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
 
 	/* Scan through the range */
 	sdram_rst_clock_delay();
@@ -756,39 +761,19 @@ static void sdram_write_leveling_find_cmd_delay(
 		/* Write level using this delay */
 #ifdef SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
 		printf("Cmd/Clk delay: %d\n", cdly);
-		sdram_write_leveling_scan(delays, 8, 1);
+		ok = sdram_write_leveling_scan(delays, 8, 1);
 #else
 		ok = sdram_write_leveling_scan(delays, 8, 0);
 #endif // SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
-		/* Use the mean of delays for error calulation */
-		int delay_mean  = 0;
-		int delay_count = 0;
-		for (int i=0; i < SDRAM_PHY_MODULES; ++i) {
-			if (delays[i] != -1) {
-				delay_mean  += delays[i]*256 + _sdram_tck_taps*64;
-				delay_count += 1;
-			}
-		}
-		if (delay_count != 0)
-			delay_mean /= delay_count;
+		cdly_scores[cdly] = ok;
 
-		/* We want the higher number of valid modules and delay to be centered */
-		int ideal_delay = SDRAM_PHY_DELAYS*128 - _sdram_tck_taps*32;
-		int error = ideal_delay - delay_mean;
-		if (error < 0)
-			error *= -1;
-
-		if (delay_count >= *best_count) {
-			if (error < *best_error) {
-				*best_cdly  = cdly;
-				*best_error = error;
-				*best_count = delay_count;
-			}
+		if (ok > *best_count) {
+			*best_cdly  = cdly;
+			*best_error = SDRAM_PHY_DELAYS - ok;
+			*best_count = ok;
 		}
-#ifdef SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
-		printf("Delay mean: %d/256, ideal: %d/256\n", delay_mean, ideal_delay);
-#else
-		printf("%d", ok);
+#ifndef SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
+		printf("%d", !!ok);
 #endif // SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
 	}
 }
@@ -802,6 +787,10 @@ int sdram_write_leveling(void) {
 	int cdly_range_end;
 	int cdly_range_step;
 
+	int cdly_scores[SDRAM_PHY_DELAYS];
+	for (int i = 0; i < SDRAM_PHY_DELAYS; i++)
+		cdly_scores[i] = -1;
+
 	_sdram_tck_taps = ddrphy_half_sys8x_taps_read()*4;
 	printf("  tCK equivalent taps: %d\n", _sdram_tck_taps);
 
@@ -809,14 +798,8 @@ int sdram_write_leveling(void) {
 		/* Center write leveling by varying cdly. Searching through all possible
 		 * values is slow, but we can use a simple optimization method of iterativly
 		 * scanning smaller ranges with decreasing step */
-		if (_sdram_write_leveling_cdly_range_start != -1)
-			cdly_range_start = _sdram_write_leveling_cdly_range_start;
-		else
-			cdly_range_start = 0;
-		if (_sdram_write_leveling_cdly_range_end != -1)
-			cdly_range_end = _sdram_write_leveling_cdly_range_end;
-		else
-			cdly_range_end = _sdram_tck_taps/2; /* Limit Clk/Cmd scan to 1/2 tCK */
+		cdly_range_start = 0;
+		cdly_range_end = SDRAM_PHY_DELAYS;
 
 		printf("  Cmd/Clk scan (%d-%d)\n", cdly_range_start, cdly_range_end);
 		if (SDRAM_PHY_DELAYS > 32)
@@ -826,7 +809,7 @@ int sdram_write_leveling(void) {
 		while (cdly_range_step > 0) {
 			printf("  |");
 			sdram_write_leveling_find_cmd_delay(&best_error, &best_count, &best_cdly,
-					cdly_range_start, cdly_range_end, cdly_range_step);
+					cdly_scores, cdly_range_start, cdly_range_end, cdly_range_step);
 
 			/* Small optimization - stop if we have zero error */
 			if (best_error == 0)
@@ -846,6 +829,12 @@ int sdram_write_leveling(void) {
 	} else {
 		best_cdly = _sdram_write_leveling_cmd_delay;
 	}
+
+	printf("cdly scores: |");
+	for (int i = 0; i < SDRAM_PHY_DELAYS; i++)
+		printf("%4d", cdly_scores[i]);
+	printf("|\n");
+
 	printf("  Setting Cmd/Clk delay to %d taps.\n", best_cdly);
 	/* Set working or forced delay */
 	if (best_cdly >= 0) {
