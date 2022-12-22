@@ -7,9 +7,9 @@
 #include <generated/soc.h>
 #include <generated/csr.h>
 
-//#define MEMTEST_BUS_DEBUG
-//#define MEMTEST_DATA_DEBUG
-//#define MEMTEST_ADDR_DEBUG
+#define MEMTEST_BUS_DEBUG
+#define MEMTEST_DATA_DEBUG
+#define MEMTEST_ADDR_DEBUG
 
 // Limits the number of errors printed, so that we can still access bios console
 #ifndef MEMTEST_DEBUG_MAX_ERRORS
@@ -95,7 +95,7 @@ int memtest_bus(unsigned int *addr, unsigned long size)
 			errors++;
 #ifdef MEMTEST_BUS_DEBUG
 			if (MEMTEST_DEBUG_MAX_ERRORS < 0 || errors <= MEMTEST_DEBUG_MAX_ERRORS)
-				printf("memtest_bus error @ %p: 0x%08x vs 0x%08x\n", addr + i, rdata, ONEZERO);
+				printf("memtest_bus error @ %p: 0x%08x vs 0x%08x  xor: 0x%08x\n", addr + i, rdata, ONEZERO, rdata ^ ONEZERO);
 #endif
 		}
 	}
@@ -116,7 +116,7 @@ int memtest_bus(unsigned int *addr, unsigned long size)
 			errors++;
 #ifdef MEMTEST_BUS_DEBUG
 			if (MEMTEST_DEBUG_MAX_ERRORS < 0 || errors <= MEMTEST_DEBUG_MAX_ERRORS)
-				printf("memtest_bus error @ %p:: 0x%08x vs 0x%08x\n", addr + i, rdata, ZEROONE);
+				printf("memtest_bus error @ %p:: 0x%08x vs 0x%08x  xor: 0x%08x\n", addr + i, rdata, ZEROONE, rdata ^ ZEROONE);
 #endif
 		}
 	}
@@ -157,7 +157,7 @@ int memtest_addr(unsigned int *addr, unsigned long size, int random)
 			errors++;
 #ifdef MEMTEST_ADDR_DEBUG
 			if (MEMTEST_DEBUG_MAX_ERRORS < 0 || errors <= MEMTEST_DEBUG_MAX_ERRORS)
-				printf("memtest_addr error @ %p: 0x%08x vs 0x%08x\n", addr + i, rdata, i);
+				printf("memtest_addr error @ %p: 0x%08x vs 0x%08x  xor: 0x%08x\n", addr + i, rdata, i, rdata ^ i);
 #endif
 		}
 	}
@@ -242,7 +242,7 @@ int memtest_data(unsigned int *addr, unsigned long size, int random, struct memt
 			}
 #ifdef MEMTEST_DATA_DEBUG
 			if (MEMTEST_DEBUG_MAX_ERRORS < 0 || errors <= MEMTEST_DEBUG_MAX_ERRORS)
-				printf("memtest_data error @ %p: 0x%08x vs 0x%08x\n", addr + i, rdata, seed_32);
+				printf("memtest_data error @ %p: 0x%08x vs 0x%08x  xor: 0x%08x\n", addr + i, rdata, seed_32, rdata ^ seed_32);
 #endif
 		}
 		if (i%0x8000 == 0 && progress)
