@@ -647,12 +647,12 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show) {
 					else
 						zero_count++;
 				}
-				if (one_count > zero_count)
+				if (zero_count == 0)
 					taps_scan[wdly] = 1;
 				else
 					taps_scan[wdly] = 0;
 
-				all_modules_working[wdly] &= !!(one_count > zero_count);
+				all_modules_working[wdly] &= !!(zero_count == 0);
 
 				if (show_iter)
 					printf("%d", taps_scan[wdly]);
@@ -669,9 +669,9 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show) {
 			one_window_best_start = 0;
 			one_window_best_count = -1;
 			delays[module] = -1;
-			for(wdly=0;wdly<err_ddrphy_wdly+1;wdly++) {
+			for(wdly=0;wdly<SDRAM_PHY_DELAYS+1;wdly++) {
 				if (one_window_active) {
-					if ((wdly == err_ddrphy_wdly) || (taps_scan[wdly] == 0)) {
+					if ((wdly == SDRAM_PHY_DELAYS) || (taps_scan[wdly] == 0)) {
 						one_window_active = 0;
 						one_window_count = wdly - one_window_start;
 						if (one_window_count > one_window_best_count) {
@@ -680,7 +680,7 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show) {
 						}
 					}
 				} else {
-					if (wdly != err_ddrphy_wdly && taps_scan[wdly]) {
+					if (wdly != SDRAM_PHY_DELAYS && taps_scan[wdly]) {
 						one_window_active = 1;
 						one_window_start = wdly;
 					}
@@ -767,7 +767,7 @@ static void sdram_write_leveling_find_cmd_delay(
 #endif // SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
 		cdly_scores[cdly] = ok;
 
-		if (ok > *best_count) {
+		if (ok >= *best_count) {
 			*best_cdly  = cdly;
 			*best_error = SDRAM_PHY_DELAYS - ok;
 			*best_count = ok;
@@ -830,11 +830,31 @@ int sdram_write_leveling(void) {
 		best_cdly = _sdram_write_leveling_cmd_delay;
 	}
 
+	int curr_cdly_score = -1, curr_cdly_win_start = -1, curr_cdly_win_len = -1;
+	int best_cdly_score = -1, best_cdly_win_start = -1, best_cdly_win_len = -1;
 	printf("cdly scores: |");
-	for (int i = 0; i < SDRAM_PHY_DELAYS; i++)
-		printf("%4d", cdly_scores[i]);
-	printf("|\n");
 
+	for (int i = 0; i < SDRAM_PHY_DELAYS; i++) {
+		printf("%4d", cdly_scores[i]);
+
+		if (cdly_scores[i] == curr_cdly_score) {
+			curr_cdly_win_len++;
+		} else {
+			curr_cdly_score = cdly_scores[i];
+			curr_cdly_win_start = i;
+			curr_cdly_win_len = 1;
+		}
+
+		if ((curr_cdly_score > best_cdly_score) ||
+		    (curr_cdly_score == best_cdly_score && curr_cdly_win_len > best_cdly_win_len)) {
+			best_cdly_score = curr_cdly_score;
+			best_cdly_win_start = curr_cdly_win_start;
+			best_cdly_win_len = curr_cdly_win_len;
+		}
+	}
+
+	printf("|\n");
+	best_cdly = best_cdly_win_start + best_cdly_win_len / 2;
 	printf("  Setting Cmd/Clk delay to %d taps.\n", best_cdly);
 	/* Set working or forced delay */
 	if (best_cdly >= 0) {
