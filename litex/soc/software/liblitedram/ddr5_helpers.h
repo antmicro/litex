@@ -14,6 +14,7 @@ void cmd_injector(int channel, int phases, int cs, int command,
 void setup_rddata_cnt(int channel, int value);
 void issue_single(int channel);
 uint16_t get_data_module_phase(int channel, int module, int phase);
+void set_data_module_phase(int channel, int module, int phase, uint16_t wrdata);
 
 void setup_capture(int channel, int setup);
 void start_capture(int channel);
@@ -50,8 +51,9 @@ void wr_inc(int channel, int module);
 
 int captured_preamble(int channel, int module);
 uint8_t recover_mrr_value(int channel, int module);
+void setup_enumerate(int channel, int rank, int module);
 void send_mpc(int channel, int rank, int cmd);
-void send_mrw(int channel, int rank, int reg, int value);
+void send_mrw(int channel, int rank, int module, int reg, int value);
 void send_mrr(int channel, int rank, int reg);
 
 void enter_cs(int channel, int rank);

@@ -1197,6 +1197,7 @@ int sdram_init(void) {
 #endif // CSR_DDRCTRL_BASE
 	init_sequence();
 #ifdef MEMORY_TYPE_DDR5
+	sdram_ddr5_module_enumerate();
 	sdram_ddr5_cs_ca_training();
 	sdram_ddr5_read_training();
 	//sdram_ddr5_write_training();

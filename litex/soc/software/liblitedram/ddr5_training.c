@@ -12,6 +12,7 @@
 #endif
 
 int N2_mode = 1;
+int enumerated = 0;
 
 static void cs_non_negative_tap(int channel, int rank, int offset, int32_t *left, int32_t *right, const char* format) {
     int _result, delay;
@@ -341,6 +342,43 @@ void sdram_ddr5_cs_ca_training(void) {
 }
 #endif // defined(SDRAM_PHY_ADDRESS_DELAY_CAPABLE)
 
+void sdram_ddr5_module_enumerate(void) {
+    int channel, rank, module;
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (SDRAM_PHY_MODULES/2 > 15) {
+#else
+    if (SDRAM_PHY_MODULES > 15) {
+#endif // SDRAM_PHY_SUBCHANNELS
+        printf("Too many modules on single rank to enumerate,\n"
+               "maximum is 15 but this design has %d\n", SDRAM_PHY_MODULES);
+        enumerated = 0;
+        return;
+    }
+#ifdef SDRAM_PHY_SUBCHANNELS
+    for (channel = 0; channel < 2; channel++) {
+        printf("Enumerating subchannel:%c\n", (char)('A'+channel));
+#else
+    {channel = 0;
+        printf("Enumerating\n");
+#endif // SDRAM_PHY_SUBCHANNELS
+        for(rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
+            printf("\tEnumerating rank:%d\n", rank);
+            // Enter PDA Enumerate Programming Mode
+            send_mpc(channel, rank, 0xB);
+#ifdef SDRAM_PHY_SUBCHANNELS
+            for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
+#else
+            for (module = 0; module < SDRAM_PHY_MODULES; module++) {
+#endif // SDRAM_PHY_SUBCHANNELS
+                setup_enumerate(channel, rank, module);
+            }
+            // Exit PDA Enumerate Programming Mode
+            send_mpc(channel, rank, 0xA);
+        }
+    }
+    enumerated = 1;
+}
+
 int seeds0[] = {0x1c, 0x5a, 0x24, 0x36};
 int seeds1[] = {0x59, 0x3c, 0x48, 0x72};
 
@@ -363,11 +401,11 @@ void sdram_ddr5_read_training(void) {
         setup_rddata_cnt(channel, 8);
         /* Setup MRs */
         for(rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-            send_mrw(channel, rank, 2, 1);
-            send_mrw(channel, rank, 25, 1);
-            send_mrw(channel, rank, 28, 0xA5);
-            send_mrw(channel, rank, 29, 0xA5);
-            send_mrw(channel, rank, 30, 0x33);
+            send_mrw(channel, rank, 0xf, 2, 1);
+            send_mrw(channel, rank, 0xf, 25, 1);
+            send_mrw(channel, rank, 0xf, 28, 0xA5);
+            send_mrw(channel, rank, 0xf, 29, 0xA5);
+            send_mrw(channel, rank, 0xf, 30, 0x33);
         }
 
         /* All PHYs so far have support for single delay far all ranks */
@@ -428,8 +466,8 @@ void sdram_ddr5_read_training(void) {
                     for (seed = 0; seed < seeds_count && works; ++seed){
                         /* Setup MRs */
                         for(rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-                            send_mrw(channel, rank, 26, seeds0[seed]);
-                            send_mrw(channel, rank, 27, seeds1[seed]);
+                            send_mrw(channel, rank, module, 26, seeds0[seed]);
+                            send_mrw(channel, rank, module, 27, seeds1[seed]);
                             send_mrr(channel, rank, 31);
                             works &= compare(channel, module,
                                              seeds0[seed], seeds1[seed],
@@ -463,25 +501,21 @@ void sdram_ddr5_read_training(void) {
             for (i = 0; i < middle_delay; ++i) {
                 idly_inc(channel, module);
             }
+            for(rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
+                send_mrw(channel, rank, module, 25, 0);
+                send_mrw(channel, rank, module, 26, 0xff);
+                send_mrw(channel, rank, module, 27, 0xff);
+                send_mrw(channel, rank, module, 28, 0);
+                send_mrw(channel, rank, module, 29, 0);
+            }
         }
         /* Finish preamble and read training*/
         for(rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-            send_mrw(channel, rank, 2, 0);
+            send_mrw(channel, rank, 0xf, 2, 0);
+            send_mpc(channel, rank, 0x7f);
         }
 #ifdef DEBUG_DDR5
         for (rank = 0; rank < SDRAM_PHY_RANKS; ++rank) {
-            send_mrw(channel, rank, 63, 0xDE);
-            send_mrr(channel, rank, 63);
-            printf("%"PRIX8, recover_mrr_value(channel, 0));
-            send_mrw(channel, rank, 63, 0xAD);
-            send_mrr(channel, rank, 63);
-            printf("%"PRIX8, recover_mrr_value(channel, 0));
-            send_mrw(channel, rank, 63, 0xBE);
-            send_mrr(channel, rank, 63);
-            printf("%"PRIX8, recover_mrr_value(channel, 0));
-            send_mrw(channel, rank, 63, 0xEF);
-            send_mrr(channel, rank, 63);
-            printf("%"PRIX8"\n", recover_mrr_value(channel, 0));
 #ifdef SDRAM_PHY_SUBCHANNELS
             for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
                 printf("Channel:%c rank:%d module:%d serial number:", (char)('A'+channel), rank, module);
@@ -494,6 +528,18 @@ void sdram_ddr5_read_training(void) {
                     printf("%02"PRIX8, recover_mrr_value(channel, module));
                 }
                 printf("\n");
+                send_mrw(channel, rank, module, 63, 0xDE);
+                send_mrr(channel, rank, 63);
+                printf("%"PRIX8, recover_mrr_value(channel, module));
+                send_mrw(channel, rank, module, 63, 0xAD);
+                send_mrr(channel, rank, 63);
+                printf("%"PRIX8, recover_mrr_value(channel, module));
+                send_mrw(channel, rank, module, 63, 0xBE);
+                send_mrr(channel, rank, 63);
+                printf("%"PRIX8, recover_mrr_value(channel, module));
+                send_mrw(channel, rank, module, 63, 0xEF);
+                send_mrr(channel, rank, 63);
+                printf("%"PRIX8"\n", recover_mrr_value(channel, module));
             }
 #ifdef SDRAM_PHY_SUBCHANNELS
             for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
@@ -508,6 +554,7 @@ void sdram_ddr5_read_training(void) {
                 }
             }
         }
+        send_mpc(channel, rank, 0x7f);
 #endif // DEBUG_DDR5
     }
 }
