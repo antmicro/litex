@@ -7,6 +7,7 @@
 //#define DEBUG_DDR5
 
 extern int N2_mode;
+extern int enumerated;
 
 int prep_payload (int cs, int command, int wrdata_en,
                   int wrdata_mask, int rddata_en) {
@@ -101,10 +102,11 @@ void setup_rddata_cnt(int channel, int value) {
 }
 
 #ifndef SDRAM_PHY_SUBCHANNELS
-#define DFII_CMDINJECTOR_DATA_BYTES SDRAM_PHY_DFI_DATABITS/8
+#define DFII_CMDINJECTOR_DATA_BYTES (SDRAM_PHY_DFI_DATABITS/8)
 #else
-#define DFII_CMDINJECTOR_DATA_BYTES SDRAM_PHY_DFI_DATABITS/16
+#define DFII_CMDINJECTOR_DATA_BYTES (SDRAM_PHY_DFI_DATABITS/16)
 #endif
+#define BYTES_PER_MODULE (SDRAM_PHY_DQ_DQS_RATIO/4)
 #define MODULE_BITMASK ((1<<SDRAM_PHY_DQ_DQS_RATIO)-1)
 
 uint16_t get_data_module_phase(int channel, int module, int phase) {
@@ -127,18 +129,57 @@ uint16_t get_data_module_phase(int channel, int module, int phase) {
     csr_rd_buf_uint8(CSR_SDRAM_DFII_CMDINJECTOR_RDDATA_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
 #endif
     // CSR are read as BIG Endian
-    nebo = (DFII_CMDINJECTOR_DATA_BYTES / SDRAM_PHY_XDR) - 1 - (module * SDRAM_PHY_DQ_DQS_RATIO)/8;
-    pebo = nebo + DFII_CMDINJECTOR_DATA_BYTES / SDRAM_PHY_XDR;
-    if ((DFII_CMDINJECTOR_DATA_BYTES/SDRAM_PHY_XDR) == 0) {
-        pebo = 0;
-        nebo = 0;
-    }
-    ibo = (module * SDRAM_PHY_DQ_DQS_RATIO)%8; // Non zero only if x4 ICs are used
+    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE;
+    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE + BYTES_PER_MODULE/2;
+
+    ibo = 0; // Non zero only if x4 ICs are used
     ret_value |= (data[pebo] >> ibo) & MODULE_BITMASK;
-    if (DFII_CMDINJECTOR_DATA_BYTES == 1) // Special case for x4 single IC
-        ibo = 0x4;
+    ibo = (0x4*BYTES_PER_MODULE) % 8;
     ret_value |= ((data[nebo] >> ibo) & MODULE_BITMASK) << SDRAM_PHY_DQ_DQS_RATIO;
     return ret_value;
+}
+
+void set_data_module_phase(int channel, int module, int phase, uint16_t wrdata) {
+    int pebo;   // module's positive_edge_byte_offset
+    int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
+    int ibo;    // module's in byte offset (x4 ICs)
+    uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (channel) {
+        sdram_dfii_b_cmdinjector_wrdata_select_write(phase);
+        csr_rd_buf_uint8(CSR_SDRAM_DFII_B_CMDINJECTOR_WRDATA_S_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+    } else {
+        sdram_dfii_a_cmdinjector_wrdata_select_write(phase);
+        csr_rd_buf_uint8(CSR_SDRAM_DFII_A_CMDINJECTOR_WRDATA_S_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+    }
+#else
+    sdram_dfii_cmdinjector_wrdata_select_write(phase);
+    csr_rd_buf_uint8(CSR_SDRAM_DFII_CMDINJECTOR_WRDATA_S_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+#endif
+
+    // CSR are read as BIG Endian
+    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE;
+    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE + BYTES_PER_MODULE/2;
+    ibo = 0; // Non zero only if x4 ICs are used
+    data[pebo] = (data[pebo]&(~MODULE_BITMASK)) | (wrdata & MODULE_BITMASK);
+    ibo = (0x4*BYTES_PER_MODULE) % 8;
+    data[nebo] = (data[nebo]&(~(MODULE_BITMASK << ibo))) | (wrdata & (MODULE_BITMASK << ibo));
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (channel) {
+        sdram_dfii_b_cmdinjector_wrdata_select_write(phase);
+        csr_wr_buf_uint8(CSR_SDRAM_DFII_B_CMDINJECTOR_WRDATA_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+        sdram_dfii_b_cmdinjector_wrdata_store_write(1);
+    } else {
+        sdram_dfii_a_cmdinjector_wrdata_select_write(phase);
+        csr_wr_buf_uint8(CSR_SDRAM_DFII_A_CMDINJECTOR_WRDATA_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+        sdram_dfii_a_cmdinjector_wrdata_store_write(1);
+    }
+#else
+    sdram_dfii_cmdinjector_wrdata_select_write(phase);
+    csr_wr_buf_uint8(CSR_SDRAM_DFII_CMDINJECTOR_WRDATA_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+    sdram_dfii_cmdinjector_wrdata_store_write(1);
+#endif
+    return;
 }
 
 void setup_capture(int channel, int setup) {
@@ -558,6 +599,25 @@ uint8_t recover_mrr_value(int channel, int module) {
     return ret;
 }
 
+void setup_enumerate(int channel, int rank, int module) {
+    int module_, i;
+#ifdef SDRAM_PHY_SUBCHANNELS
+    for (module_ = 0; module_ < SDRAM_PHY_MODULES/2; module_++) {
+#else
+    for (module_ = 0; module_ < SDRAM_PHY_MODULES; module_++) {
+#endif // SDRAM_PHY_SUBCHANNELS
+        for (i = 0; i < 4; ++i)
+            set_data_module_phase(channel, module_, i, 0xffff);
+    }
+    for (i = 0; i < 4; ++i)
+        set_data_module_phase(channel, module, i, 0);
+    cmd_injector(channel, 0xf, 0, 0, 1, 0, 0, 0);
+    cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
+    cmd_injector(channel, 0xf, 1<<rank, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
+    cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
+    cdelay(100);
+}
+
 void send_mpc(int channel, int rank, int cmd) {
     cmd_injector(channel, 0xf, 0, 0xf | (cmd<<5), 0, 0, 0, 0);
     cmd_injector(channel, 0xf, 1<<rank, 0xf | (cmd<<5), 0, 0, 0, 0);
@@ -565,7 +625,10 @@ void send_mpc(int channel, int rank, int cmd) {
     cdelay(100);
 }
 
-void send_mrw(int channel, int rank, int reg, int value) {
+void send_mrw(int channel, int rank, int module, int reg, int value) {
+    if (enumerated)
+        send_mpc(channel, rank, 0x7<<4|(module&0xF));
+
     cmd_injector(channel, 1<<0, 1<<rank, 0x5 | (reg<<5), 0, 0, 0, 1);
     if (N2_mode)
         cmd_injector(channel, 1<<1, 0, 0x5 | (reg<<5), 0, 0, 0, 1);
