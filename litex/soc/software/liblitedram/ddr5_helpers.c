@@ -238,18 +238,27 @@ uint32_t capture_result(int channel) {
 
 int or_sample(int channel) {
     setup_capture(channel, 0);
-    cdelay(100);
+    cdelay(50);
     start_capture(channel);
-    cdelay(2000);
+    cdelay(1000);
     stop_capture(channel);
     return !capture_result(channel);
 }
 
 int and_sample(int channel) {
     setup_capture(channel, 3);
-    cdelay(100);
+    cdelay(50);
     start_capture(channel);
-    cdelay(2000);
+    cdelay(1000);
+    stop_capture(channel);
+    return !!capture_result(channel);
+}
+
+int wleveling_sample(int channel) {
+    setup_capture(channel, 0);
+    cdelay(10);
+    start_capture(channel);
+    cdelay(10);
     stop_capture(channel);
     return !!capture_result(channel);
 }
@@ -356,6 +365,62 @@ static void rd_inc_internal(int channel) {
 #else
     ddrphy_ck_rdly_inc_write(1);
 #endif
+}
+
+static void odly_dqs_rst_internal(int channel) {
+#ifdef SDRAM_OUTPUT_DELAY_CAPABLE
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        ddrphy_B_wdly_dqs_rst_write(1);
+    } else {
+        ddrphy_A_wdly_dqs_rst_write(1);
+    }
+#else
+    ddrphy_wdly_dqs_rst_write(1);
+#endif
+#endif // SDRAM_OUTPUT_DELAY_CAPABLE
+}
+
+static void odly_dqs_inc_internal(int channel) {
+#ifdef SDRAM_OUTPUT_DELAY_CAPABLE
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        ddrphy_B_wdly_dqs_inc_write(1);
+    } else {
+        ddrphy_A_wdly_dqs_inc_write(1);
+    }
+#else
+    ddrphy_wdly_dqs_inc_write(1);
+#endif
+#endif // SDRAM_OUTPUT_DELAY_CAPABLE
+}
+
+static void odly_dq_rst_internal(int channel) {
+#ifdef SDRAM_OUTPUT_DELAY_CAPABLE
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        ddrphy_B_wdly_dq_rst_write(1);
+    } else {
+        ddrphy_A_wdly_dq_rst_write(1);
+    }
+#else
+    ddrphy_wdly_dq_rst_write(1);
+#endif
+#endif // SDRAM_OUTPUT_DELAY_CAPABLE
+}
+
+static void odly_dq_inc_internal(int channel) {
+#ifdef SDRAM_OUTPUT_DELAY_CAPABLE
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        ddrphy_B_wdly_dq_inc_write(1);
+    } else {
+        ddrphy_A_wdly_dq_inc_write(1);
+    }
+#else
+    ddrphy_wdly_dq_inc_write(1);
+#endif
+#endif // SDRAM_OUTPUT_DELAY_CAPABLE
 }
 
 static void wr_rst_internal(int channel) {
@@ -579,6 +644,30 @@ void wr_inc(int channel, int module) {
     phy_deselect(channel, module);
 }
 
+void odly_dqs_rst(int channel, int module) {
+    phy_select(channel, module);
+    odly_dqs_rst_internal(channel);
+    phy_deselect(channel, module);
+}
+
+void odly_dqs_inc(int channel, int module) {
+    phy_select(channel, module);
+    odly_dqs_inc_internal(channel);
+    phy_deselect(channel, module);
+}
+
+void odly_dq_rst(int channel, int module) {
+    phy_select(channel, module);
+    odly_dq_rst_internal(channel);
+    phy_deselect(channel, module);
+}
+
+void odly_dq_inc(int channel, int module) {
+    phy_select(channel, module);
+    odly_dq_inc_internal(channel);
+    phy_deselect(channel, module);
+}
+
 int captured_preamble(int channel, int module) {
     int temp;
     phy_select(channel, module);
@@ -615,14 +704,14 @@ void setup_enumerate(int channel, int rank, int module) {
     cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
     cmd_injector(channel, 0xf, 1<<rank, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
     cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
-    cdelay(100);
+    cdelay(50);
 }
 
 void send_mpc(int channel, int rank, int cmd) {
     cmd_injector(channel, 0xf, 0, 0xf | (cmd<<5), 0, 0, 0, 0);
     cmd_injector(channel, 0xf, 1<<rank, 0xf | (cmd<<5), 0, 0, 0, 0);
     cmd_injector(channel, 0xf, 0, 0xf | (cmd<<5), 0, 0, 0, 0);
-    cdelay(100);
+    cdelay(50);
 }
 
 void send_mrw(int channel, int rank, int module, int reg, int value) {
@@ -641,7 +730,7 @@ void send_mrw(int channel, int rank, int module, int reg, int value) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 0, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(100);
+    cdelay(50);
 }
 
 void send_mrr(int channel, int rank, int reg) {
@@ -657,7 +746,24 @@ void send_mrr(int channel, int rank, int reg) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
     issue_single(channel);
-    cdelay(100);
+    cdelay(50);
+}
+
+void send_wleveling_write(int channel, int rank) {
+    int wr_2 = 0 | (1<<10) | (1<<1); // Second beat of write, no auto precharge, no wr_partial
+    cmd_injector(channel, 1<<0, 1<<rank, 0x0D | (1<<5), 1, 0, 0, 1);
+    if (N2_mode)
+        cmd_injector(channel, 1<<1, 0, 0x0D | (1<<5), 0, 0, 0, 1);
+    else
+        cmd_injector(channel, 1<<1, 0, wr_2, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<2, 0, wr_2, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<3, 0, wr_2, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<4, 0, 0, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<5, 0, 0, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<6, 0, 0, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
+    issue_single(channel);
+    cdelay(50);
 }
 
 void enter_cs(int channel, int rank) {
@@ -671,7 +777,7 @@ void exit_cs(int channel, int rank) {
 void cs_sample_prep(int channel, int rank, int address, int l2h) {
     cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 1, 0);
     cmd_injector(channel, 0xa>>l2h, 1<<rank, 0x1f, 0, 0, 1, 0);
-    cdelay(100);
+    cdelay(50);
 }
 
 void enter_ca(int channel, int rank) {
@@ -681,48 +787,44 @@ void enter_ca(int channel, int rank) {
 void exit_ca(int channel, int rank) {
     cmd_injector(channel, 0xff, 1<<rank, 0x1f, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(100);
+    cdelay(50);
 }
 
 void ca_sample_prep_current_period(int channel, int rank, int address, int l2h) {
     cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
     cmd_injector(channel, 0x1, 1<<rank, l2h<<address, 0, 0, 1, 0);
-    cdelay(100);
+    cdelay(50);
 }
 
 void ca_sample_prep_previous_period(int channel, int rank, int address, int l2h) {
     cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
     cmd_injector(channel, 0x1, 0, l2h<<address, 0, 0, 1, 0);
     cmd_injector(channel, 0x2, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
-    cdelay(100);
+    cdelay(50);
 }
 
-int32_t _ca_results[14][2];
-
-void setup_ca_results(void) {
-    int address;
-    for (address = 0; address < 14; address++) {
-        _ca_results[address][0] = -SDRAM_PHY_DELAYS; // right
-        _ca_results[address][1] = SDRAM_PHY_DELAYS;  // left
+void enter_write_leveling(int channel) {
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        return ddrphy_B_wlevel_en_write(1);
+    } else {
+        return ddrphy_A_wlevel_en_write(1);
     }
+#else
+    return ddrphy_wlevel_en_write(1);
+#endif
 }
 
-void mid_point_calc_and_set(uint8_t* success, const char* format_str, int channel,
-                            int rank, int address, int32_t index, int32_t left,
-                            int32_t right, inc_func inc, int cs) {
-    int32_t mid_point, delay;
-    printf(format_str, index, left - right);
-    mid_point = (left + right) / 2;
-    if (mid_point < 0 && cs)
-        mid_point += SDRAM_PHY_DELAYS;
-    else if (mid_point < 0)
-        mid_point = 0;
-
-    printf("Mid point:%"PRId32"\n", mid_point);
-    for (delay = 0; delay < mid_point; delay++) {
-        inc(channel, rank, address);
+void exit_write_leveling(int channel) {
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        return ddrphy_B_wlevel_en_write(0);
+    } else {
+        return ddrphy_A_wlevel_en_write(0);
     }
-    *success &= (left != UNSET_DELAY) && (right != UNSET_DELAY);
+#else
+    return ddrphy_wlevel_en_write(0);
+#endif
 }
 #endif // MEMORY_TYPE_DDR5
 #endif // LIBLITEDRAM_DDR5_HELPERS_H

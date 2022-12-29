@@ -1218,7 +1218,7 @@ int sdram_init(void) {
 	sdram_ddr5_module_enumerate();
 	sdram_ddr5_cs_ca_training();
 	sdram_ddr5_read_training();
-	//sdram_ddr5_write_training();
+	sdram_ddr5_write_training();
 #else
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 	sdram_leveling();
