@@ -42,6 +42,8 @@ void write_rst_dqs_bitslip(int module);
 
 #if defined(SDRAM_FULL_OUTPUT_DELAY_CAPABLE) || defined(SDRAM_PHY_ADDRESS_DELAY_CAPABLE)
 
+void ck_inc_delay(int channel);
+void ck_rst_delay(int channel);
 void cs_inc_delay(int channel);
 void cs_rst_delay(int channel);
 void ca_inc_delay(int channel);

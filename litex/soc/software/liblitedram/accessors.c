@@ -195,6 +195,31 @@ void write_rst_dqs_bitslip(int module) {
 
 #if defined(SDRAM_FULL_OUTPUT_DELAY_CAPABLE) || defined(SDRAM_PHY_ADDRESS_DELAY_CAPABLE)
 
+void ck_inc_delay(int channel) {
+	/* Increment CA delay */
+#ifdef SDRAM_PHY_SUBCHANNELS
+	if (channel)
+		ddrphy_B_ckdly_inc_write(1);
+	else
+		ddrphy_A_ckdly_inc_write(1);
+#else
+	ddrphy_ckdly_inc_write(1);
+#endif //SDRAM_PHY_SUBCHANNELS
+
+}
+
+void ck_rst_delay(int channel) {
+	/* Reset CA delay */
+#ifdef SDRAM_PHY_SUBCHANNELS
+	if (channel)
+		ddrphy_B_ckdly_rst_write(1);
+	else
+		ddrphy_A_ckdly_rst_write(1);
+#else
+	ddrphy_ckdly_rst_write(1);
+#endif //SDRAM_PHY_SUBCHANNELS
+}
+
 void cs_inc_delay(int channel) {
 	/* Increment CS delay */
 #ifdef SDRAM_PHY_SUBCHANNELS

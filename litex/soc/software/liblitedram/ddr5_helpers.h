@@ -22,14 +22,19 @@ void stop_capture(int channel);
 uint32_t capture_result(int channel);
 int or_sample(int channel);
 int and_sample(int channel);
+int wleveling_sample(int channel);
 
 void enable_dfi_2n_mode(void);
 void disable_dfi_2n_mode(void);
 void disable_dram_2n_mode(int, int);
 
-#define UNSET_DELAY 0xffff
+// Use max int16_t, all Fs could be interpreted as -1
+#define UNSET_DELAY 0xefff
 
 typedef void (*inc_func)(int, int, int);
+
+void ck_rst(int channel, int rank, int address);
+void ck_inc(int channel, int rank, int address);
 
 void cs_rst(int channel, int rank, int address);
 void cs_inc(int channel, int rank, int address);
@@ -48,6 +53,11 @@ void idly_inc(int channel, int module);
 
 void wr_rst(int channel, int module);
 void wr_inc(int channel, int module);
+void odly_dqs_rst(int channel, int module);
+void odly_dqs_inc(int channel, int module);
+void odly_dq_rst(int channel, int module);
+void odly_dq_inc(int channel, int module);
+
 
 int captured_preamble(int channel, int module);
 uint8_t recover_mrr_value(int channel, int module);
@@ -55,6 +65,7 @@ void setup_enumerate(int channel, int rank, int module);
 void send_mpc(int channel, int rank, int cmd);
 void send_mrw(int channel, int rank, int module, int reg, int value);
 void send_mrr(int channel, int rank, int reg);
+void send_wleveling_write(int channel, int rank);
 
 void enter_cs(int channel, int rank);
 void exit_cs(int channel, int rank);
@@ -65,12 +76,8 @@ void exit_ca(int channel, int rank);
 void ca_sample_prep_current_period(int channel, int rank, int address, int l2h);
 void ca_sample_prep_previous_period(int channel, int rank, int address, int l2h);
 
-extern int32_t _ca_results[14][2];
-void setup_ca_results(void);
-
-void mid_point_calc_and_set(uint8_t* success, const char* format_str, int channel,
-                            int rank, int address, int32_t index, int32_t left,
-                            int32_t right, inc_func inc, int cs);
+void enter_write_leveling(int channel);
+void exit_write_leveling(int channel);
 #endif // MEMORY_TYPE_DDR5
 #endif // LIBLITEDRAM_DDR5_HELPERS_H
 #endif // CSR_SDRAM_BASE
