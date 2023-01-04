@@ -44,10 +44,13 @@ class XilinxClocking(Module, AutoCSR):
 
     def create_clkout(self, cd, freq, phase=0, buf="bufg", margin=1e-2,
                       with_reset=True, ce=None, bypass=False, name="",
-                      platform=None):
+                      platform=None, div=1, clock_out=None):
         assert self.nclkouts < self.nclkouts_max
         clkout = Signal()
-        self.clkouts[self.nclkouts] = (clkout, freq, phase, margin)
+        if clock_out is None:
+            self.clkouts[self.nclkouts] = (clkout, freq, phase, margin)
+        else:
+            clkout = self.clkouts[clock_out][0]
         if with_reset:
             self.specials += AsyncResetSynchronizer(cd, ~self.locked)
         if buf is None:
@@ -62,7 +65,7 @@ class XilinxClocking(Module, AutoCSR):
             elif buf == "bufr":
                 self.specials += Instance(
                     "BUFR", i_I=clkout, o_O=clkout_buf,
-                    **(dict(p_BUFR_DIVIDE="BYPASS") if bypass else dict()),
+                    **(dict(p_BUFR_DIVIDE="BYPASS") if bypass else dict(p_BUFR_DIVIDE=str(div))),
                     name=name
                 )
             elif buf == "bufgce":
