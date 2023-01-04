@@ -19,10 +19,11 @@ void set_data_module_phase(int channel, int module, int phase, uint16_t wrdata);
 void setup_capture(int channel, int setup);
 void start_capture(int channel);
 void stop_capture(int channel);
-uint32_t capture_result(int channel);
+uint32_t capture_and_reduce_result(int channel, int operation);
+uint32_t capture_and_reduce_module(int channel, int module, int operation);
 int or_sample(int channel);
 int and_sample(int channel);
-int wleveling_sample(int channel);
+int wleveling_sample(int channel, int module);
 
 void enable_dfi_2n_mode(void);
 void disable_dfi_2n_mode(void);
@@ -41,7 +42,9 @@ void cs_inc(int channel, int rank, int address);
 
 void ca_rst(int channel, int rank, int address);
 void ca_inc(int channel, int rank, int address);
+uint16_t get_ca_dly(int channel, int rank, int address);
 
+uint8_t lfsr_next(uint8_t input);
 int compare(int channel, int module,
             int data0, int data1,
             int inv, int select);
@@ -50,14 +53,28 @@ void rd_rst(int channel, int module);
 void rd_inc(int channel, int module);
 void idly_rst(int channel, int module);
 void idly_inc(int channel, int module);
+void idly_dq_rst(int channel, int module, int dq_line);
+void idly_dq_inc(int channel, int module, int dq_line);
 
-void wr_rst(int channel, int module);
-void wr_inc(int channel, int module);
+uint16_t get_rd_dq_dly(int channel, int module);
+uint16_t get_rd_dqs_dly(int channel, int module);
+
+void wr_dqs_rst(int channel, int module);
+void wr_dqs_inc(int channel, int module);
 void odly_dqs_rst(int channel, int module);
 void odly_dqs_inc(int channel, int module);
+
+uint16_t get_wr_dqs_dly(int channel, int module);
+
+void wr_dq_rst(int channel, int module);
+void wr_dq_inc(int channel, int module);
 void odly_dq_rst(int channel, int module);
 void odly_dq_inc(int channel, int module);
+void odly_per_dq_rst(int channel, int module, int dq);
+void odly_per_dq_inc(int channel, int module, int dq);
 
+uint16_t get_wr_dq_dly(int channel, int module);
+uint16_t get_wr_dm_dly(int channel, int module);
 
 int captured_preamble(int channel, int module);
 uint8_t recover_mrr_value(int channel, int module);
@@ -66,6 +83,10 @@ void send_mpc(int channel, int rank, int cmd);
 void send_mrw(int channel, int rank, int module, int reg, int value);
 void send_mrr(int channel, int rank, int reg);
 void send_wleveling_write(int channel, int rank);
+void send_activate(int channel, int rank);
+void send_precharge(int channel, int rank);
+void send_write(int channel, int rank);
+void send_read(int channel, int rank);
 
 void enter_cs(int channel, int rank);
 void exit_cs(int channel, int rank);
@@ -77,6 +98,8 @@ void ca_sample_prep_current_period(int channel, int rank, int address, int l2h);
 void ca_sample_prep_previous_period(int channel, int rank, int address, int l2h);
 
 void enter_write_leveling(int channel);
+void wleveling_scan(int *cycle, int *got, int *start_cycle, int *start_delay,
+                    int channel, int rank, int module);
 void exit_write_leveling(int channel);
 #endif // MEMORY_TYPE_DDR5
 #endif // LIBLITEDRAM_DDR5_HELPERS_H
