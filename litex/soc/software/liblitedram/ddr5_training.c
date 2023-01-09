@@ -180,13 +180,12 @@ static void CA_training(int32_t channel) {
             ca_rst(channel, rank, address);
 
             // Check if address line is correct with 0 tap.
-            on_edge = 0;
+            on_edge = 1;
             ca_sample_prep_current_period(channel, rank, address, 1);
-            if (and_sample(channel))
-                on_edge = 1;
+            on_edge &= and_sample(channel);
             ca_sample_prep_current_period(channel, rank, address, 0);
-            if (or_sample(channel))
-                on_edge &= 1;
+            on_edge &= or_sample(channel);
+
             printf("CA line:%2"PRId32"", address);
 
             left_side = UNSET_DELAY; right_side = UNSET_DELAY;
@@ -194,7 +193,6 @@ static void CA_training(int32_t channel) {
             if (on_edge) {
                 printf("|");
                 works = 1;
-                // loop over all delays, prevent too sudden clock change
                 for(ckdly = 0; ckdly < SDRAM_PHY_DELAYS; ckdly++) {
                     ca_sample_prep_current_period(channel, rank, address, 1);
                     _result = and_sample(channel);
@@ -209,6 +207,7 @@ static void CA_training(int32_t channel) {
                     }
                     ck_inc(channel, rank, 0);
                 }
+                ck_rst(channel, rank, 0);
             }
             printf("|");
             for (cadly = 0; cadly < SDRAM_PHY_DELAYS; cadly++) {
@@ -489,8 +488,8 @@ void sdram_ddr5_module_enumerate(void) {
     enumerated = 1;
 }
 
-int seeds0[] = {0x1c, 0x5a, 0x24, 0x36};
-int seeds1[] = {0x59, 0x3c, 0x48, 0x72};
+int seeds0[] = {0x1c, 0x5a, 0x24, 0x36, 0xaa, 0xc1};
+int seeds1[] = {0x59, 0x3c, 0x48, 0x72, 0x55, 0x95};
 
 int seeds_count = sizeof(seeds0)/sizeof(int);
 
@@ -508,7 +507,6 @@ void sdram_ddr5_read_training(void) {
     {channel = 0;
         printf("Read training\n");
 #endif // SDRAM_PHY_SUBCHANNELS
-        setup_rddata_cnt(channel, 8);
 
         /* All PHYs so far have support for single delay far all ranks,
            use only first rank, leave all other as inactive*/
@@ -647,7 +645,6 @@ void sdram_ddr5_read_training(void) {
             }
             /* Finish preamble and read training*/
             send_mrw(channel, rank, 0xf, 2, 0|WICA);
-            send_mpc(channel, rank, 0x7f);
         }
 
         printf("Simple read check\n");
@@ -667,7 +664,7 @@ void sdram_ddr5_read_training(void) {
                     printf("%02"PRIX8, recover_mrr_value(channel, module));
                 }
                 printf("\n");
-#ifdef INFO_DDR5
+//#ifdef INFO_DDR5
                 // Check if data is read correctly
                 send_mrw(channel, rank, module, 63, 0xDE);
                 send_mrr(channel, rank, 63);
@@ -681,9 +678,9 @@ void sdram_ddr5_read_training(void) {
                 send_mrw(channel, rank, module, 63, 0xEF);
                 send_mrr(channel, rank, 63);
                 printf("%"PRIX8"\n", recover_mrr_value(channel, module));
-#endif //INFO_DDR5
+//#endif //INFO_DDR5
             }
-#ifdef INFO_DDR5
+//#ifdef INFO_DDR5
             // Check if registers are correct
 #ifdef SDRAM_PHY_SUBCHANNELS
             for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
@@ -697,19 +694,19 @@ void sdram_ddr5_read_training(void) {
                     printf("\tMR:%3d %02"PRIX8"\n", i, recover_mrr_value(channel, module));
                 }
             }
-#endif // INFO_DDR5
-            send_mpc(channel, rank, 0x7f);
+//#endif // INFO_DDR5
         }
     }
 }
 
 void sdram_ddr5_write_training(void) {
-    int channel, rank, module, seed, cnt_seed;
+    int channel, rank, module, seed, cnt_seed, byte;
     int cycle, delay, got, sample, it, works, dq;
     int start_cycle, start_delay,   // First working cycle delay pair
         middle_cycle, middle_delay, // Middle between first and last working
         end_cycle, end_delay;       // First cycle delay pair that does not work after working
     uint8_t lfsr;
+    uint8_t mr5;
     uint16_t wrdata, rddata;
     uint32_t eye_width;             // In taps
     WICA = 1<<7;
@@ -733,6 +730,7 @@ void sdram_ddr5_write_training(void) {
 #else
             for (module = 0; module < SDRAM_PHY_MODULES; module++) {
 #endif // SDRAM_PHY_SUBCHANNELS
+                printf("WL m:%2d\n", module);
                 start_cycle = -1;
                 wr_dqs_rst(channel, module);
                 cycle = 0;
@@ -867,13 +865,19 @@ void sdram_ddr5_write_training(void) {
             send_mrw(channel, rank, 0xf, 2, 0|WICA);
             exit_write_leveling(channel);
             printf("DQ write training\n");
+            mr5 = 0;
 #ifdef SDRAM_PHY_SUBCHANNELS
             for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
 #else
             for (module = 0; module < SDRAM_PHY_MODULES; module++) {
 #endif // SDRAM_PHY_SUBCHANNELS
+                send_mrr(channel, rank, 5);
+                mr5 = recover_mrr_value(channel, module);
+                printf("mr5:%02"PRIx8"\n", mr5);
+                send_mrw(channel, rank, module, 5, mr5 & 0xDF); // Disable DM
+
                 wr_dq_rst(channel, module);
-                printf("m|%2d\n", module);
+                printf("m%2d|\n", module);
                 cycle = 0;
                 got = 0;
                 start_cycle = -1; start_delay = 1;
@@ -887,8 +891,7 @@ void sdram_ddr5_write_training(void) {
                     odly_dq_rst(channel, module);
                     for(delay = 0; delay < SDRAM_PHY_DELAYS; ++delay){
 #ifdef DEBUG_DDR5
-                        printf("DQ dly:%"PRIu16", DM dly:%"PRIu16"\n",
-                               get_wr_dq_dly(channel, module), get_wr_dm_dly(channel, module));
+                        printf("DQ dly:%"PRIu16"\n", get_wr_dq_dly(channel, module));
 #endif // DEBUG_DDR5
                         works = 1;
                         for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
@@ -974,9 +977,116 @@ void sdram_ddr5_write_training(void) {
                 for (it = 0; it < middle_delay; ++it) {
                     odly_dq_inc(channel, module);
                 }
+
+                // DM training
+                printf("%x\n", mr5);
+                if (mr5 & 0x20) { // DM was enabled
+                    printf("DM scan\nm:%2d DM|", module);
+                    odly_dm_rst(channel, module);
+                    got = 0;
+                    start_delay = 1; end_delay = -1;
+                    for(delay = 0; delay < SDRAM_PHY_DELAYS; ++delay){
+#ifdef DEBUG_DDR5
+                        printf("DM dly:%"PRIu16"\n", get_wr_dm_dly(channel, module));
+#endif // DEBUG_DDR5
+                        works = 1;
+                        for (byte = 0; byte < 16 && works; ++byte) {
+                            for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
+                                send_mrw(channel, rank, module, 5, mr5 & 0xDF); // Disable DM
+                                if(cnt_seed < seeds_count)
+                                    seed = seeds0[cnt_seed];
+                                else
+                                    seed = seeds1[cnt_seed - seeds_count];
+
+                                for (it =0; it <8; ++it) {
+                                    set_data_module_phase(channel, module, it, 0);
+                                }
+                                send_write(channel, rank);
+
+                                send_mrw(channel, rank, module, 5, mr5); // Enable DM
+                                lfsr = seed;
+                                for (it =0; it <8; ++it) {
+                                    wrdata = lfsr;
+                                    lfsr = lfsr_next(lfsr);
+                                    if (BYTES_PER_MODULE > 1) {
+                                        wrdata |= lfsr << 8;
+                                        lfsr = lfsr_next(lfsr);
+                                    }
+#ifdef DEBUG_DDR5
+                                    printf("wrdata:%04"PRIx16"|", wrdata);
+#endif // DEBUG_DDR5
+                                    set_data_module_phase(channel, module, it, wrdata);
+                                }
+#ifdef DEBUG_DDR5
+                                printf("\n");
+#endif // DEBUG_DDR5
+                                send_write_byte(channel, rank, module, byte);
+                                send_read(channel, rank);
+
+                                lfsr = seed;
+                                for (it =0; it <8; ++it) {
+                                    rddata = get_data_module_phase(channel, module, it);
+#ifdef DEBUG_DDR5
+                                    printf("rddata:%04"PRIx16"|", rddata);
+#endif // DEBUG_DDR5
+                                    if ((byte >> 1) == it) {
+                                        if(!(byte & 1)) {
+                                            works &= ((rddata&0xff) == lfsr);
+                                        }
+                                        lfsr = lfsr_next(lfsr);
+                                        rddata >>= 8;
+                                        if(byte & 1) {
+                                            works &= ((rddata&0xff) == lfsr);
+                                        }
+                                        lfsr = lfsr_next(lfsr);
+                                    } else {
+                                        lfsr = lfsr_next(lfsr);
+                                        lfsr = lfsr_next(lfsr);
+                                    }
+                                }
+                                for (it =0; it <8; ++it) {
+                                    set_data_module_phase(channel, module, it, 0);
+                                }
+                                send_write(channel, rank);
+#ifdef DEBUG_DDR5
+                                printf("\n");
+#endif // DEBUG_DDR5
+                            }
+                        }
+                        printf("%d", works);
+#ifdef DEBUG_DDR5
+                        printf("\n");
+#endif // DEBUG_DDR5
+                        if (works && got == 0) {
+                            start_delay = delay;
+                            got = 1;
+                        } else if (!works && got == 1) {
+                            end_delay = delay;
+                            got = 2;
+                        }
+                        odly_dm_inc(channel, module);
+                    }
+                    printf("|\n");
+                }
+                printf("m%2d|DM start delay:%2d; delay:%2d|",
+                    module, start_delay, end_delay);
+                eye_width = end_delay - start_delay;
+                middle_delay = (start_delay + eye_width/2)%SDRAM_PHY_DELAYS;
+                printf("eye_width:%2"PRIu32"; eye center: delay:%2d\n",
+                    eye_width, middle_delay);
+
+                // Setting read delay to eye center
+                odly_dm_rst(channel, module);
+                for (it = 0; it < middle_delay; ++it) {
+                    odly_dm_inc(channel, module);
+                }
             }
         }
     }
+}
+
+int in_2n_mode(void) {
+    return N2_mode;
 }
 
 #endif // MEMORY_TYPE_DDR5
