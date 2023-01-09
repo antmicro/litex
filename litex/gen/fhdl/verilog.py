@@ -38,6 +38,8 @@ from litex.build.tools import get_litex_git_revision
 def visit_with_display(self, node):
     if isinstance(node, Display):
         self.output_list.add(node)
+    elif isinstance(node, Finish):
+        self.output_list.add(node)
     else:
         pass
 
@@ -479,7 +481,7 @@ def _print_combinatorial_logic_sim(f, ns, blocking_assign):
                 assert isinstance(t, Signal)
                 r += "assign " + _print_node(ns, _AT_BLOCKING, 0, stmts[0])
             else:
-                assert isinstance(t, Signal) or isinstance(t, Display)
+                assert isinstance(t, Signal) or isinstance(t, Display) or isinstance(t, Finish)
                 r += "always @(*) begin\n"
                 if blocking_assign:
                     if isinstance(t, Signal):
