@@ -10,19 +10,19 @@ extern int N2_mode;
 extern int enumerated;
 
 int prep_payload (int cs, int command, int wrdata_en,
-                  int wrdata_mask, int rddata_en) {
+                  uint32_t wrdata_mask, int rddata_en) {
     int payload;
 #ifdef SDRAM_PHY_SUBCHANNELS
     payload = cs << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_CS_OFFSET | \
               command << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_CA_OFFSET | \
               wrdata_en << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_WRDATA_EN_OFFSET | \
-              wrdata_mask << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_WRDATA_MASK_OFFSET | \
+              (wrdata_mask & WRDATA_BITMASK) << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_WRDATA_MASK_OFFSET | \
               rddata_en << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_RDDATA_EN_OFFSET;
 #else
     payload = cs << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_CS_OFFSET | \
               command << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_CA_OFFSET | \
               wrdata_en << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_WRDATA_EN_OFFSET | \
-              wrdata_mask << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_WRDATA_MASK_OFFSET | \
+              (wrdata_mask & WRDATA_BITMASK) << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_WRDATA_MASK_OFFSET | \
               rddata_en << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_RDDATA_EN_OFFSET;
 #endif
     return payload;
@@ -65,7 +65,7 @@ void store_payload(int channel, int single) {
 }
 
 void cmd_injector(int channel, int phases, int cs, int command,
-                  int wrdata_en, int wrdata_mask, int rddata_en, int single) {
+                  int wrdata_en, uint32_t wrdata_mask, int rddata_en, int single) {
     int payload = prep_payload(cs, command, wrdata_en, wrdata_mask, rddata_en);
     upload_payload(channel, phases, payload);
     store_payload(channel, single);
@@ -238,7 +238,7 @@ uint32_t capture_and_reduce_result(int channel, int operation) {
     csr_rd_buf_uint8(CSR_SDRAM_DFII_CMDINJECTOR_RESULT_ARRAY_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
 #endif
     for (i = 1; i < DFII_CMDINJECTOR_DATA_BYTES; ++i) {
-        data[0] = operation ? data[0] & data[i] : data[0]  | data[i];
+        data[0] = operation ? (data[0] & data[i]) : (data[0] | data[i]);
     }
     if (operation) {
         data[0] &= data[0]>>4;
@@ -970,6 +970,18 @@ void wr_dq_inc(int channel, int module) {
     phy_deselect(channel, module);
 }
 
+void odly_dm_rst(int channel, int module) {
+    phy_select(channel, module);
+    odly_dm_rst_internal(channel);
+    phy_deselect(channel, module);
+}
+
+void odly_dm_inc(int channel, int module) {
+    phy_select(channel, module);
+    odly_dm_inc_internal(channel);
+    phy_deselect(channel, module);
+}
+
 void odly_dq_rst(int channel, int module) {
     phy_select(channel, module);
     for(int i=0; i < SDRAM_PHY_DQ_DQS_RATIO; ++i) {
@@ -977,7 +989,6 @@ void odly_dq_rst(int channel, int module) {
         odly_dq_rst_internal(channel);
         phy_dq_deselect(channel, i);
     }
-    odly_dm_rst_internal(channel);
     phy_deselect(channel, module);
 }
 
@@ -988,7 +999,6 @@ void odly_dq_inc(int channel, int module) {
         odly_dq_inc_internal(channel);
         phy_dq_deselect(channel, i);
     }
-    odly_dm_inc_internal(channel);
     phy_deselect(channel, module);
 }
 
@@ -1087,9 +1097,12 @@ void send_mrw(int channel, int rank, int module, int reg, int value) {
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
     issue_single(channel);
     cdelay(50);
+    send_mpc(channel, rank, 0x7f);
 }
 
 void send_mrr(int channel, int rank, int reg) {
+    setup_rddata_cnt(channel, 0);
+    setup_rddata_cnt(channel, 8);
     cmd_injector(channel, 1<<0, 1<<rank, 0x15 | (reg<<5), 0, 0, 1, 1);
     if (N2_mode)
         cmd_injector(channel, 1<<1, 0, 0x15 | (reg<<5), 0, 0, 1, 1);
@@ -1103,6 +1116,7 @@ void send_mrr(int channel, int rank, int reg) {
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
     issue_single(channel);
     cdelay(50);
+    setup_rddata_cnt(channel, 0);
 }
 
 void send_wleveling_write(int channel, int rank) {
@@ -1176,6 +1190,53 @@ void send_write(int channel, int rank) {
     cdelay(500);
 }
 
+void send_write_byte(int channel, int rank, int module, int byte) {
+    int bg  = 0 << 8;
+    int ba  = 0 << 6;
+    int col = 0;
+
+    int wr_1 = 0xD | (1 << 5) | ba | bg;    // Write to bank group 0, bank 0
+    int wr_2 = col;                         // Second beat of write, with auto precharge, with wr_partial
+
+    uint32_t mask     = ~((1 << (byte&1)) << (2*module));
+    uint8_t  transfer = byte >> 1;
+    uint8_t  cmd_r = 0;
+    int      cmd = 0;
+
+    send_activate(channel, rank);
+    cmd_injector(channel, 1<<0, 1<<rank, wr_1, 1, WRDATA_BITMASK, 0, 1);
+    if (N2_mode)
+        cmd_injector(channel, 1<<1, 0, wr_1, 1, WRDATA_BITMASK, 0, 1);
+    else
+        cmd_injector(channel, 1<<1, 0, wr_2, 1, WRDATA_BITMASK, 0, 1);
+    cmd_injector(channel, 1<<2, 0, wr_2, 1, WRDATA_BITMASK, 0, 1);
+    cmd_injector(channel, 1<<3, 0, wr_2, 1, WRDATA_BITMASK, 0, 1);
+    cmd_injector(channel, 1<<4, 0, 0, 1, WRDATA_BITMASK, 0, 1);
+    cmd_injector(channel, 1<<5, 0, 0, 1, WRDATA_BITMASK, 0, 1);
+    cmd_injector(channel, 1<<6, 0, 0, 1, WRDATA_BITMASK, 0, 1);
+    cmd_injector(channel, 1<<7, 0, 0, 1, WRDATA_BITMASK, 0, 1);
+    switch(transfer) {
+    case 0:
+        cmd = wr_1;
+        cmd_r = 1<<rank;
+        break;
+    case 1:
+        if (N2_mode) {
+            cmd = wr_1;
+            break;
+        }
+    case 2:
+    case 3:
+        cmd = wr_2;
+        break;
+    default:
+        break;
+    }
+    cmd_injector(channel, 1<<transfer, cmd_r, cmd, 1, mask, 0, 1);
+    issue_single(channel);
+    cdelay(500);
+}
+
 void send_read(int channel, int rank) {
     int bg  = 0 << 8;
     int ba  = 0 << 6;
@@ -1183,6 +1244,9 @@ void send_read(int channel, int rank) {
 
     int rd_1 = 0x1D | (1 << 5) | ba |bg;    // Read from bank group 0, bank 0
     int rd_2 = col;                         // Second beat of read, with auto precharge
+
+    setup_rddata_cnt(channel, 0);
+    setup_rddata_cnt(channel, 8);
 
     send_activate(channel, rank);
     cmd_injector(channel, 1<<0, 1<<rank, rd_1, 0, 0, 1, 1);
@@ -1198,6 +1262,7 @@ void send_read(int channel, int rank) {
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
     issue_single(channel);
     cdelay(500);
+    setup_rddata_cnt(channel, 0);
 }
 
 void enter_cs(int channel, int rank) {
@@ -1227,13 +1292,6 @@ void exit_ca(int channel, int rank) {
 void ca_sample_prep_current_period(int channel, int rank, int address, int l2h) {
     cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
     cmd_injector(channel, 0x1, 1<<rank, l2h<<address, 0, 0, 1, 0);
-    cdelay(50);
-}
-
-void ca_sample_prep_previous_period(int channel, int rank, int address, int l2h) {
-    cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
-    cmd_injector(channel, 0x1, 0, l2h<<address, 0, 0, 1, 0);
-    cmd_injector(channel, 0x2, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
     cdelay(50);
 }
 
