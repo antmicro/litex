@@ -1195,13 +1195,21 @@ int sdram_init(void) {
 	ddrctrl_init_done_write(0);
 	ddrctrl_init_error_write(0);
 #endif // CSR_DDRCTRL_BASE
-	init_sequence();
+	reset_sequence();
 #ifdef MEMORY_TYPE_DDR5
 	sdram_ddr5_module_enumerate();
 	sdram_ddr5_cs_ca_training();
+	if (in_2n_mode()) {
+		printf("2N mode setup\n");
+		init_sequence_2n();
+	} else {
+		printf("1N mode setup\n");
+		init_sequence_1n();
+	}
 	sdram_ddr5_read_training();
 	sdram_ddr5_write_training();
 #else
+	init_sequence();
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 	sdram_leveling();
 #endif // defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
