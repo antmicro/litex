@@ -222,7 +222,7 @@ static int CA_ck_scan(int32_t channel, int32_t rank, int32_t address, int32_t cs
     return last_good;
 }
 
-static void CA_scan(int32_t channel, int32_t rank, int32_t address, int32_t* left, int32_t* right) {
+static void CA_scan(int32_t channel, int32_t rank, int32_t address, int* left, int* right) {
     int cadly, _result;
     ca_rst(channel, rank, address);
     for (cadly = 0; cadly < SDRAM_PHY_DELAYS; cadly++) {
@@ -245,7 +245,7 @@ static void CA_scan(int32_t channel, int32_t rank, int32_t address, int32_t* lef
 }
 
 static void CA_training(int32_t channel) {
-    int32_t left_side, right_side;
+    int left_side, right_side;
     int32_t rank, address;
     int32_t on_edge;
 
@@ -1218,8 +1218,12 @@ void sdram_ddr5_write_training(void) {
                         if (works && got == 0) {
                             start_delay = delay;
                             got = 1;
-                        } else if (!works && got == 1) {
+                        }
+                        if (!works && got == 1) {
                             end_delay = delay;
+                            got = 2;
+                        } else if (delay == SDRAM_PHY_DELAYS-1 && got == 1) {
+                            end_delay = delay + 1;
                             got = 2;
                         }
                         odly_dm_inc(channel, module);
