@@ -493,8 +493,15 @@ int seeds1[] = {0x59, 0x3c, 0x48, 0x72, 0x55, 0x95};
 
 int seeds_count = sizeof(seeds0)/sizeof(int);
 
+uint16_t serial[] = {0x0000, 0xffff,
+                     0xfffe, 0xfffd, 0xfffb, 0xfff7, 0xffef, 0xffdf, 0xffbf, 0xff7f,
+                     0xfeff, 0xfdff, 0xfbff, 0xf7ff, 0xefff, 0xdfff, 0xbfff, 0x7fff,
+                     0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080,
+                     0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000};
+int serial_count = sizeof(serial)/sizeof(uint16_t);
+
 void sdram_ddr5_read_training(void) {
-    int channel, rank, module, i, seed, dq;
+    int channel, rank, module, i, seed;
     int cycle, delay, preamble, got, works;
     int start_cycle, start_delay,   // First working cycle delay pair
         middle_cycle, middle_delay, // Middle between first and last working
@@ -591,8 +598,18 @@ void sdram_ddr5_read_training(void) {
                                get_rd_dq_dly(channel, module));
 #endif // DEBUG_DDR5
                         works = 1;
+                        for (seed = 0; seed < serial_count && works; ++seed){
+                            /* Setup MRs */
+                            send_mrw(channel, rank, 0xf, 25, 0);
+                            send_mrw(channel, rank, module, 26, serial[seed]&0xff);
+                            send_mrw(channel, rank, module, 27, serial[seed]>>8);
+                            send_mrr(channel, rank, 31);
+                            works &= compare_serial(channel, module, serial[seed],
+                                                    0xA5, 0x33);
+                        }
                         for (seed = 0; seed < seeds_count && works; ++seed){
                             /* Setup MRs */
+                            send_mrw(channel, rank, 0xf, 25, 1);
                             send_mrw(channel, rank, module, 26, seeds0[seed]);
                             send_mrw(channel, rank, module, 27, seeds1[seed]);
                             send_mrr(channel, rank, 31);
@@ -664,7 +681,7 @@ void sdram_ddr5_read_training(void) {
                     printf("%02"PRIX8, recover_mrr_value(channel, module));
                 }
                 printf("\n");
-//#ifdef INFO_DDR5
+#ifdef INFO_DDR5
                 // Check if data is read correctly
                 send_mrw(channel, rank, module, 63, 0xDE);
                 send_mrr(channel, rank, 63);
@@ -678,9 +695,9 @@ void sdram_ddr5_read_training(void) {
                 send_mrw(channel, rank, module, 63, 0xEF);
                 send_mrr(channel, rank, 63);
                 printf("%"PRIX8"\n", recover_mrr_value(channel, module));
-//#endif //INFO_DDR5
+#endif //INFO_DDR5
             }
-//#ifdef INFO_DDR5
+#ifdef INFO_DDR5
             // Check if registers are correct
 #ifdef SDRAM_PHY_SUBCHANNELS
             for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
@@ -694,18 +711,18 @@ void sdram_ddr5_read_training(void) {
                     printf("\tMR:%3d %02"PRIX8"\n", i, recover_mrr_value(channel, module));
                 }
             }
-//#endif // INFO_DDR5
+#endif // INFO_DDR5
         }
     }
 }
 
 void sdram_ddr5_write_training(void) {
     int channel, rank, module, seed, cnt_seed, byte;
-    int cycle, delay, got, sample, it, works, dq;
+    int cycle, delay, got, sample, it, works;
     int start_cycle, start_delay,   // First working cycle delay pair
         middle_cycle, middle_delay, // Middle between first and last working
         end_cycle, end_delay;       // First cycle delay pair that does not work after working
-    uint8_t lfsr;
+    uint8_t lfsr, temp;
     uint8_t mr5;
     uint16_t wrdata, rddata;
     uint32_t eye_width;             // In taps
@@ -742,10 +759,14 @@ void sdram_ddr5_write_training(void) {
                     sample = 1;
                     // Check multiple times, as we can be on the edge of transition
                     // Make sure we aren't in meta stable delay
+                    printf("%2d|", cycle);
                     for (it = 0; it<16; it++) {
                         send_wleveling_write(channel, rank);
-                        sample &= wleveling_sample(channel, module);
+                        temp = wleveling_sample(channel, module);
+                        sample &= temp;
+                        printf("%d/%d|", sample, temp);
                     }
+                    printf("\n");
                     if (sample && got == 0) {
                         start_cycle = cycle;
                         got = 1;
@@ -778,7 +799,7 @@ void sdram_ddr5_write_training(void) {
 
 #ifdef INFO_DDR5
                 printf("cycle:%2d delay:%2d\n", start_cycle, start_delay);
-#endif // DEBUG_DDR5
+#endif // INFO_DDR5
 
                 // Pull back 0.75 clock as specified by JEDEC
                 // to train WICA
@@ -791,7 +812,7 @@ void sdram_ddr5_write_training(void) {
 
 #ifdef INFO_DDR5
                 printf("After -0.75; cycle:%2d delay:%2d\n", start_cycle, start_delay);
-#endif // DEBUG_DDR5
+#endif // INFO_DDR5
 
                 wr_dqs_rst(channel, module);
                 odly_dqs_rst(channel, module);
@@ -894,6 +915,46 @@ void sdram_ddr5_write_training(void) {
                         printf("DQ dly:%"PRIu16"\n", get_wr_dq_dly(channel, module));
 #endif // DEBUG_DDR5
                         works = 1;
+                        for (cnt_seed = 0; cnt_seed < serial_count && works; ++cnt_seed) {
+                            for (it =0; it <8; ++it) {
+                                wrdata = 0;
+                                for (temp = 0; temp < SDRAM_PHY_DQ_DQS_RATIO; ++temp) {
+                                    wrdata |= ((serial[cnt_seed]>>(2*it))&1) << temp;
+                                }
+                                for (temp = 0; temp < SDRAM_PHY_DQ_DQS_RATIO; ++temp) {
+                                    wrdata |= ((serial[cnt_seed]>>(2*it+1))&1) << (temp + SDRAM_PHY_DQ_DQS_RATIO);
+                                }
+#ifdef DEBUG_DDR5
+                                printf("wrdata:%04"PRIx16"|", wrdata);
+#endif // DEBUG_DDR5
+                                set_data_module_phase(channel, module, it, wrdata);
+                            }
+#ifdef DEBUG_DDR5
+                            printf("\n");
+#endif // DEBUG_DDR5
+                            send_write(channel, rank);
+                            send_read(channel, rank);
+
+                            for (it =0; it <8; ++it) {
+                                rddata = get_data_module_phase(channel, module, it);
+#ifdef DEBUG_DDR5
+                                printf("rddata:%04"PRIx16"|", rddata);
+#endif // DEBUG_DDR5
+                                for (temp = 0; temp < SDRAM_PHY_DQ_DQS_RATIO; ++temp) {
+                                    works &= !!(((rddata>>temp)&1) == ((serial[cnt_seed]>>(2*it))&1));
+                                }
+                                for (temp = 0; temp < SDRAM_PHY_DQ_DQS_RATIO; ++temp) {
+                                    works &= !!(((rddata>>(temp + SDRAM_PHY_DQ_DQS_RATIO))&1) == ((serial[cnt_seed]>>(2*it+1))&1));
+                                }
+                            }
+                            for (it =0; it <8; ++it) {
+                                set_data_module_phase(channel, module, it, 0);
+                            }
+                            send_write(channel, rank);
+#ifdef DEBUG_DDR5
+                            printf("\n");
+#endif // DEBUG_DDR5
+                        }
                         for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
                             if(cnt_seed < seeds_count)
                                 seed = seeds0[cnt_seed];
