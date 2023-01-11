@@ -12,6 +12,7 @@ void store_payload(int channel, int single);
 void cmd_injector(int channel, int phases, int cs, int command,
                   int wrdata_en, uint32_t wrdata_mask, int rddata_en, int single);
 void setup_rddata_cnt(int channel, int value);
+void store_continuous(int channel);
 void issue_single(int channel);
 uint16_t get_data_module_phase(int channel, int module, int phase);
 void set_data_module_phase(int channel, int module, int phase, uint16_t wrdata);
@@ -24,6 +25,8 @@ uint32_t capture_and_reduce_module(int channel, int module, int operation);
 int or_sample(int channel);
 int and_sample(int channel);
 int wleveling_sample(int channel, int module);
+
+void read_registers(int channel, int rank, int module);
 
 void enable_dfi_2n_mode(void);
 void disable_dfi_2n_mode(void);
@@ -102,7 +105,7 @@ void cs_sample_prep(int channel, int rank, int address, int l2h);
 
 void enter_ca(int channel, int rank);
 void exit_ca(int channel, int rank);
-void ca_sample_prep_current_period(int channel, int rank, int address, int l2h);
+void ca_sample_prep_current_period(int channel, int rank, int address, int l2h, int cs_dly);
 
 void enter_write_leveling(int channel);
 void wleveling_scan(int *cycle, int *got, int *start_cycle, int *start_delay,

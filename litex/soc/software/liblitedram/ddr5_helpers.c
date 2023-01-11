@@ -71,6 +71,21 @@ void cmd_injector(int channel, int phases, int cs, int command,
     store_payload(channel, single);
 }
 
+void store_continuous(int channel) {
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        sdram_dfii_b_cmdinjector_single_shot_write(0);
+        sdram_dfii_b_cmdinjector_issue_command_write(1);
+    } else {
+        sdram_dfii_a_cmdinjector_single_shot_write(0);
+        sdram_dfii_a_cmdinjector_issue_command_write(1);
+    }
+#else
+    sdram_dfii_cmdinjector_single_shot_write(0);
+    sdram_dfii_cmdinjector_issue_command_write(1);
+#endif
+}
+
 void issue_single(int channel) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -292,29 +307,37 @@ uint32_t capture_and_reduce_module(int channel, int module, int operation) {
 
 int or_sample(int channel) {
     setup_capture(channel, 0);
-    cdelay(50);
+    cdelay(100);
     start_capture(channel);
-    cdelay(1000);
+    cdelay(2000);
     stop_capture(channel);
     return !capture_and_reduce_result(channel, 0);
 }
 
 int and_sample(int channel) {
     setup_capture(channel, 3);
-    cdelay(50);
+    cdelay(100);
     start_capture(channel);
-    cdelay(1000);
+    cdelay(2000);
     stop_capture(channel);
     return !!capture_and_reduce_result(channel, 1);
 }
 
 int wleveling_sample(int channel, int module) {
     setup_capture(channel, 3);
-    cdelay(50);
+    cdelay(100);
     start_capture(channel);
-    cdelay(50);
+    cdelay(2000);
     stop_capture(channel);
     return !!capture_and_reduce_module(channel, module, 1);
+}
+
+void read_registers(int channel, int rank, int module) {
+    int i;
+    for (i = 0; i < 256; ++i) {
+        send_mrr(channel, rank, i);
+        printf("\tMR:%3d %02"PRIX8"\n", i, recover_mrr_value(channel, module));
+    }
 }
 
 void disable_dfi_2n_mode(void) {
@@ -349,6 +372,7 @@ static void phy_select(int channel, int select) {
 #else
     ddrphy_dly_sel_write(1<<select);
 #endif
+    cdelay(5);
 }
 
 static void phy_deselect(int channel, int select) {
@@ -361,6 +385,7 @@ static void phy_deselect(int channel, int select) {
 #else
     ddrphy_dly_sel_write(0);
 #endif
+    cdelay(5);
 }
 
 static void phy_dq_select(int channel, int select) {
@@ -374,6 +399,7 @@ static void phy_dq_select(int channel, int select) {
 #else
     ddrphy_dq_dly_sel_write(1<<select);
 #endif
+    cdelay(5);
 #endif // SDRAM_DELAY_PER_DQ
 }
 
@@ -388,6 +414,7 @@ static void phy_dq_deselect(int channel, int select) {
 #else
     ddrphy_dq_dly_sel_write(0);
 #endif
+    cdelay(5);
 #endif // SDRAM_DELAY_PER_DQ
 }
 
@@ -1048,16 +1075,23 @@ void setup_enumerate(int channel, int rank, int module) {
     for (i = 0; i < 4; ++i)
         set_data_module_phase(channel, module, i, 0);
     cmd_injector(channel, 0xf, 0, 0, 1, 0, 0, 0);
+    store_continuous(channel);
     cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
+    store_continuous(channel);
     cmd_injector(channel, 0xf, 1<<rank, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
+    store_continuous(channel);
     cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
+    store_continuous(channel);
     cdelay(50);
 }
 
 void send_mpc(int channel, int rank, int cmd) {
     cmd_injector(channel, 0xf, 0, 0xf | (cmd<<5), 0, 0, 0, 0);
+    store_continuous(channel);
     cmd_injector(channel, 0xf, 1<<rank, 0xf | (cmd<<5), 0, 0, 0, 0);
+    store_continuous(channel);
     cmd_injector(channel, 0xf, 0, 0xf | (cmd<<5), 0, 0, 0, 0);
+    store_continuous(channel);
     cdelay(50);
 }
 
@@ -1257,6 +1291,7 @@ void exit_cs(int channel, int rank) {
 void cs_sample_prep(int channel, int rank, int address, int l2h) {
     cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 1, 0);
     cmd_injector(channel, 0xa>>l2h, 1<<rank, 0x1f, 0, 0, 1, 0);
+    store_continuous(channel);
     cdelay(50);
 }
 
@@ -1265,14 +1300,22 @@ void enter_ca(int channel, int rank) {
 }
 
 void exit_ca(int channel, int rank) {
+    cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 0, 0);
+    store_continuous(channel);
     cmd_injector(channel, 0xff, 1<<rank, 0x1f, 0, 0, 0, 1);
     issue_single(channel);
     cdelay(50);
 }
 
-void ca_sample_prep_current_period(int channel, int rank, int address, int l2h) {
+void ca_sample_prep_current_period(int channel, int rank, int address, int l2h, int cs_dly) {
     cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
-    cmd_injector(channel, 0x1, 1<<rank, l2h<<address, 0, 0, 1, 0);
+    if (cs_dly == 0) {
+        cmd_injector(channel, 0x1, 1<<rank, l2h<<address, 0, 0, 1, 0);
+    } else {
+        cmd_injector(channel, 0x1, 0, l2h<<address, 0, 0, 1, 0);
+        cmd_injector(channel, 0x1<<cs_dly, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
+    }
+    store_continuous(channel);
     cdelay(50);
 }
 
