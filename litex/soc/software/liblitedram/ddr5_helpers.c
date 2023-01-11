@@ -310,9 +310,9 @@ int and_sample(int channel) {
 
 int wleveling_sample(int channel, int module) {
     setup_capture(channel, 3);
-    cdelay(10);
+    cdelay(50);
     start_capture(channel);
-    cdelay(10);
+    cdelay(50);
     stop_capture(channel);
     return !!capture_and_reduce_module(channel, module, 1);
 }
@@ -722,6 +722,35 @@ uint8_t lfsr_next(uint8_t input) {
     temp |= ((input>>2) &1) << 1;
     temp |= ((input>>1) &1) << 0;
     return temp;
+}
+
+int compare_serial(int channel, int module, uint16_t data, int inv, int select) {
+    uint16_t module_data[8];
+    int phase;
+    int bit, it, _bit;
+    for (phase = 0; phase < 8; ++phase) {
+        module_data[phase] = get_data_module_phase(channel, module, phase);
+#ifdef DEBUG_DDR5
+        printf("%d:%x,", phase, module_data[phase]);
+#endif
+    }
+#ifdef DEBUG_DDR5
+    printf("\n");
+#endif
+    for (bit = 0; bit < SDRAM_PHY_DQ_DQS_RATIO; ++bit) {
+        for (it = 0; it < 16; ++it) {
+            _bit = (module_data[it>>1] >> (bit+((it&1)*SDRAM_PHY_DQ_DQS_RATIO))) & 1;
+            if (inv & (1<<bit))
+                _bit = !_bit;
+            if (_bit != ((data>>it)&1)) {
+#ifdef DEBUG_DDR5
+                printf("Failed for line:%d bit:%d, expected %d got %d\n", bit, it, (data>>it)&1, _bit);
+#endif
+                return 0;
+            }
+        }
+    }
+    return 1;
 }
 
 int compare(int channel, int module, int data0, int data1, int inv, int select) {
