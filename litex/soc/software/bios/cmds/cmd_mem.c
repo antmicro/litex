@@ -189,9 +189,10 @@ static void mem_test_handler(int nb_params, char **params)
 	char *c;
 	unsigned int *addr;
 	unsigned long maxsize = ~0uL;
+	unsigned long repeats = 1;
 
 	if (nb_params < 1) {
-		printf("mem_test <addr> [<maxsize>]");
+		printf("mem_test <addr> [<maxsize>] [<repeats>]");
 		return;
 	}
 
@@ -207,10 +208,18 @@ static void mem_test_handler(int nb_params, char **params)
 			printf("Incorrect size");
 			return;
 		}
-
 	}
 
-	memtest(addr, maxsize);
+	if (nb_params >= 3) {
+		repeats = strtoul(params[2], &c, 0);
+		if (*c != 0) {
+			printf("Incorrect repeats count");
+			return;
+		}
+	}
+
+	while(repeats-->0)
+		memtest(addr, maxsize);
 }
 define_command(mem_test, mem_test_handler, "Test memory access", MEM_CMDS);
 
