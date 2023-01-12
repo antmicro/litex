@@ -309,7 +309,7 @@ int or_sample(int channel) {
     setup_capture(channel, 0);
     cdelay(100);
     start_capture(channel);
-    cdelay(2000);
+    cdelay(1000);
     stop_capture(channel);
     return !capture_and_reduce_result(channel, 0);
 }
@@ -318,7 +318,7 @@ int and_sample(int channel) {
     setup_capture(channel, 3);
     cdelay(100);
     start_capture(channel);
-    cdelay(2000);
+    cdelay(1000);
     stop_capture(channel);
     return !!capture_and_reduce_result(channel, 1);
 }
@@ -327,7 +327,7 @@ int wleveling_sample(int channel, int module) {
     setup_capture(channel, 3);
     cdelay(100);
     start_capture(channel);
-    cdelay(2000);
+    cdelay(1000);
     stop_capture(channel);
     return !!capture_and_reduce_module(channel, module, 1);
 }
@@ -372,7 +372,6 @@ static void phy_select(int channel, int select) {
 #else
     ddrphy_dly_sel_write(1<<select);
 #endif
-    cdelay(5);
 }
 
 static void phy_deselect(int channel, int select) {
@@ -385,7 +384,6 @@ static void phy_deselect(int channel, int select) {
 #else
     ddrphy_dly_sel_write(0);
 #endif
-    cdelay(5);
 }
 
 static void phy_dq_select(int channel, int select) {
@@ -399,7 +397,6 @@ static void phy_dq_select(int channel, int select) {
 #else
     ddrphy_dq_dly_sel_write(1<<select);
 #endif
-    cdelay(5);
 #endif // SDRAM_DELAY_PER_DQ
 }
 
@@ -414,7 +411,6 @@ static void phy_dq_deselect(int channel, int select) {
 #else
     ddrphy_dq_dly_sel_write(0);
 #endif
-    cdelay(5);
 #endif // SDRAM_DELAY_PER_DQ
 }
 
@@ -1250,7 +1246,7 @@ void send_write(int channel, int rank) {
     cmd_injector(channel, 1<<6, 0, 0, 1, 0, 0, 1);
     cmd_injector(channel, 1<<7, 0, 0, 1, 0, 0, 1);
     issue_single(channel);
-    cdelay(500);
+    cdelay(50);
 }
 
 void send_write_byte(int channel, int rank, int module, int byte) {
@@ -1297,7 +1293,7 @@ void send_write_byte(int channel, int rank, int module, int byte) {
     }
     cmd_injector(channel, 1<<transfer, cmd_r, cmd, 1, mask, 0, 1);
     issue_single(channel);
-    cdelay(500);
+    cdelay(50);
 }
 
 void send_read(int channel, int rank) {
@@ -1324,7 +1320,7 @@ void send_read(int channel, int rank) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
     issue_single(channel);
-    cdelay(500);
+    cdelay(50);
     setup_rddata_cnt(channel, 0);
 }
 
