@@ -685,6 +685,7 @@ void sdram_ddr5_read_training(void) {
                                get_rd_dq_dly(channel, module));
 #endif // DEBUG_DDR5
                         works = 1;
+#ifndef DDR5_TRAINING_SIM
                         for (seed = 0; seed < serial_count && works; ++seed){
                             /* Setup MRs */
                             send_mrw(channel, rank, 0xf, 25, 0);
@@ -694,6 +695,7 @@ void sdram_ddr5_read_training(void) {
                             works &= compare_serial(channel, module, serial[seed],
                                                     0xA5, 0x33);
                         }
+#endif // DDR5_TRAINING_SIM
                         for (seed = 0; seed < seeds_count && works; ++seed){
                             /* Setup MRs */
                             send_mrw(channel, rank, 0xf, 25, 1);
@@ -1012,6 +1014,7 @@ void sdram_ddr5_write_training(void) {
                         printf("DQ dly:%"PRIu16"\n", get_wr_dq_dly(channel, module));
 #endif // DEBUG_DDR5
                         works = 1;
+#ifndef DDR5_TRAINING_SIM
                         for (cnt_seed = 0; cnt_seed < serial_count && works; ++cnt_seed) {
                             for (it =0; it <8; ++it) {
                                 wrdata = 0;
@@ -1052,6 +1055,7 @@ void sdram_ddr5_write_training(void) {
                             printf("\n");
 #endif // DEBUG_DDR5
                         }
+#endif // DDR5_TRAINING_SIM
                         for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
                             if(cnt_seed < seeds_count)
                                 seed = seeds0[cnt_seed];
@@ -1149,7 +1153,11 @@ void sdram_ddr5_write_training(void) {
 #endif // DEBUG_DDR5
                         works = 1;
                         for (byte = 0; byte < 16 && works; ++byte) {
+#ifndef DDR5_TRAINING_SIM
                             for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
+#else
+                            {cnt_seed = 0;
+#endif // DDR5_TRAINING_SIM
                                 send_mrw(channel, rank, module, 5, mr5 & 0xDF); // Disable DM
                                 if(cnt_seed < seeds_count)
                                     seed = seeds0[cnt_seed];
