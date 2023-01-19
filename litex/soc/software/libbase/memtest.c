@@ -313,6 +313,7 @@ void memspeed(unsigned int *addr, unsigned long size, bool read_only, bool rando
 	flush_l2_cache();
 
 	/* Measure Read speed */
+	timer0_en_write(0);
 	timer0_en_write(1);
 	timer0_update_value_write(1);
 	start = timer0_value_read();
