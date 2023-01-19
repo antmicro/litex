@@ -130,7 +130,7 @@ void sdram_select(int module, int dq_line) {
 #ifdef SDRAM_DELAY_PER_DQ
 	/* Select DQ line */
 	ddrphy_dq_dly_sel_write(1 << dq_line);
-#endif
+#endif //SDRAM_DELAY_PER_DQ
 }
 
 void sdram_deselect(int module, int dq_line) {
