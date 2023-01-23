@@ -1462,8 +1462,7 @@ class LiteXSoC(SoC):
         self.check_if_exists(name)
         sdram = LiteDRAMCore(
             phy             = phy,
-            geom_settings   = module.geom_settings,
-            timing_settings = module.timing_settings,
+            module          = module,
             clk_freq        = self.sys_clk_freq,
             **kwargs)
         setattr(self, name, sdram)
