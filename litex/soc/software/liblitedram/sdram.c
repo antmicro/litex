@@ -1235,7 +1235,9 @@ int sdram_set_timings(struct sdram_timings_s *timings)
 	sdram_controller_tRRD_write(timings->trrd);
 	sdram_controller_tRC_write(timings->trc);
 	sdram_controller_tRAS_write(timings->tras);
+#if !defined(MEMORY_TYPE_LPDDR4) && !defined(MEMORY_TYPE_LPDDR5)
 	sdram_controller_tZQCS_write(timings->tzqcs);
+#endif
 
 	return 0;
 }
