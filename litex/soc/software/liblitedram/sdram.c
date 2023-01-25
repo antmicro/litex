@@ -1195,6 +1195,39 @@ int sdram_init(void) {
 	sdram_leveling();
 #endif // defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 	sdram_software_control_off();
+
+	printf("\nSelected bitslips and delays:\n");
+#ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
+	printf("Clock delay: %d\n", sdram_clock_delay);
+
+	printf("module:");
+	for (int i = 0; i < SDRAM_PHY_MODULES; i++)
+		printf("%3d", i);
+	printf("\n");
+
+	printf("    wb:");
+	for (int i = 0; i < SDRAM_PHY_MODULES; i++)
+		printf("%3d", write_dq_bitslip[i]);
+	printf("\n");
+
+	printf("  wdly:");
+	for (int i = 0; i < SDRAM_PHY_MODULES; i++)
+		printf("%3d", write_dq_delay[i]);
+	printf("\n");
+#endif // SDRAM_PHY_WRITE_LEVELING_CAPABLE
+
+#ifdef SDRAM_PHY_READ_LEVELING_CAPABLE
+	printf("    rb:");
+	for (int i = 0; i < SDRAM_PHY_MODULES; i++)
+		printf("%3d", read_dq_bitslip[i]);
+	printf("\n");
+
+	printf("  rdly:");
+	for (int i = 0; i < SDRAM_PHY_MODULES; i++)
+		printf("%3d", read_dq_delay[i]);
+	printf("\n");
+#endif // SDRAM_PHY_READ_LEVELING_CAPABLE
+
 #ifndef SDRAM_TEST_DISABLE
 	if(!memtest((unsigned int *) MAIN_RAM_BASE, MEMTEST_DATA_SIZE)) {
 #ifdef CSR_DDRCTRL_BASE
