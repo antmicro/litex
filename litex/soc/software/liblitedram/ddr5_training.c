@@ -45,6 +45,12 @@ int par_final_delay[2];
 
 int WICA = 0;
 
+#ifdef SDRAM_PHY_SUBCHANNELS
+#define CHANNELS 2
+#else
+#define CHANNELS 1
+#endif
+
 static int CS_on_edge_detect(int32_t channel, int32_t rank) {
     int offset, _result;
     for (offset = 0; offset < 2; offset++) {
@@ -314,13 +320,8 @@ static void CS_CA_best_timings(void) {
     min = SDRAM_PHY_DELAYS;
     max = -SDRAM_PHY_DELAYS;
 
-#ifdef SDRAM_PHY_SUBCHANNELS
-    for (channel = 0; channel < 2; channel++) {
+    for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Timings\n", 'A'+channel);
-#else
-    {channel = 0;
-        printf("Timings\n");
-#endif // SDRAM_PHY_SUBCHANNELS
         // If we ever have multiple ranks, and independent timing for them
         // Uncomment loop below
         // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
@@ -363,14 +364,8 @@ static void CS_CA_best_timings(void) {
     for (cntdly = 0; cntdly < newdly; ++cntdly)
         ck_inc(0, 0, 0);
 
-#ifdef SDRAM_PHY_SUBCHANNELS
-    for (channel = 0; channel < 2; channel++) {
-        printf("Subchannel:%c Adjusted Timings\n", 'A'+channel);
-#else
-    {channel = 0;
-        printf("Adjusted Timings\n");
-#endif // SDRAM_PHY_SUBCHANNELS
         // If we ever have multiple ranks, and independent timing for them
+    for (channel = 0; channel < CHANNELS; channel++) {
         // Uncomment loop below
         // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
         {rank = 0;
@@ -398,12 +393,6 @@ static void CS_CA_best_timings(void) {
     }
 
     printf("Re-scan CS/CA\n");
-#ifdef SDRAM_PHY_SUBCHANNELS
-    for (channel = 0; channel < 2; channel++) {
-        printf("Subchannel:%c\n", 'A'+channel);
-#else
-    {channel = 0;
-#endif // SDRAM_PHY_SUBCHANNELS
         // If we ever have multiple ranks, and independent timing for them
         // Uncomment loop below
         // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
@@ -453,13 +442,8 @@ void sdram_ddr5_cs_ca_training(void) {
     CS_success = 1;
     CA_success = 1;
     CA_setup_array();
-#ifdef SDRAM_PHY_SUBCHANNELS
-    for (channel = 0; channel < 2; channel++) {
+    for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c CS training\n", (char)('A'+channel));
-#else
-    {channel = 0;
-        printf("CS training\n");
-#endif // SDRAM_PHY_SUBCHANNELS
         CS_training(channel, &CS_success);
         printf("CA training\n");
         CA_check_lines(channel);
@@ -470,11 +454,7 @@ void sdram_ddr5_cs_ca_training(void) {
         enable_dfi_2n_mode();
     } else {
         CS_CA_best_timings();
-#ifdef SDRAM_PHY_SUBCHANNELS
-        for (channel = 0; channel < 2; channel++) {
-#else
-        {channel = 0;
-#endif // SDRAM_PHY_SUBCHANNELS
+        for (channel = 0; channel < CHANNELS; channel++) {
             for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
                 disable_dram_2n_mode(channel, rank);
             }
@@ -497,13 +477,8 @@ void sdram_ddr5_cs_ca_training(void) {
     CS_success = 1;
     CA_success = 1;
     CA_setup_array();
-#ifdef SDRAM_PHY_SUBCHANNELS
-    for (channel = 0; channel < 2; channel++) {
+    for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c CS training\n", (char)('A'+channel));
-#else
-    {channel = 0;
-        printf("CS training\n");
-#endif // SDRAM_PHY_SUBCHANNELS
         CS_training(channel, &CS_success);
         printf("CA training\n");
         CA_check_lines(channel);
@@ -514,11 +489,7 @@ void sdram_ddr5_cs_ca_training(void) {
         enable_dfi_2n_mode();
     } else {
         CS_CA_best_timings();
-#ifdef SDRAM_PHY_SUBCHANNELS
-        for (channel = 0; channel < 2; channel++) {
-#else
-        {channel = 0;
-#endif // SDRAM_PHY_SUBCHANNELS
+        for (channel = 0; channel < CHANNELS; channel++) {
             // If we ever have multiple ranks, and independent timing for them
             // Uncomment loop below
             // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
@@ -537,23 +508,14 @@ void sdram_ddr5_cs_ca_training(void) {
 
 void sdram_ddr5_module_enumerate(void) {
     int channel, rank, module;
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if (SDRAM_PHY_MODULES/2 > 15) {
-#else
-    if (SDRAM_PHY_MODULES > 15) {
-#endif // SDRAM_PHY_SUBCHANNELS
+    if (SDRAM_PHY_MODULES/CHANNELS > 15) {
         printf("Too many modules on single rank to enumerate,\n"
                "maximum is 15 but this design has %2d\n", SDRAM_PHY_MODULES);
         enumerated = 0;
         return;
     }
-#ifdef SDRAM_PHY_SUBCHANNELS
-    for (channel = 0; channel < 2; channel++) {
+    for (channel = 0; channel < CHANNELS; channel++) {
         printf("Enumerating subchannel:%c\n", (char)('A'+channel));
-#else
-    {channel = 0;
-        printf("Enumerating\n");
-#endif // SDRAM_PHY_SUBCHANNELS
         // If we ever have multiple ranks, and independent timing for them
         // Uncomment loop below
         // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
@@ -561,11 +523,7 @@ void sdram_ddr5_module_enumerate(void) {
             printf("\tEnumerating rank:%2d\n", rank);
             // Enter PDA Enumerate Programming Mode
             send_mpc(channel, rank, 0xB);
-#ifdef SDRAM_PHY_SUBCHANNELS
-            for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
-#else
-            for (module = 0; module < SDRAM_PHY_MODULES; module++) {
-#endif // SDRAM_PHY_SUBCHANNELS
+            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 setup_enumerate(channel, rank, module);
             }
             // Exit PDA Enumerate Programming Mode
@@ -605,13 +563,8 @@ void sdram_ddr5_read_training(void) {
         middle_cycle, middle_delay, // Middle between first and last working
         end_cycle, end_delay;       // First cycle delay pair that does not work after working
     uint32_t eye_width;             // In taps
-#ifdef SDRAM_PHY_SUBCHANNELS
-    for (channel = 0; channel < 2; channel++) {
+    for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Read training\n", (char)('A'+channel));
-#else
-    {channel = 0;
-        printf("Read training\n");
-#endif // SDRAM_PHY_SUBCHANNELS
 
         /* All PHYs so far have support for single delay far all ranks,
            use only first rank, leave all other as inactive*/
@@ -628,11 +581,7 @@ void sdram_ddr5_read_training(void) {
             send_mrw(channel, rank, 0xf, 30, 0x33);
 
             printf("Training rank%2d\n", rank);
-#ifdef SDRAM_PHY_SUBCHANNELS
-            for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
-#else
-            for (module = 0; module < SDRAM_PHY_MODULES; module++) {
-#endif // SDRAM_PHY_SUBCHANNELS
+            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 printf("Training module%2d\n", module);
                 start_cycle = -1;
                 end_cycle = 100;
@@ -769,13 +718,8 @@ void sdram_ddr5_read_training(void) {
         // Uncomment loop below
         // for(rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
         {rank =0;
-#ifdef SDRAM_PHY_SUBCHANNELS
-            for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
+            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 printf("Channel:%c rank:%2d module:%2d serial number:", (char)('A'+channel), rank, module);
-#else
-            for (module = 0; module < SDRAM_PHY_MODULES; module++) {
-                printf("Rank:%2d module:%2d serial number:", rank, module);
-#endif // SDRAM_PHY_SUBCHANNELS
                 for (i = 0; i < 5; ++i) {
                     send_mrr(channel, rank, 65+i);
                     printf("%02"PRIX8, recover_mrr_value(channel, module));
@@ -799,13 +743,8 @@ void sdram_ddr5_read_training(void) {
             }
 #ifdef INFO_DDR5
             // Check if registers are correct
-#ifdef SDRAM_PHY_SUBCHANNELS
-            for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
+            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 printf("Channel:%c rank:%d module:%d\n", (char)('A'+channel), rank, module);
-#else
-            for (module = 0; module < SDRAM_PHY_MODULES; module++) {
-                printf("Rank:%2d module:%d\n", rank, module);
-#endif // SDRAM_PHY_SUBCHANNELS
                 read_registers(channel, rank, module);
             }
 #endif // INFO_DDR5
@@ -824,13 +763,8 @@ void sdram_ddr5_write_training(void) {
     uint16_t wrdata, rddata;
     uint32_t eye_width;             // In taps
     WICA = 1<<7;
-#ifdef SDRAM_PHY_SUBCHANNELS
-    for (channel = 0; channel < 2; channel++) {
+    for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Write leveling\n", (char)('A'+channel));
-#else
-    {channel = 0;
-        printf("Write leveling\n");
-#endif // SDRAM_PHY_SUBCHANNELS
         /* Coarse alignment */
         // If we ever have multiple ranks, and independent timing for them
         // Uncomment loop below
@@ -839,11 +773,7 @@ void sdram_ddr5_write_training(void) {
             enter_write_leveling(channel);
             /* Setup MRs */
             send_mrw(channel, rank, 0xf, 2, 2);
-#ifdef SDRAM_PHY_SUBCHANNELS
-            for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
-#else
-            for (module = 0; module < SDRAM_PHY_MODULES; module++) {
-#endif // SDRAM_PHY_SUBCHANNELS
+            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 printf("WL m:%2d\n", module);
                 start_cycle = -1;
                 wr_dqs_rst(channel, module);
@@ -987,21 +917,13 @@ void sdram_ddr5_write_training(void) {
             send_mrw(channel, rank, 0xf, 2, 0|WICA);
             exit_write_leveling(channel);
 #ifdef DEBUG_DDR5
-#ifdef SDRAM_PHY_SUBCHANNELS
-            for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
-#else
-            for (module = 0; module < SDRAM_PHY_MODULES; module++) {
-#endif // SDRAM_PHY_SUBCHANNELS
+            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 read_registers(channel, rank, module);
             }
 #endif // DEBUG_DDR5
             printf("DQ write training\n");
             mr5 = 0;
-#ifdef SDRAM_PHY_SUBCHANNELS
-            for (module = 0; module < SDRAM_PHY_MODULES/2; module++) {
-#else
-            for (module = 0; module < SDRAM_PHY_MODULES; module++) {
-#endif // SDRAM_PHY_SUBCHANNELS
+            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 send_mrr(channel, rank, 5);
                 mr5 = recover_mrr_value(channel, module);
                 printf("mr5:%02"PRIx8"\n", mr5);
