@@ -314,98 +314,25 @@ static void CA_check_values(int32_t channel, uint8_t *success) {
     }
 }
 
-static void CS_CA_best_timings(void) {
-    int channel, rank, address, newdly, cntdly;
-    int min, max, temp;
-    min = SDRAM_PHY_DELAYS;
-    max = -SDRAM_PHY_DELAYS;
-
-    for (channel = 0; channel < CHANNELS; channel++) {
-        printf("Subchannel:%c Timings\n", 'A'+channel);
-        // If we ever have multiple ranks, and independent timing for them
-        // Uncomment loop below
-        // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-        {rank = 0;
-            temp = (cs_delays[channel][rank][0] + cs_delays[channel][rank][1])/2;
-            printf("Rank:%2d: min delay %2d, max delay %2d, center %2d\n",
-                rank, cs_delays[channel][rank][0], cs_delays[channel][rank][1], temp);
-
-            cs_final_delay[channel][rank] = temp;
-            min = min > temp ? temp : min;
-            max = max < temp ? temp : max;
-        }
-        for (address = 0; address < ca_line_count; address++) {
-            temp = (ca_delays[channel][address][0] + ca_delays[channel][address][1])/2;
-            printf("CA:%2d: min delay %2d, max delay %2d, center %2d\n",
-                address, ca_delays[channel][address][0], ca_delays[channel][address][1], temp);
-
-            ca_final_delay[channel][address] = temp;
-            min = min > temp ? temp : min;
-            max = max < temp ? temp : max;
-        }
-#ifdef DDR5_RDIMM
-        temp = (par_delays[channel][0] + par_delays[channel][1])/2;
-        printf("PAR: min delay %2d, max delay %2d, center %2d\n",
-            par_delays[channel][0], par_delays[channel][1], temp);
-
-        par_final_delay[channel] = temp;
-        min = min > temp ? temp : min;
-        max = max < temp ? temp : max;
-#endif // DDR5_RDIMM
-    }
-    printf("Max center point delay:%2d, min center point delay:%2d, spread:%2d\n", max, min, max-min);
-
-    printf("Adjusting clock delay, so min center point is at delay 0\n");
-
-    newdly = (SDRAM_PHY_DELAYS - min) % SDRAM_PHY_DELAYS;
-    printf("New clock delay:%2d\n", newdly);
-
-    ck_rst(0, 0, 0);
-    for (cntdly = 0; cntdly < newdly; ++cntdly)
-        ck_inc(0, 0, 0);
-
-        // If we ever have multiple ranks, and independent timing for them
-    for (channel = 0; channel < CHANNELS; channel++) {
-        // Uncomment loop below
-        // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-        {rank = 0;
-            cs_final_delay[channel][rank] -= min;
-            printf("Rank:%2d center point delay:%2d\n", rank, cs_final_delay[channel][rank]);
-            cs_rst(channel, rank, 0);
-            for (cntdly = 0; cntdly < cs_final_delay[channel][rank]; ++cntdly)
-                cs_inc(channel, rank, 0);
-
-        }
-        for (address = 0; address < ca_line_count; address++) {
-            ca_final_delay[channel][address] -= min;
-            printf("CA:%2d center point delay:%2d\n", address, ca_final_delay[channel][address]);
-            ca_rst(channel, 0, address);
-            for (cntdly = 0; cntdly < ca_final_delay[channel][address]; ++cntdly)
-                ca_inc(channel, 0, address);
-        }
-#ifdef DDR5_RDIMM
-        par_final_delay[channel] -= min;
-        printf("PAR center point delay:%2d\n", address, par_final_delay[channel]);
-            par_rst(channel, 0, 0);
-            for (cntdly = 0; cntdly < pra_final_delay[channel]; ++cntdly)
-                par_inc(channel, 0, 0);
-#endif // DDR5_RDIMM
-    }
-
+static void CS_CA_rescan(int ckdly) {
+    int channel, rank, address;
+    int tmpckdly, cntdly, discard;
     printf("Re-scan CS/CA\n");
+    for (channel = 0; channel < CHANNELS; channel++) {
+        printf("Subchannel:%c\n", 'A'+channel);
         // If we ever have multiple ranks, and independent timing for them
         // Uncomment loop below
         // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
         {rank = 0;
             printf("Rank:%d\n", rank);
             enter_cs(channel, rank);
-            temp = CS_find_offset(channel, rank);
-            CS_ck_scan(channel, rank, temp);
+            tmpckdly = CS_find_offset(channel, rank);
+            CS_ck_scan(channel, rank, tmpckdly);
             ck_rst(0, 0, 0);
-            for (cntdly = 0; cntdly < newdly; ++cntdly)
+            for (cntdly = 0; cntdly < ckdly; ++cntdly)
                 ck_inc(0, 0, 0);
             printf("|");
-            CS_scan(channel, rank, &temp, &temp);
+            CS_scan(channel, rank, &discard, &discard);
             printf("\n");
             exit_cs(channel, rank);
 
@@ -418,10 +345,10 @@ static void CS_CA_best_timings(void) {
                 printf("Address:%2d\n", address);
                 CA_ck_scan(channel, rank, address, cs_final_delay[channel][rank]);
                 ck_rst(0, 0, 0);
-                for (cntdly = 0; cntdly < newdly; ++cntdly)
+                for (cntdly = 0; cntdly < ckdly; ++cntdly)
                     ck_inc(0, 0, 0);
                 printf("|");
-                CA_scan(channel, rank, address, &temp, &temp);
+                CA_scan(channel, rank, address, &discard, &discard);
                 printf("\n");
                 ca_rst(channel, rank, address);
                 for (cntdly = 0; cntdly < ca_final_delay[channel][address]; ++cntdly)
@@ -430,6 +357,101 @@ static void CS_CA_best_timings(void) {
             exit_ca(channel, rank);
         }
     }
+}
+
+static void CS_CA_min_max_midpoints(int *min, int *max) {
+    int channel, rank, address;
+    int temp;
+    for (channel = 0; channel < CHANNELS; channel++) {
+        printf("Subchannel:%c Timings\n", 'A'+channel);
+        // If we ever have multiple ranks, and independent timing for them
+        // Uncomment loop below
+        // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
+        {rank = 0;
+            temp = (cs_delays[channel][rank][0] + cs_delays[channel][rank][1])/2;
+            printf("Rank:%2d: min delay %2d, max delay %2d, center %2d\n",
+                rank, cs_delays[channel][rank][0], cs_delays[channel][rank][1], temp);
+
+            cs_final_delay[channel][rank] = temp;
+            *min = *min > temp ? temp : *min;
+            *max = *max < temp ? temp : *max;
+        }
+        for (address = 0; address < ca_line_count; address++) {
+            temp = (ca_delays[channel][address][0] + ca_delays[channel][address][1])/2;
+            printf("CA:%2d: min delay %2d, max delay %2d, center %2d\n",
+                address, ca_delays[channel][address][0], ca_delays[channel][address][1], temp);
+
+            ca_final_delay[channel][address] = temp;
+            *min = *min > temp ? temp : *min;
+            *max = *max < temp ? temp : *max;
+        }
+#ifdef DDR5_RDIMM
+        temp = (par_delays[channel][0] + par_delays[channel][1])/2;
+        printf("PAR: min delay %2d, max delay %2d, center %2d\n",
+            par_delays[channel][0], par_delays[channel][1], temp);
+
+        par_final_delay[channel] = temp;
+        *min = *min > temp ? temp : *min;
+        *max = *max < temp ? temp : *max;
+#endif // DDR5_RDIMM
+    }
+}
+
+static void CS_CA_setup_new_delays(int ck_offset) {
+    int channel, rank, address, cntdly;
+    for (channel = 0; channel < CHANNELS; channel++) {
+        printf("Subchannel:%c Adjusted Tick_offsetgs\n", 'A'+channel);
+        // If we ever have multiple ranks, and independent tick_offsetg for them
+        // Uncomment loop below
+        // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
+        {rank = 0;
+            cs_final_delay[channel][rank] -= ck_offset;
+            printf("Rank:%2d center point delay:%2d\n", rank, cs_final_delay[channel][rank]);
+            cs_rst(channel, rank, 0);
+            for (cntdly = 0; cntdly < cs_final_delay[channel][rank]; ++cntdly)
+                cs_inc(channel, rank, 0);
+
+        }
+        for (address = 0; address < ca_line_count; address++) {
+            ca_final_delay[channel][address] -= ck_offset;
+            printf("CA:%2d center point delay:%2d\n", address, ca_final_delay[channel][address]);
+            ca_rst(channel, 0, address);
+            for (cntdly = 0; cntdly < ca_final_delay[channel][address]; ++cntdly)
+                ca_inc(channel, 0, address);
+        }
+#ifdef DDR5_RDIMM
+        par_final_delay[channel] -= ck_offset;
+        printf("PAR center point delay:%2d\n", address, par_final_delay[channel]);
+            par_rst(channel, 0, 0);
+            for (cntdly = 0; cntdly < pra_final_delay[channel]; ++cntdly)
+                par_inc(channel, 0, 0);
+#endif // DDR5_RDIMM
+    }
+}
+
+static void CK_CS_CA_best_timings(void) {
+    int new_ckdly, cntdly;
+    int min, max;
+    min = SDRAM_PHY_DELAYS;
+    max = -SDRAM_PHY_DELAYS;
+
+    CS_CA_min_max_midpoints(&min, &max);
+
+    printf("Max center point delay:%2d, min center point delay:%2d, spread:%2d\n", max, min, max-min);
+
+    printf("Adjusting clock delay, so min center point is at delay 0\n");
+
+    new_ckdly = (SDRAM_PHY_DELAYS - min) % SDRAM_PHY_DELAYS;
+
+    printf("New clock delay:%2d\n", new_ckdly);
+
+    ck_rst(0, 0, 0);
+    for (cntdly = 0; cntdly < new_ckdly; ++cntdly)
+        ck_inc(0, 0, 0);
+    CS_CA_setup_new_delays(new_ckdly);
+
+    CS_CA_rescan(new_ckdly);
+
     max_value = max - min;
 }
 
@@ -453,7 +475,7 @@ void sdram_ddr5_cs_ca_training(void) {
     if (!(CS_success & CA_success)) {
         enable_dfi_2n_mode();
     } else {
-        CS_CA_best_timings();
+        CK_CS_CA_best_timings();
         for (channel = 0; channel < CHANNELS; channel++) {
             for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
                 disable_dram_2n_mode(channel, rank);
@@ -488,7 +510,7 @@ void sdram_ddr5_cs_ca_training(void) {
     if (!(CS_success & CA_success)) {
         enable_dfi_2n_mode();
     } else {
-        CS_CA_best_timings();
+        CK_CS_CA_best_timings();
         for (channel = 0; channel < CHANNELS; channel++) {
             // If we ever have multiple ranks, and independent timing for them
             // Uncomment loop below
