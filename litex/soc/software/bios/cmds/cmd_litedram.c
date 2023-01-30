@@ -13,6 +13,7 @@
 
 #include <liblitedram/sdram.h>
 #include <liblitedram/sdram_spd.h>
+#include <liblitedram/sdram_rcd.h>
 #include <liblitedram/bist.h>
 #include <liblitedram/accessors.h>
 
@@ -449,6 +450,164 @@ static void sdram_spd_handler(int nb_params, char **params)
 }
 define_command(sdram_spd, sdram_spd_handler, "Read SDRAM SPD EEPROM", LITEDRAM_CMDS);
 #endif
+
+#if defined(CONFIG_HAS_I2C) && (defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_DDR4_RDIMM))
+#define EXTRACT_BYTE(data, i)	(((data) & (0xff << ((i) * 8))) >> ((i) * 8))
+
+/**
+ * Command "sdram_rcd_read_dword"
+ *
+ * Read from SDRAM RCD
+ *
+ */
+static void sdram_rcd_read_handler(int nb_params, char **params)
+{
+	char *c;
+	uint8_t rcd = 0;
+	uint8_t reg_num = 0;
+	uint8_t page_num = 0;
+	uint8_t function = 0;
+	bool byte_read = false;
+
+	if (nb_params < 3) {
+		printf("sdram_rcd_read <rcd> <page_num> <reg_num> [<function>] [<byte_read>]");
+		return;
+	}
+
+	rcd = strtoul(params[0], &c, 0);
+	if (*c != 0 || rcd > 7) {
+		printf("Incorrect RCD number");
+		return;
+	}
+
+	reg_num = strtoul(params[1], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect register number");
+		return;
+	}
+
+	page_num = strtoul(params[2], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect page number");
+		return;
+	}
+
+	if (nb_params > 3) {
+		function = strtoul(params[3], &c, 0);
+		if (*c != 0) {
+			printf("Incorrect function");
+			return;
+		}
+	}
+
+	if (nb_params > 4) {
+		byte_read = strtoul(params[4], &c, 0);
+		if (*c != 0) {
+			printf("Incorrect byte_read value");
+			return;
+		}
+	}
+
+	uint8_t data[5];
+	if (!sdram_rcd_read(rcd, 0, function, page_num, reg_num, data, byte_read)) {
+		printf("NACK received");
+		return;
+	}
+
+	uint8_t status = data[0];
+	if (!(status & 0x01))
+		printf("Status byte reported operation not successful\n");
+
+	if (status & 0x10)
+		printf("Status byte reported internal target abort\n");
+
+	dump_bytes((unsigned int *) &data[1], 4, (page_num << 8) | reg_num);
+
+}
+define_command(sdram_rcd_read, sdram_rcd_read_handler, "Read from SDRAM RCD", LITEDRAM_CMDS);
+
+/**
+ * Command "sdram_rcd_write"
+ *
+ * Write to SDRAM RCD
+ *
+ */
+static void sdram_rcd_write_handler(int nb_params, char **params)
+{
+	char *c;
+	uint8_t rcd = 0;
+	uint8_t reg_num = 0;
+	uint8_t page_num = 0;
+	uint32_t data = 0;
+	uint8_t size = 0;
+	uint8_t function = 0;
+	bool byte_write = false;
+
+	if (nb_params < 5) {
+		printf("sdram_rcd_write <rcd> <page_num> <reg_num> <data> <size> [<function>] [<byte_write>]");
+		return;
+	}
+
+	rcd = strtoul(params[0], &c, 0);
+	if (*c != 0 || rcd > 7) {
+		printf("Incorrect RCD number");
+		return;
+	}
+
+	reg_num = strtoul(params[1], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect register number");
+		return;
+	}
+
+	page_num = strtoul(params[2], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect page number");
+		return;
+	}
+
+	data = strtoul(params[3], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect data value");
+		return;
+	}
+
+	size = strtoul(params[4], &c, 0);
+	if (*c != 0 || (size != 1 && size != 2 && size != 4)) {
+		printf("Incorrect size");
+		return;
+	}
+
+	if (nb_params > 5) {
+		function = strtoul(params[5], &c, 0);
+		if (*c != 0) {
+			printf("Incorrect function");
+			return;
+		}
+	}
+
+	if (nb_params > 6) {
+		byte_write = strtoul(params[6], &c, 0);
+		if (*c != 0) {
+			printf("Incorrect byte_write value");
+			return;
+		}
+	}
+
+	const uint8_t data_array[4] = {
+		EXTRACT_BYTE(data, 3),
+		EXTRACT_BYTE(data, 2),
+		EXTRACT_BYTE(data, 1),
+		EXTRACT_BYTE(data, 0),
+	};
+
+	if (!sdram_rcd_write(rcd, 0, function, page_num, reg_num, data_array, size, byte_write)) {
+		printf("NACK received");
+		return;
+	}
+}
+define_command(sdram_rcd_write, sdram_rcd_write_handler, "Write to SDRAM RCD", LITEDRAM_CMDS);
+#endif /* defined(CONFIG_HAS_I2C) && (defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_DDR4_RDIMM)) */
 
 #ifdef SDRAM_DEBUG
 define_command(sdram_debug, sdram_debug, "Run SDRAM debug tests", LITEDRAM_CMDS);
