@@ -71,6 +71,10 @@ class XilinxClocking(Module, AutoCSR):
                     **(dict(p_BUFR_DIVIDE="BYPASS") if bypass else dict(p_BUFR_DIVIDE=str(div))),
                     name=name
                 )
+            elif buf == "bufmr":
+                self.specials += Instance(
+                    "BUFMR", i_I=clkout, o_O=clkout_buf, name=name,
+                )
             elif buf == "bufgce":
                 if ce is None:
                     raise ValueError("BUFGCE requires user to provide a clock enable ce Signal")
