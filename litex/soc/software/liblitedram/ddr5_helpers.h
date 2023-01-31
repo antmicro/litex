@@ -5,6 +5,13 @@
 #define LIBLITEDRAM_DDR5_HELPERS_H
 
 #ifdef MEMORY_TYPE_DDR5
+
+#ifdef SDRAM_PHY_SUBCHANNELS
+#define CHANNELS 2
+#else
+#define CHANNELS 1
+#endif
+
 int prep_payload (int cs, int command, int wrdata_en,
                   uint32_t wrdata_mask, int rddata_en);
 void upload_payload(int channel, int phases, int payload);
@@ -32,7 +39,7 @@ void enable_dfi_2n_mode(void);
 void disable_dfi_2n_mode(void);
 void disable_dram_2n_mode(int, int);
 
-#define WRDATA_BITMASK ((1<<(2*SDRAM_PHY_MODULES))-1)
+#define WRDATA_BITMASK ((1<<(2*SDRAM_PHY_MODULES/CHANNELS))-1)
 
 // Use max int16_t, all Fs could be interpreted as -1
 #define UNSET_DELAY 0xefff

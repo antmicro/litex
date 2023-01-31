@@ -45,12 +45,6 @@ int par_final_delay[2];
 
 int WICA = 0;
 
-#ifdef SDRAM_PHY_SUBCHANNELS
-#define CHANNELS 2
-#else
-#define CHANNELS 1
-#endif
-
 static int CS_on_edge_detect(int32_t channel, int32_t rank) {
     int offset, _result;
     for (offset = 0; offset < 2; offset++) {
