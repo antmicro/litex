@@ -124,6 +124,7 @@ void write_rst_dq_bitslip(int module) {
 
 #endif // defined(SDRAM_PHY_BITSLIPS)
 
+#if defined(CSR_DDRPHY_DLY_SEL_ADDR)
 void sdram_select(int module, int dq_line) {
 	ddrphy_dly_sel_write(1 << module);
 
@@ -158,6 +159,7 @@ void sdram_leveling_action(int module, int dq_line, action_callback action) {
 	/* Un-select module */
 	sdram_deselect(module, dq_line);
 }
+#endif // defined(CSR_DDRPHY_DLY_SEL_ADDR)
 
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
 int _sdram_write_leveling_dat_delays[16];
