@@ -884,14 +884,7 @@ void ck_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, address);
     /* Reset CK delay */
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if (channel)
-        ddrphy_B_ckdly_rst_write(1);
-    else
-        ddrphy_A_ckdly_rst_write(1);
-#else
     ddrphy_ckdly_rst_write(1);
-#endif //SDRAM_PHY_SUBCHANNELS
     phy_deselect(channel, address);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
@@ -900,14 +893,7 @@ void ck_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, address);
     /* Increment CK delay */
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if (channel)
-        ddrphy_B_ckdly_inc_write(1);
-    else
-        ddrphy_A_ckdly_inc_write(1);
-#else
     ddrphy_ckdly_inc_write(1);
-#endif //SDRAM_PHY_SUBCHANNELS
     phy_deselect(channel, address);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
