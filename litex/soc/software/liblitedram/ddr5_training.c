@@ -1,6 +1,6 @@
 #include <liblitedram/ddr5_training.h>
 
-#if defined(CSR_SDRAM_BASE) && defined(MEMORY_TYPE_DDR5)
+#if defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
 #include <liblitedram/ddr5_helpers.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -1203,4 +1203,4 @@ void sdram_ddr5_write_training(void) {
     }
 }
 
-#endif // defined(CSR_SDRAM_BASE) && defined(MEMORY_TYPE_DDR5)
+#endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)

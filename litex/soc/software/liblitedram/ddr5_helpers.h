@@ -5,7 +5,7 @@
 #ifdef CSR_SDRAM_BASE
 #include <generated/sdram_phy.h>
 
-#ifdef MEMORY_TYPE_DDR5
+#ifdef SDRAM_PHY_DDR5
 
 #ifdef SDRAM_PHY_SUBCHANNELS
 #define CHANNELS 2
@@ -120,7 +120,7 @@ void enter_write_leveling(int channel);
 void wleveling_scan(int *cycle, int *got, int *start_cycle, int *start_delay,
                     int channel, int rank, int module);
 void exit_write_leveling(int channel);
-#endif // MEMORY_TYPE_DDR5
+#endif // SDRAM_PHY_DDR5
 
 #endif // CSR_SDRAM_BASE
 

@@ -1,6 +1,6 @@
 #include <liblitedram/ddr5_helpers.h>
 
-#if defined(CSR_SDRAM_BASE) && defined(MEMORY_TYPE_DDR5)
+#if defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
 
 #include <stdio.h>
 
@@ -1405,4 +1405,4 @@ void exit_write_leveling(int channel) {
 #endif
 }
 
-#endif // defined(CSR_SDRAM_BASE) && defined(MEMORY_TYPE_DDR5)
+#endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)

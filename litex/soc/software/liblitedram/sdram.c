@@ -29,12 +29,12 @@
 #include <liblitedram/sdram_dbg.h>
 #include <liblitedram/sdram_spd.h>
 
-#ifdef MEMORY_TYPE_DDR5
+#ifdef SDRAM_PHY_DDR5
 #include <liblitedram/ddr5_helpers.h>
 #include <liblitedram/ddr5_training.h>
 #else
 #include <liblitedram/accessors.h>
-#endif
+#endif // SDRAM_PHY_DDR5
 
 //#define SDRAM_TEST_DISABLE
 #define SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
@@ -110,7 +110,7 @@ int sdram_get_cwl(void) {
 /*-----------------------------------------------------------------------*/
 
 #ifdef CSR_DDRPHY_BASE
-#ifndef MEMORY_TYPE_DDR5
+#ifndef SDRAM_PHY_DDR5
 static unsigned char sdram_dfii_get_rdphase(void) {
 #ifdef CSR_DDRPHY_RDPHASE_ADDR
 	return ddrphy_rdphase_read();
@@ -222,7 +222,7 @@ static void command_pwr(unsigned int value) {
 	unsigned char wrphase = sdram_dfii_get_wrphase();
 	command_px(wrphase, value);
 }
-#endif // ndef MEMORY_TYPE_DDR5
+#endif // ndef SDRAM_PHY_DDR5
 #endif // CSR_DDRPHY_BASE
 
 /*-----------------------------------------------------------------------*/
@@ -236,7 +236,7 @@ void sdram_software_control_on(void) {
 	unsigned int previous;
 	previous = sdram_dfii_control_read();
 	/* Switch DFII to software control */
-#ifndef MEMORY_TYPE_DDR5
+#ifndef SDRAM_PHY_DDR5
 	if (previous != DFII_CONTROL_SOFTWARE) {
 		sdram_dfii_control_write(DFII_CONTROL_SOFTWARE);
 		printf("Switching SDRAM to software control.\n");
@@ -247,7 +247,7 @@ void sdram_software_control_on(void) {
 		sdram_dfii_control_write(previous);
 		printf("Switching SDRAM to software control.\n");
 	}
-#endif // MEMORY_TYPE_DDR5
+#endif // SDRAM_PHY_DDR5
 
 #if CSR_DDRPHY_EN_VTC_ADDR
 	/* Disable Voltage/Temperature compensation */
@@ -259,7 +259,7 @@ void sdram_software_control_off(void) {
 	unsigned int previous;
 	previous = sdram_dfii_control_read();
 	/* Switch DFII to hardware control */
-#ifndef MEMORY_TYPE_DDR5
+#ifndef SDRAM_PHY_DDR5
 	if (previous != DFII_CONTROL_HARDWARE) {
 		sdram_dfii_control_write(DFII_CONTROL_HARDWARE);
 		printf("Switching SDRAM to hardware control.\n");
@@ -281,7 +281,7 @@ void sdram_software_control_off(void) {
 /*  Mode Register                                                        */
 /*-----------------------------------------------------------------------*/
 
-#ifndef MEMORY_TYPE_DDR5
+#ifndef SDRAM_PHY_DDR5
 void sdram_mode_register_write(char reg, int value) {
 	sdram_dfii_pi0_address_write(value);
 	sdram_dfii_pi0_baddress_write(reg);
@@ -291,7 +291,7 @@ void sdram_mode_register_write(char reg, int value) {
 void sdram_mode_register_write(char reg, int value) {}
 #endif
 
-#if !defined(MEMORY_TYPE_DDR5) && defined(CSR_DDRPHY_BASE)
+#if !defined(SDRAM_PHY_DDR5) && defined(CSR_DDRPHY_BASE)
 
 /*-----------------------------------------------------------------------*/
 /* Leveling Centering (Common for Read/Write Leveling)                   */
@@ -979,7 +979,7 @@ void sdram_read_leveling(void) {
 
 #endif // SDRAM_PHY_READ_LEVELING_CAPABLE
 
-#endif /* !defined(MEMORY_TYPE_DDR5) && defined(CSR_DDRPHY_BASE) */
+#endif /* !defined(SDRAM_PHY_DDR5) && defined(CSR_DDRPHY_BASE) */
 
 /*-----------------------------------------------------------------------*/
 /* Write latency calibration                                             */
@@ -1215,7 +1215,7 @@ int sdram_init(void) {
 	ddrctrl_init_error_write(0);
 #endif // CSR_DDRCTRL_BASE
 	reset_sequence();
-#ifdef MEMORY_TYPE_DDR5
+#ifdef SDRAM_PHY_DDR5
 	sdram_ddr5_module_enumerate();
 	sdram_ddr5_cs_ca_training();
 	if (in_2n_mode()) {
@@ -1232,7 +1232,7 @@ int sdram_init(void) {
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 	sdram_leveling();
 #endif // defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
-#endif /* MEMORY_TYPE_DDR5 */
+#endif /* SDRAM_PHY_DDR5 */
 	sdram_software_control_off();
 
 	printf("\nSelected bitslips and delays:\n");
@@ -1317,7 +1317,7 @@ int sdram_set_timings(struct sdram_timings_s *timings)
 	sdram_controller_tRRD_write(timings->trrd);
 	sdram_controller_tRC_write(timings->trc);
 	sdram_controller_tRAS_write(timings->tras);
-#if !defined(MEMORY_TYPE_LPDDR4) && !defined(MEMORY_TYPE_LPDDR5) && !defined(MEMORY_TYPE_DDR5)
+#if !defined(SDRAM_PHY_LPDDR4) && !defined(SDRAM_PHY_LPDDR5) && !defined(SDRAM_PHY_DDR5)
 	sdram_controller_tZQCS_write(timings->tzqcs);
 #endif
 
