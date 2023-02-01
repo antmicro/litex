@@ -6,6 +6,8 @@
 
 #include <liblitedram/accessors.h>
 
+#include <liblitedram/sdram_rcd.h>
+
 //#define DEBUG_DDR5
 
 static int N2_mode = 1;
@@ -1404,5 +1406,368 @@ void exit_write_leveling(int channel) {
     return ddrphy_wlevel_en_write(0);
 #endif
 }
+
+/*-----------------------------------------------------------------------*/
+/* RCD Training Helpers                                                  */
+/*-----------------------------------------------------------------------*/
+
+#if defined(CONFIG_HAS_I2C)
+
+/*-----------------------------------------------------------------------*/
+/* Host->RCD CS Training (DCSTM) Helpers                                 */
+/*-----------------------------------------------------------------------*/
+
+/**
+ * enter_dcstm
+ *
+ * Enables Host->RCD CS training (DCSTM) for selected subchannel on selected rank.
+ * JESD82-511 5.1.1
+ */
+void enter_dcstm(int channel, int rank) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+    uint8_t rw_data[4];
+
+    // we need to modify RW01 and RW02
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    // in RW01 we unset bit 5 to make sure we get channel feedback on alert_n
+    rw_data[1] &= ~(1 << 5);
+
+    // in RW02 we select CS training mode
+    // channel A settings: RW02[1:0]
+    // channel B settings: RW02[3:2]
+    // higher bit selects CS training mode, while lower bit selects rank
+    rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    rw_data[2] |= (0b10 | (rank & 1)) << (2 * channel); // set new bits
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, rw_data, 4, false);
+
+    if (!ok)
+        printf("There was a problem with entering Host->RCD CS training (DCSTM)\n");
+}
+
+/**
+ * exit_dcstm
+ *
+ * Disables Host->RCD CS training (DCSTM) for selected subchannel on selected rank.
+ * JESD82-511 5.1.1
+ */
+void exit_dcstm(int channel, int rank) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+    uint8_t rw_data[4];
+
+    // we need to modify RW02
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    // in RW02 we clear training mode setting
+    // channel A settings: RW02[1:0]
+    // channel B settings: RW02[3:2]
+    rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 2, &rw_data[2], 1, false);
+
+    if (!ok)
+        printf("There was a problem with exiting Host->RCD CS training (DCSTM)\n");
+}
+
+/*-----------------------------------------------------------------------*/
+/* RCD->DRAM CS Training (QCSTM) Helpers                                 */
+/*-----------------------------------------------------------------------*/
+
+static uint8_t qcs_delays[2][SDRAM_PHY_RANKS] = {}; // init with 0s
+
+/**
+ * qcs_inc
+ *
+ * Increment output delay for QCS signal
+ * JESD82-511 8.13.6-9
+ */
+void qcs_inc(int channel, int rank, int address) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+
+    uint8_t *qcs_dly = &qcs_delays[channel][rank];
+     *qcs_dly = (*qcs_dly + 1) & 0x7f; // delay is a is 6-bit value + 1 bit for full cycle delay
+
+    // 0x17: QACS0_n, 0x18: QACS1_n, 0x19: QBCS0_n, 0x1a: QBCS1_n
+    uint8_t rw_number = 0x17 + (rank & 1) + (2 * channel);
+    uint8_t rw_value = *qcs_dly | (1 << 7); // enable delays
+
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+
+    if (!ok)
+        printf("There was a problem with incrementing Q%cCS%c_n output delay\n", 'A' + channel, '0' + (rank & 1));
+}
+
+/**
+ * qcs_rst
+ *
+ * Reset output delay for QCS signal
+ * JESD82-511 8.13.6-9
+ */
+void qcs_rst(int channel, int rank, int address) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+
+    qcs_delays[channel][rank] = 0;
+
+    // 0x17: QACS0_n, 0x18: QACS1_n, 0x19: QBCS0_n, 0x1a: QBCS1_n
+    uint8_t rw_number = 0x17 + (rank & 1) + (2 * channel);
+    uint8_t rw_value = 0; // RW[7] bit is 0, means output delays are disabled
+
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+
+    if (!ok)
+        printf("There was a problem with resetting Q%cCS%c_n output delay\n", 'A' + channel, '0' + (rank & 1));
+}
+
+/**
+ * enter_qcstm
+ *
+ * Enables RCD->DRAM CS training (QCSTM) for selected subchannel on selected rank.
+ * JESD82-511 5.1.2
+ */
+void enter_qcstm(int channel, int rank) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+    uint8_t rw_data[4];
+
+    // we need to modify RW03
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    // in RW03 we select CS training mode
+    // QCSTM enable: RW03[0]
+    // QCSTM rank selection: RW03[1]
+    rw_data[3] &= ~(0b11); // clear setting bits
+    rw_data[3] |= 0b10 | (rank & 1); // set new bits
+
+    // write RW03 setting back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 3, &rw_data[3], 1, false);
+
+    if (!ok)
+        printf("There was a problem with entering RCD->DRAM CS training (QCSTM)\n");
+}
+
+/**
+ * exit_qcstm
+ *
+ * Disables RCD->DRAM CS training (QCSTM) for selected subchannel on selected rank.
+ * JESD82-511 5.1.2
+ */
+void exit_qcstm(int channel, int rank) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+    uint8_t rw_data[4];
+
+    // we need to modify RW03
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    // in RW03 we disable CS training mode
+    // QCSTM enable: RW03[0]
+    // QCSTM rank selection: RW03[1]
+    rw_data[3] &= ~1; // clear lowest bit
+
+    // write RW03 setting back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 3, &rw_data[3], 1, false);
+
+    if (!ok)
+        printf("There was a problem with exiting RCD->DRAM CS training (QCSTM)\n");
+}
+
+/*-----------------------------------------------------------------------*/
+/* Host->RCD CA Training (DCATM) Helpers                                 */
+/*-----------------------------------------------------------------------*/
+
+/**
+ * enter_dcatm
+ *
+ * Enables Host->RCD CA training (DCATM) for selected subchannel on selected rank.
+ * JESD82-511 5.2.1
+ */
+void enter_dcatm(int channel, int rank) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+    uint8_t rw_data[4];
+
+    // we need to modify RW01 and RW02
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    // in RW01 we unset bit 5 to make sure we get channel feedback on alert_n
+    rw_data[1] &= ~(1 << 5);
+
+    // in RW02 we select CA training mode
+    // channel A settings: RW02[1:0]
+    // channel B settings: RW02[3:2]
+    // write 0b01 to enter CA training
+    rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    rw_data[2] |=   0b01 << (2 * channel);  // set new bits
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 2, rw_data, 4, false);
+
+    if (!ok)
+        printf("There was a problem with entering Host->RCD CA training (DCATM)\n");
+}
+
+/**
+ * exit_dcatm
+ *
+ * Disables Host->RCD CA training (DCATM) for selected subchannel on selected rank.
+ * JESD82-511 5.2.1
+ */
+void exit_dcatm(int channel, int rank) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+    uint8_t rw_data[4];
+
+    // we need to modify RW02
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    // channel A settings: RW02[1:0]
+    // channel B settings: RW02[3:2]
+    rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 2, &rw_data[2], 1, false);
+
+    if (!ok)
+        printf("There was a problem with exiting Host->RCD CA training (DCATM)\n");
+}
+
+/*-----------------------------------------------------------------------*/
+/* RCD->DRAM CA Training (QCATM) Helpers                                 */
+/*-----------------------------------------------------------------------*/
+
+static uint8_t qca_delays[2][14] = {}; // init with 0s
+
+/**
+ * qca_inc
+ *
+ * Increment output delay for QCA signal
+ * JESD82-511 8.13.10-11
+ */
+void qca_inc(int channel, int rank, int address) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+
+    uint8_t *qca_dly = &qca_delays[channel][address];
+     *qca_dly = (*qca_dly + 1) & 0x7f; // delay is a is 6-bit value + 1 bit for full cycle delay
+
+    // 0x1b: QACA, 0x1c: QBCA
+    uint16_t rw_number = 0x1b + channel;
+    uint8_t rw_value = *qca_dly | (1 << 7); // enable delays
+
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+
+    if (!ok)
+        printf("There was a problem with incrementing Q%cCA output delay\n", 'A' + channel);
+}
+
+/**
+ * qca_rst
+ *
+ * Reset output delay for QCA signal
+ * JESD82-511 8.13.10-11
+ */
+void qca_rst(int channel, int rank, int address) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+
+    qca_delays[channel][address] = 0;
+
+    // 0x1b: QACA, 0x1c: QBCA
+    uint16_t rw_number = 0x1b + channel;
+    uint8_t rw_value = 0; // RW[7] bit is 0, means output delays are disabled
+
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+
+    if (!ok)
+        printf("There was a problem with resetting Q%cCA output delay\n", 'A' + channel);
+}
+
+/**
+ * enter_qcatm
+ *
+ * Enables RCD->DRAM CA training (QCATM) for selected subchannel on selected rank.
+ * While there is no real QCA Training Mode, we still need to enable CA Pass-Through
+ * mode, which can be treated like enabling QCA Training Mode.
+ * JESD82-511 5.2.2
+ */
+void enter_qcatm(int channel, int rank) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+    uint8_t rw_data[4];
+
+    // we need to modify RW00, RW01
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    // we set RW00[2] to enable CA Pass Through mode
+    rw_data[0] |= 1 << 2;
+    // in RW00[3] we select rank for CA Pass Through mode
+    rw_data[0] |= (rank & 1) << 3;
+    // Power Down Mode (RW00[6]) must be disabled
+    // TODO: I think Power Down Mode is already disabled at this point
+    rw_data[0] &= ~(1 << 6);
+
+    // CA Parity Checking (RW01[0]) needs to be disabled
+    rw_data[1] &= ~1;
+    // RCD must be set to forward DRAM commands (RW01[1])
+    rw_data[1] |= 0b10;
+
+    // write RW00 and RW01 settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, rw_data, 2, false);
+
+    if (!ok)
+        printf("There was a problem with entering RCD->DRAM CA training (QCATM)\n");
+}
+
+/**
+ * exit_qcatm
+ *
+ * Disables RCD->DRAM CA training (QCATM) for selected subchannel on selected rank.
+ * While there is no real QCA Training Mode, we still need to disable CA Pass-Through
+ * mode, which can be treated like disabling QCA Training Mode.
+ * JESD82-511 5.2.2
+ */
+void exit_qcatm(int channel, int rank) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+    uint8_t rw_data[4];
+
+    // we need to modify RW00, RW01
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    // we unset RW00[2] to disable CA Pass Through mode
+    rw_data[0] &= ~(1 << 2);
+
+    // TODO: do we reenable them?
+    // // CA Parity Checking (RW01[0]) needs to be disabled
+    // rw_data[1] &= ~1;
+    // // RCD must be set to forward DRAM commands (RW01[1])
+    // rw_data[1] |= 0b10;
+
+    // write RW00 and RW01 settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, rw_data, 2, false);
+
+    if (!ok)
+        printf("There was a problem with exiting RCD->DRAM CA training (QCATM)\n");
+}
+#endif // defined(CONFIG_HAS_I2C)
 
 #endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
