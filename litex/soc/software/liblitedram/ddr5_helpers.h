@@ -121,7 +121,7 @@ void wleveling_scan(int *cycle, int *got, int *start_cycle, int *start_delay,
                     int channel, int rank, int module);
 void exit_write_leveling(int channel);
 
-#if defined(SDRAM_PHY_RDIMM) && defined(CONFIG_HAS_I2C)
+#if defined(CONFIG_HAS_I2C)
 void enter_dcstm(int channel, int rank);
 void exit_dcstm(int channel, int rank);
 
@@ -137,7 +137,7 @@ void qca_inc(int channel, int rank, int address);
 void qca_rst(int channel, int rank, int address);
 void enter_qcatm(int channel, int rank);
 void exit_qcatm(int channel, int rank);
-#endif // defined(SDRAM_PHY_RDIMM) && defined(CONFIG_HAS_I2C)
+#endif // defined(CONFIG_HAS_I2C)
 
 #endif // SDRAM_PHY_DDR5
 

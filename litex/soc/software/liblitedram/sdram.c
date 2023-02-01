@@ -1217,7 +1217,7 @@ int sdram_init(void) {
 	reset_sequence();
 #ifdef SDRAM_PHY_DDR5
 	sdram_ddr5_module_enumerate();
-	sdram_ddr5_cs_ca_training();
+	sdram_ddr5_cs_ca_training(&host_dram_ctx);
 	if (in_2n_mode()) {
 		printf("2N mode setup\n");
 		init_sequence_2n();
