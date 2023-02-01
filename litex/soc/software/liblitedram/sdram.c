@@ -29,10 +29,11 @@
 #include <liblitedram/sdram_dbg.h>
 #include <liblitedram/sdram_spd.h>
 
-#include <liblitedram/accessors.h>
-
 #ifdef MEMORY_TYPE_DDR5
+#include <liblitedram/ddr5_helpers.h>
 #include <liblitedram/ddr5_training.h>
+#else
+#include <liblitedram/accessors.h>
 #endif
 
 //#define SDRAM_TEST_DISABLE

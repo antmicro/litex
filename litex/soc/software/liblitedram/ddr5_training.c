@@ -11,7 +11,6 @@
 
 #define BYTES_PER_MODULE (SDRAM_PHY_DQ_DQS_RATIO/4)
 
-int N2_mode = 1;
 int enumerated = 0;
 
 // Addressing: channel, pin, 0-right eye closing, 1-left eye closing
@@ -1202,10 +1201,6 @@ void sdram_ddr5_write_training(void) {
             }
         }
     }
-}
-
-int in_2n_mode(void) {
-    return N2_mode;
 }
 
 #endif // MEMORY_TYPE_DDR5

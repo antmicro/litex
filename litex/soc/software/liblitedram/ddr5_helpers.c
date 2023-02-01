@@ -6,7 +6,7 @@
 #ifdef MEMORY_TYPE_DDR5
 //#define DEBUG_DDR5
 
-extern int N2_mode;
+static int N2_mode = 1;
 extern int enumerated;
 
 int prep_payload (int cs, int command, int wrdata_en,
@@ -354,6 +354,10 @@ void enable_dfi_2n_mode(void) {
     sdram_dfii_control_write(value);
     printf("Switching DFI to 2N mode\n");
     N2_mode = 1;
+}
+
+int in_2n_mode(void) {
+    return N2_mode;
 }
 
 void disable_dram_2n_mode(int channel, int rank) {

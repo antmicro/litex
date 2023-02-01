@@ -38,6 +38,7 @@ void read_registers(int channel, int rank, int module);
 void enable_dfi_2n_mode(void);
 void disable_dfi_2n_mode(void);
 void disable_dram_2n_mode(int, int);
+int in_2n_mode(void);
 
 #define WRDATA_BITMASK ((1<<(2*SDRAM_PHY_MODULES/CHANNELS))-1)
 
