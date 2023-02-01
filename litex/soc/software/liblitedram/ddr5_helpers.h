@@ -1,8 +1,9 @@
+#ifndef LIBLITEDRAM_DDR5_HELPERS_H
+#define LIBLITEDRAM_DDR5_HELPERS_H
+
 #include <generated/csr.h>
 #ifdef CSR_SDRAM_BASE
 #include <generated/sdram_phy.h>
-#ifndef LIBLITEDRAM_DDR5_HELPERS_H
-#define LIBLITEDRAM_DDR5_HELPERS_H
 
 #ifdef MEMORY_TYPE_DDR5
 
@@ -120,5 +121,7 @@ void wleveling_scan(int *cycle, int *got, int *start_cycle, int *start_delay,
                     int channel, int rank, int module);
 void exit_write_leveling(int channel);
 #endif // MEMORY_TYPE_DDR5
-#endif // LIBLITEDRAM_DDR5_HELPERS_H
+
 #endif // CSR_SDRAM_BASE
+
+#endif // LIBLITEDRAM_DDR5_HELPERS_H

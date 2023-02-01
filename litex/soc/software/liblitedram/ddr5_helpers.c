@@ -1,9 +1,11 @@
-#include <liblitedram/accessors.h>
 #include <liblitedram/ddr5_helpers.h>
-#ifdef LIBLITEDRAM_DDR5_HELPERS_H
+
+#if defined(CSR_SDRAM_BASE) && defined(MEMORY_TYPE_DDR5)
+
 #include <stdio.h>
 
-#ifdef MEMORY_TYPE_DDR5
+#include <liblitedram/accessors.h>
+
 //#define DEBUG_DDR5
 
 static int N2_mode = 1;
@@ -1402,5 +1404,5 @@ void exit_write_leveling(int channel) {
     return ddrphy_wlevel_en_write(0);
 #endif
 }
-#endif // MEMORY_TYPE_DDR5
-#endif // LIBLITEDRAM_DDR5_HELPERS_H
+
+#endif // defined(CSR_SDRAM_BASE) && defined(MEMORY_TYPE_DDR5)
