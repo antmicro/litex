@@ -156,6 +156,12 @@ static void CS_training(int32_t channel, uint8_t *success) {
 
         // Exit CS training MPC
         exit_cs(channel, rank);
+
+        if (cs_delays[channel][rank][1] == UNSET_DELAY || cs_delays[channel][rank][0] == UNSET_DELAY) {
+            printf("CS:%2"PRId32" Eye width:0 Failed\n", rank);
+            *success &= 0;
+            return;
+        }
     }
 }
 
@@ -262,8 +268,6 @@ static void CA_training(int32_t channel) {
 
             // Check if address line is correct with 0 tap.
             on_edge = CA_detect(channel, rank, address, 0);
-            on_edge &= CA_detect(channel, rank, address, 0);
-            on_edge &= CA_detect(channel, rank, address, 0);
 
             left_side = UNSET_DELAY;
             right_side = UNSET_DELAY;
