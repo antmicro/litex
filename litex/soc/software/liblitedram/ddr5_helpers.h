@@ -43,9 +43,6 @@ int in_2n_mode(void);
 
 #define WRDATA_BITMASK ((1<<(2*SDRAM_PHY_MODULES/CHANNELS))-1)
 
-// Use max int16_t, all Fs could be interpreted as -1
-#define UNSET_DELAY 0xefff
-
 typedef void (*inc_func)(int, int, int);
 
 void ck_rst(int channel, int rank, int address);

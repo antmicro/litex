@@ -6,6 +6,9 @@
 #include <generated/sdram_phy.h>
 
 #ifdef SDRAM_PHY_DDR5
+// Use max int16_t, all Fs could be interpreted as -1
+#define UNSET_DELAY 0xefff
+
 void sdram_ddr5_module_enumerate(void);
 void sdram_ddr5_cs_ca_training(void);
 void sdram_ddr5_read_training(void);
