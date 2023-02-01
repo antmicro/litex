@@ -27,8 +27,6 @@ int enumerated = 0;
 //      --------------<============>-------------
 
 int ca_line_count = 14;
-int has_parity = 0;
-int max_value = 0;
 
 int cs_delays[2][SDRAM_PHY_RANKS][2];
 int cs_coarse_delays[2][SDRAM_PHY_RANKS];
@@ -444,8 +442,6 @@ static void CK_CS_CA_best_timings(void) {
     CS_CA_setup_new_delays(new_ckdly);
 
     CS_CA_rescan(new_ckdly);
-
-    max_value = max - min;
 }
 
 #if defined(SDRAM_PHY_ADDRESS_DELAY_CAPABLE)
