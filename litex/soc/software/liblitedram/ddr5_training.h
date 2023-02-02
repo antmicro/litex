@@ -22,20 +22,40 @@ typedef struct {
         action_callback_t inc_dly;
     } ck;
     struct {
+        int delays[CHANNELS][SDRAM_PHY_RANKS][2];
+        int coarse_delays[CHANNELS][SDRAM_PHY_RANKS];
+        int final_delays[CHANNELS][SDRAM_PHY_RANKS];
+
         training_mode_callback_t enter_training_mode;
         training_mode_callback_t exit_training_mode;
+
         action_callback_t rst_dly;
         action_callback_t inc_dly;
+
         delay_checker_t check;
     } cs;
     struct {
+        int line_count;
+
+        int delays[CHANNELS][14][2];
+        int final_delays[CHANNELS][14];
+        // If per rank timings are available, the array above should be [CHANNELS][SDRAM_PHY_RANKS][14][2]
+        // To cover clock/ca delays per rank
+
         training_mode_callback_t enter_training_mode;
         training_mode_callback_t exit_training_mode;
+
         action_callback_t rst_dly;
         action_callback_t inc_dly;
+
         delay_checker_t check;
+
+        int (*has_line13)(int32_t channel);
     } ca;
     struct {
+        int delays[CHANNELS][2];
+        int final_delays[CHANNELS];
+
         action_callback_t rst_dly;
         action_callback_t inc_dly;
     } par;

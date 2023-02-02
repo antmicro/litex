@@ -26,20 +26,6 @@ int enumerated = 0;
 //      \______________/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 //      --------------<============>-------------
 
-int ca_line_count = 14;
-
-int cs_delays[CHANNELS][SDRAM_PHY_RANKS][2];
-int cs_coarse_delays[CHANNELS][SDRAM_PHY_RANKS];
-
-int ca_delays[CHANNELS][14][2];
-int par_delays[CHANNELS][2];
-// If per rank timings are available, the array above should be [CHANNELS][SDRAM_PHY_RANKS][14][2]
-// To cover clock/ca delays per rank
-int cs_final_delay[CHANNELS][SDRAM_PHY_RANKS];
-
-int ca_final_delay[CHANNELS][14];
-int par_final_delay[CHANNELS];
-
 int WICA = 0;
 
 static int CS_on_edge_detect(training_ctx_t *ctx, int32_t channel, int32_t rank) {
@@ -126,26 +112,26 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         // Get working pattern
         on_edge = CS_on_edge_detect(ctx, channel, rank);
 
-        cs_delays[channel][rank][0] = UNSET_DELAY;
-        cs_delays[channel][rank][1] = UNSET_DELAY;
+        ctx->cs.delays[channel][rank][0] = UNSET_DELAY;
+        ctx->cs.delays[channel][rank][1] = UNSET_DELAY;
 
         // We got one of the patterns to work flawlessly, check clock delays
         if (on_edge) {
-            cs_delays[channel][rank][0] = CS_ck_scan(ctx, channel, rank, on_edge >> 1);
+            ctx->cs.delays[channel][rank][0] = CS_ck_scan(ctx, channel, rank, on_edge >> 1);
         }
         // After delaying clock, pattern could have changes, as we missed one clock cycle
         printf("|");
-        CS_scan(ctx, channel, rank, &cs_delays[channel][rank][1], &cs_delays[channel][rank][0]);
+        CS_scan(ctx, channel, rank, &ctx->cs.delays[channel][rank][1], &ctx->cs.delays[channel][rank][0]);
         printf("|\n");
 
         ctx->cs.rst_dly(channel, rank, 0);
 
         // Set up coarse delay adjustment until we get CA results
-        printf("Rank delays: %2d:%2d\n", cs_delays[channel][rank][0], cs_delays[channel][rank][1]);
-        coarse = (cs_delays[channel][rank][0]+cs_delays[channel][rank][1]) / 2;
+        printf("Rank delays: %2d:%2d\n", ctx->cs.delays[channel][rank][0], ctx->cs.delays[channel][rank][1]);
+        coarse = (ctx->cs.delays[channel][rank][0]+ctx->cs.delays[channel][rank][1]) / 2;
         coarse = coarse < 0 ? 0 : coarse;
         printf("Coarse adjustment:%"PRId32"\n", coarse);
-        cs_coarse_delays[channel][rank] = coarse;
+        ctx->cs.coarse_delays[channel][rank] = coarse;
 
         for (csdly = 0; csdly < coarse; ++csdly)
             ctx->cs.inc_dly(channel, rank, 0);
@@ -153,7 +139,7 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         // Exit CS training
         ctx->cs.exit_training_mode(channel, rank);
 
-        if (cs_delays[channel][rank][1] == UNSET_DELAY || cs_delays[channel][rank][0] == UNSET_DELAY) {
+        if (ctx->cs.delays[channel][rank][1] == UNSET_DELAY || ctx->cs.delays[channel][rank][0] == UNSET_DELAY) {
             printf("CS:%2"PRId32" Eye width:0 Failed\n", rank);
             *success &= 0;
             return;
@@ -161,27 +147,49 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
     }
 }
 
-static void CA_setup_array(void) {
+/**
+ * CA_setup_array
+ *
+ * Fills CA delays array in the training_ctx_t with initial values
+ */
+static void CA_setup_array(training_ctx_t *ctx) {
     int channel, address;
     for (channel = 0; channel < CHANNELS; ++channel) {
         for (address = 0; address < 14; ++address) {
-           ca_delays[channel][address][0] = -SDRAM_PHY_DELAYS;
-           ca_delays[channel][address][1] = SDRAM_PHY_DELAYS;
+           ctx->ca.delays[channel][address][0] = -SDRAM_PHY_DELAYS;
+           ctx->ca.delays[channel][address][1] = SDRAM_PHY_DELAYS;
         }
     }
 }
 
-static void CA_check_lines(training_ctx_t *ctx, int32_t channel) {
-    ctx->ca.enter_training_mode(channel, 0);
+/**
+ * ca_check_if_has_line13
+ *
+ * Detect if CA13 is present
+ */
+static int ca_check_if_has_line13(int32_t channel) {
     cmd_injector(channel, 0xf, 0, 1<<13, 0, 0, 1, 0);
     cmd_injector(channel, 0x1, 1, 1<<13, 0, 0, 1, 0);
     store_continuous(channel);
-    if (and_sample(channel))
-        ca_line_count = 14;
+
+    return and_sample(channel);
+}
+
+/**
+ * CA_check_lines
+ *
+ * Detect and assign CA lines count.
+ * Depending on the die density and usage of die stacking,
+ * CA13 may be used or not.
+ */
+static void CA_check_lines(training_ctx_t *ctx, int32_t channel) {
+    ctx->ca.enter_training_mode(channel, 0);
+    if (ctx->ca.has_line13(channel))
+        ctx->ca.line_count = 14;
     else
-        ca_line_count = 13;
+        ctx->ca.line_count = 13;
     ctx->ca.exit_training_mode(channel, 0);
-    printf("DDR5 module has %d address lines\n", ca_line_count);
+    printf("DDR5 module has %d address lines\n", ctx->ca.line_count);
 }
 
 static int CA_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t address, int32_t csdly_base) {
@@ -247,7 +255,7 @@ static void CA_training(training_ctx_t *ctx, int32_t channel) {
         // Enter CA training MPC
         ctx->ca.enter_training_mode(channel, rank);
 
-        for (address = 0; address < ca_line_count; address++) {
+        for (address = 0; address < ctx->ca.line_count; address++) {
             printf("CA line:%2"PRId32"", address);
 
             // Reset CA delay
@@ -260,24 +268,24 @@ static void CA_training(training_ctx_t *ctx, int32_t channel) {
             right_side = UNSET_DELAY;
             // Address line works with no delays no clock or ca delay
             if (on_edge) {
-                right_side = CA_ck_scan(ctx, channel, rank, address, cs_coarse_delays[channel][rank]);
+                right_side = CA_ck_scan(ctx, channel, rank, address, ctx->cs.coarse_delays[channel][rank]);
             }
             printf("|");
             CA_scan(ctx, channel, rank, address, &left_side, &right_side);
             printf("|\n");
 
             if(right_side == UNSET_DELAY) {
-                ca_delays[channel][address][0] = UNSET_DELAY;
+                ctx->ca.delays[channel][address][0] = UNSET_DELAY;
                 break;
-            } else if (right_side > ca_delays[channel][address][0]) {
-                ca_delays[channel][address][0] = right_side;
+            } else if (right_side > ctx->ca.delays[channel][address][0]) {
+                ctx->ca.delays[channel][address][0] = right_side;
             }
 
             if(left_side == UNSET_DELAY) {
-                ca_delays[channel][address][1] = UNSET_DELAY;
+                ctx->ca.delays[channel][address][1] = UNSET_DELAY;
                 break;
-            } else if (left_side < ca_delays[channel][address][1]) {
-                ca_delays[channel][address][1] = left_side;
+            } else if (left_side < ctx->ca.delays[channel][address][1]) {
+                ctx->ca.delays[channel][address][1] = left_side;
             }
         }
         // Exit CA training multiple NOPs
@@ -285,10 +293,10 @@ static void CA_training(training_ctx_t *ctx, int32_t channel) {
     }
 }
 
-static void CA_check_values(int32_t channel, uint8_t *success) {
+static void CA_check_values(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
     int32_t address;
-    for (address = 0; address < ca_line_count; address++) {
-        if (ca_delays[channel][address][1] == UNSET_DELAY || ca_delays[channel][address][0] == UNSET_DELAY) {
+    for (address = 0; address < ctx->ca.line_count; address++) {
+        if (ctx->ca.delays[channel][address][1] == UNSET_DELAY || ctx->ca.delays[channel][address][0] == UNSET_DELAY) {
             printf("CA:%2"PRId32" Eye width:0 Failed\n", address);
             *success &= 0;
             return;
@@ -319,13 +327,13 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
             ctx->cs.exit_training_mode(channel, rank);
 
             ctx->cs.rst_dly(channel, rank, 0);
-            for (cntdly = 0; cntdly < cs_final_delay[channel][rank]; ++cntdly)
+            for (cntdly = 0; cntdly < ctx->cs.final_delays[channel][rank]; ++cntdly)
                 ctx->cs.inc_dly(channel, rank, 0);
 
             ctx->ca.enter_training_mode(channel, rank);
-            for (address = 0; address < ca_line_count; address++) {
+            for (address = 0; address < ctx->ca.line_count; address++) {
                 printf("Address:%2d\n", address);
-                CA_ck_scan(ctx, channel, rank, address, cs_final_delay[channel][rank]);
+                CA_ck_scan(ctx, channel, rank, address, ctx->cs.final_delays[channel][rank]);
                 ctx->ck.rst_dly(0, 0, 0);
                 for (cntdly = 0; cntdly < ckdly; ++cntdly)
                     ctx->ck.inc_dly(0, 0, 0);
@@ -333,7 +341,7 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
                 CA_scan(ctx, channel, rank, address, &discard, &discard);
                 printf("\n");
                 ctx->ca.rst_dly(channel, rank, address);
-                for (cntdly = 0; cntdly < ca_final_delay[channel][address]; ++cntdly)
+                for (cntdly = 0; cntdly < ctx->ca.final_delays[channel][address]; ++cntdly)
                     ctx->ca.inc_dly(channel, rank, address);
             }
             ctx->ca.exit_training_mode(channel, rank);
@@ -350,30 +358,30 @@ static void CS_CA_min_max_midpoints(training_ctx_t *ctx, int *min, int *max) {
         // Uncomment loop below
         // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
         {rank = 0;
-            temp = (cs_delays[channel][rank][0] + cs_delays[channel][rank][1])/2;
+            temp = (ctx->cs.delays[channel][rank][0] + ctx->cs.delays[channel][rank][1])/2;
             printf("Rank:%2d: min delay %2d, max delay %2d, center %2d\n",
-                rank, cs_delays[channel][rank][0], cs_delays[channel][rank][1], temp);
+                rank, ctx->cs.delays[channel][rank][0], ctx->cs.delays[channel][rank][1], temp);
 
-            cs_final_delay[channel][rank] = temp;
+            ctx->cs.final_delays[channel][rank] = temp;
             *min = *min > temp ? temp : *min;
             *max = *max < temp ? temp : *max;
         }
-        for (address = 0; address < ca_line_count; address++) {
-            temp = (ca_delays[channel][address][0] + ca_delays[channel][address][1])/2;
+        for (address = 0; address < ctx->ca.line_count; address++) {
+            temp = (ctx->ca.delays[channel][address][0] + ctx->ca.delays[channel][address][1])/2;
             printf("CA:%2d: min delay %2d, max delay %2d, center %2d\n",
-                address, ca_delays[channel][address][0], ca_delays[channel][address][1], temp);
+                address, ctx->ca.delays[channel][address][0], ctx->ca.delays[channel][address][1], temp);
 
-            ca_final_delay[channel][address] = temp;
+            ctx->ca.final_delays[channel][address] = temp;
             *min = *min > temp ? temp : *min;
             *max = *max < temp ? temp : *max;
         }
 
         if (ctx->training_type == HOST_RCD) {
-            temp = (par_delays[channel][0] + par_delays[channel][1])/2;
+            temp = (ctx->par.delays[channel][0] + ctx->par.delays[channel][1])/2;
             printf("PAR: min delay %2d, max delay %2d, center %2d\n",
-                par_delays[channel][0], par_delays[channel][1], temp);
+                ctx->par.delays[channel][0], ctx->par.delays[channel][1], temp);
 
-            par_final_delay[channel] = temp;
+            ctx->par.final_delays[channel] = temp;
             *min = *min > temp ? temp : *min;
             *max = *max < temp ? temp : *max;
         }
@@ -389,26 +397,26 @@ static void CS_CA_setup_new_delays(training_ctx_t *ctx, int ck_offset) {
         // Uncomment loop below
         // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
         {rank = 0;
-            cs_final_delay[channel][rank] -= ck_offset;
-            printf("Rank:%2d center point delay:%2d\n", rank, cs_final_delay[channel][rank]);
+            ctx->cs.final_delays[channel][rank] -= ck_offset;
+            printf("Rank:%2d center point delay:%2d\n", rank, ctx->cs.final_delays[channel][rank]);
             ctx->cs.rst_dly(channel, rank, 0);
-            for (cntdly = 0; cntdly < cs_final_delay[channel][rank]; ++cntdly)
+            for (cntdly = 0; cntdly < ctx->cs.final_delays[channel][rank]; ++cntdly)
                 ctx->cs.inc_dly(channel, rank, 0);
 
         }
-        for (address = 0; address < ca_line_count; address++) {
-            ca_final_delay[channel][address] -= ck_offset;
-            printf("CA:%2d center point delay:%2d\n", address, ca_final_delay[channel][address]);
+        for (address = 0; address < ctx->ca.line_count; address++) {
+            ctx->ca.final_delays[channel][address] -= ck_offset;
+            printf("CA:%2d center point delay:%2d\n", address, ctx->ca.final_delays[channel][address]);
             ctx->ca.rst_dly(channel, 0, address);
-            for (cntdly = 0; cntdly < ca_final_delay[channel][address]; ++cntdly)
+            for (cntdly = 0; cntdly < ctx->ca.final_delays[channel][address]; ++cntdly)
                 ctx->ca.inc_dly(channel, 0, address);
         }
 
         if (ctx->training_type == HOST_RCD) {
-            par_final_delay[channel] -= ck_offset;
-            printf("PAR center point delay:%2d\n", par_final_delay[channel]);
+            ctx->par.final_delays[channel] -= ck_offset;
+            printf("PAR center point delay:%2d\n", ctx->par.final_delays[channel]);
             ctx->par.rst_dly(channel, 0, 0);
-            for (cntdly = 0; cntdly < par_final_delay[channel]; ++cntdly)
+            for (cntdly = 0; cntdly < ctx->par.final_delays[channel]; ++cntdly)
                 ctx->par.inc_dly(channel, 0, 0);
         }
     }
@@ -446,14 +454,14 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
 
     CS_success = 1;
     CA_success = 1;
-    CA_setup_array();
+    CA_setup_array(ctx);
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c CS training\n", (char)('A'+channel));
         CS_training(ctx, channel, &CS_success);
         printf("CA training\n");
         CA_check_lines(ctx, channel);
         CA_training(ctx, channel);
-        CA_check_values(channel, &CA_success);
+        CA_check_values(ctx, channel, &CA_success);
     }
     if (!(CS_success & CA_success)) {
         enable_dfi_2n_mode();
@@ -481,14 +489,14 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
 
     CS_success = 1;
     CA_success = 1;
-    CA_setup_array();
+    CA_setup_array(ctx);
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c CS training\n", (char)('A'+channel));
         CS_training(ctx, channel, &CS_success);
         printf("CA training\n");
         CA_check_lines(ctx, channel);
         CA_training(ctx, channel);
-        CA_check_values(channel, &CA_success);
+        CA_check_values(ctx, channel, &CA_success);
     }
     if (!(CS_success & CA_success)) {
         enable_dfi_2n_mode();
@@ -1206,11 +1214,13 @@ training_ctx_t host_dram_ctx = {
         .check = cs_check_if_works,
     },
     .ca = {
+        .line_count = 13,
         .enter_training_mode = enter_ca,
         .exit_training_mode  = exit_ca,
         .inc_dly = ca_inc,
         .rst_dly = ca_rst,
         .check = ca_check_if_works,
+        .has_line13 = ca_check_if_has_line13,
     },
     .par = {
         .rst_dly = par_rst,
@@ -1233,11 +1243,13 @@ training_ctx_t host_rcd_ctx = {
         .check = NULL, // TODO: implement checker
     },
     .ca = {
+        .line_count = 14,
         .enter_training_mode = enter_dcatm,
         .exit_training_mode  = exit_dcatm,
         .inc_dly = ca_inc,
         .rst_dly = ca_rst,
         .check = NULL, // TODO: implement checker
+        .has_line13 = NULL, // TODO: implement checker
     },
     .par = {
         .rst_dly = par_rst,
