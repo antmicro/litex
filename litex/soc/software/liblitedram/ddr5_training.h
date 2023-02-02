@@ -14,6 +14,8 @@
 typedef void (*action_callback_t)(int channel, int rank, int address);
 typedef void (*training_mode_callback_t)(int channel, int rank);
 
+typedef int (*delay_checker_t)(int channel, int rank, int address, int offset);
+
 typedef struct {
     struct {
         action_callback_t rst_dly;
@@ -24,6 +26,7 @@ typedef struct {
         training_mode_callback_t exit_training_mode;
         action_callback_t rst_dly;
         action_callback_t inc_dly;
+        delay_checker_t check;
     } cs;
     struct {
         training_mode_callback_t enter_training_mode;

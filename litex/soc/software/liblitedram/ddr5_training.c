@@ -42,10 +42,10 @@ int par_final_delay[CHANNELS];
 
 int WICA = 0;
 
-static int CS_on_edge_detect(int32_t channel, int32_t rank) {
+static int CS_on_edge_detect(training_ctx_t *ctx, int32_t channel, int32_t rank) {
     int offset, _result;
     for (offset = 0; offset < 2; offset++) {
-        if (cs_check_if_works(channel, rank, 0, offset))
+        if (ctx->cs.check(channel, rank, 0, offset))
             _result = offset<<1|1;
     }
     return _result;
@@ -58,7 +58,7 @@ static int CS_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int of
     last_good = 0;
     ctx->cs.rst_dly(channel, rank, 0);
     for(ckdly = 0; ckdly < SDRAM_PHY_DELAYS && works; ckdly++) {
-        _result = cs_check_if_works(channel, rank, 0, offset);
+        _result = ctx->cs.check(channel, rank, 0, offset);
         printf("%d", !!_result);
         if (!_result && works) {
             works = 0;
@@ -79,7 +79,7 @@ static int CS_find_offset(training_ctx_t *ctx, int32_t channel, int32_t rank) {
     for (offset = 0; offset < 2; offset++) {
         for (csdly = 0; csdly < SDRAM_PHY_DELAYS; csdly++) {
             // Found working pattern
-            if (cs_check_if_works(channel, rank, 0, offset)) {
+            if (ctx->cs.check(channel, rank, 0, offset)) {
                 offset_result[offset] = csdly;
                 break;
             }
@@ -95,7 +95,7 @@ static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* lef
     offset = CS_find_offset(ctx, channel, rank);
     ctx->cs.rst_dly(channel, rank, 0);
     for (csdly = 0; csdly < SDRAM_PHY_DELAYS; csdly++) {
-        works = cs_check_if_works(channel, rank, 0, offset);
+        works = ctx->cs.check(channel, rank, 0, offset);
         printf("%d", !!works);
         if (works && *right  == UNSET_DELAY)
             *right = csdly;
@@ -121,10 +121,10 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
 
         // Scan clock delays only if one of patterns work (0x55 or 0xAA)
         // If neither works then we are in meta state, both clock and CS change
-        // to close to each other. In such situations we only check CS delays
+        // too close to each other. In such situations we only check CS delays
 
         // Get working pattern
-        on_edge = CS_on_edge_detect(channel, rank);
+        on_edge = CS_on_edge_detect(ctx, channel, rank);
 
         cs_delays[channel][rank][0] = UNSET_DELAY;
         cs_delays[channel][rank][1] = UNSET_DELAY;
@@ -1212,6 +1212,7 @@ training_ctx_t host_dram_ctx = {
         .exit_training_mode  = exit_cs,
         .rst_dly = cs_rst,
         .inc_dly = cs_inc,
+        .check = cs_check_if_works,
     },
     .ca = {
         .enter_training_mode = enter_ca,
@@ -1237,6 +1238,7 @@ training_ctx_t host_rcd_ctx = {
         .exit_training_mode  = exit_dcstm,
         .rst_dly = cs_rst,
         .inc_dly = cs_inc,
+        .check = NULL, // TODO: implement checker
     },
     .ca = {
         .enter_training_mode = enter_dcatm,
