@@ -1346,11 +1346,25 @@ void send_read(int channel, int rank) {
     setup_rddata_cnt(channel, 0);
 }
 
-void enter_cs(int channel, int rank) {
+/**
+ * enter_cstm
+ *
+ * Enters CS training when doing Host->DRAM training.
+ * Sends "Enter CS Training Mode" MPC over multiple cycles.
+ * JESD79-5A 4.20.2
+ */
+void enter_cstm(int channel, int rank) {
     send_mpc(channel, rank, 1);
 }
 
-void exit_cs(int channel, int rank) {
+/**
+ * exit_cstm
+ *
+ * Exits CS training when doing Host->DRAM training.
+ * Sends "Exit CS Training Mode" MPC over multiple cycles.
+ * JESD79-5A 4.20.2
+ */
+void exit_cstm(int channel, int rank) {
     send_mpc(channel, rank, 0);
 }
 
@@ -1375,11 +1389,29 @@ int cs_check_if_works(int channel, int rank, int address, int pattern_shift) {
     return !or_sample(channel);
 }
 
-void enter_ca(int channel, int rank) {
+/**
+ * enter_catm
+ *
+ * Enters CA training when doing Host->DRAM training.
+ * Sends "Enter CA Training Mode" MPC.
+ *
+ * As no commands are being processed by the DRAM other
+ * than NOPs it is safe to send this MPC over multiple
+ * cycles.
+ * JESD79-5A 4.19.2
+ */
+void enter_catm(int channel, int rank) {
     send_mpc(channel, rank, 3);
 }
 
-void exit_ca(int channel, int rank) {
+/**
+ * exit_catm
+ *
+ * Exits CA training when doing Host->DRAM training.
+ * Sends multiple NOPs is consecutive cycles (at least 2 needed).
+ * JESD79-5A 4.19.2
+ */
+void exit_catm(int channel, int rank) {
     cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 0, 0);
     store_continuous(channel);
     cmd_injector(channel, 0xff, 1<<rank, 0x1f, 0, 0, 0, 1);

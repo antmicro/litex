@@ -108,12 +108,12 @@ void send_write(int channel, int rank);
 void send_write_byte(int channel, int rank, int module, int byte);
 void send_read(int channel, int rank);
 
-void enter_cs(int channel, int rank);
-void exit_cs(int channel, int rank);
+void enter_cstm(int channel, int rank);
+void exit_cstm(int channel, int rank);
 int cs_check_if_works(int channel, int rank, int address, int pattern_shift);
 
-void enter_ca(int channel, int rank);
-void exit_ca(int channel, int rank);
+void enter_catm(int channel, int rank);
+void exit_catm(int channel, int rank);
 int ca_check_if_works(int channel, int rank, int address, int cs_dly);
 
 void enter_write_leveling(int channel);

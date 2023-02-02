@@ -252,7 +252,7 @@ static void CA_training(training_ctx_t *ctx, int32_t channel) {
     // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
     {rank = 0;
         printf("Rank:%2"PRId32"\n", rank);
-        // Enter CA training MPC
+        // Enter CA training
         ctx->ca.enter_training_mode(channel, rank);
 
         for (address = 0; address < ctx->ca.line_count; address++) {
@@ -288,7 +288,7 @@ static void CA_training(training_ctx_t *ctx, int32_t channel) {
                 ctx->ca.delays[channel][address][1] = left_side;
             }
         }
-        // Exit CA training multiple NOPs
+        // Exit CA training
         ctx->ca.exit_training_mode(channel, rank);
     }
 }
@@ -1207,16 +1207,16 @@ training_ctx_t host_dram_ctx = {
         .inc_dly = ck_inc,
     },
     .cs = {
-        .enter_training_mode = enter_cs,
-        .exit_training_mode  = exit_cs,
+        .enter_training_mode = enter_cstm,
+        .exit_training_mode  = exit_cstm,
         .rst_dly = cs_rst,
         .inc_dly = cs_inc,
         .check = cs_check_if_works,
     },
     .ca = {
         .line_count = 13,
-        .enter_training_mode = enter_ca,
-        .exit_training_mode  = exit_ca,
+        .enter_training_mode = enter_catm,
+        .exit_training_mode  = exit_catm,
         .inc_dly = ca_inc,
         .rst_dly = ca_rst,
         .check = ca_check_if_works,
