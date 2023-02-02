@@ -55,6 +55,9 @@ void ca_rst(int channel, int rank, int address);
 void ca_inc(int channel, int rank, int address);
 uint16_t get_ca_dly(int channel, int rank, int address);
 
+void par_rst(int channel, int rank, int address);
+void par_inc(int channel, int rank, int address);
+
 uint8_t lfsr_next(uint8_t input);
 int compare_serial(int channel, int module,
                    uint16_t data,
