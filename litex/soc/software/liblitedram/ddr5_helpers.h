@@ -114,7 +114,7 @@ int cs_check_if_works(int channel, int rank, int address, int pattern_shift);
 
 void enter_ca(int channel, int rank);
 void exit_ca(int channel, int rank);
-void ca_sample_prep_current_period(int channel, int rank, int address, int l2h, int cs_dly);
+int ca_check_if_works(int channel, int rank, int address, int cs_dly);
 
 void enter_write_leveling(int channel);
 void wleveling_scan(int *cycle, int *got, int *start_cycle, int *start_delay,

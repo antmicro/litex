@@ -33,6 +33,7 @@ typedef struct {
         training_mode_callback_t exit_training_mode;
         action_callback_t rst_dly;
         action_callback_t inc_dly;
+        delay_checker_t check;
     } ca;
     struct {
         action_callback_t rst_dly;

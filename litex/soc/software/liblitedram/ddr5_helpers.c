@@ -1387,7 +1387,7 @@ void exit_ca(int channel, int rank) {
     cdelay(50);
 }
 
-void ca_sample_prep_current_period(int channel, int rank, int address, int l2h, int cs_dly) {
+static void ca_sample_prep_current_period(int channel, int rank, int address, int l2h, int cs_dly) {
     cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
     if (cs_dly == 0) {
         cmd_injector(channel, 0x1, 1<<rank, l2h<<address, 0, 0, 1, 0);
@@ -1397,6 +1397,46 @@ void ca_sample_prep_current_period(int channel, int rank, int address, int l2h, 
     }
     store_continuous(channel);
     cdelay(50);
+}
+
+/**
+ * ca_check_if_works
+ *
+ * Checks if during CATM, CA and CS signals are aligned.
+ * The DRAM will reduce sampled CA values with the XOR
+ * operation.
+ *
+ * To check if a specific CA line is correctly aligned, we
+ * change only the CA line we want to test. If it is aligned,
+ * the DRAM will respond with only 1s on DQ lines.
+ *
+ * First we test scenario, where selected line is set low
+ * and for one phase when CS_n is low, we set it high.
+ * We sample DQ's over multiple cycles, reduce them with
+ * the AND operation and check if all were 1s.
+ *
+ * We also perform a second test where the selected line is
+ * inverted. So for all phases it is high and when CS_n goes
+ * low, selected CA also goes low.
+ * This time, we reduce sampled DQ's with the OR operation as
+ * we expect the response to be 0s.
+ *
+ * Performing both tests, ensures that selected delay works
+ * just as good when going low->high and high->low.
+ * JESD79-5A 4.19
+ */
+int ca_check_if_works(int channel, int rank, int address, int cs_dly) {
+    int ok;
+
+    // Test change from low to high
+    ca_sample_prep_current_period(channel, rank, address, 1, cs_dly);
+    ok = and_sample(channel);
+
+    // Test change from high to low
+    ca_sample_prep_current_period(channel, rank, address, 0, cs_dly);
+    ok &= or_sample(channel);
+
+    return ok;
 }
 
 void enter_write_leveling(int channel) {

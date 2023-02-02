@@ -184,15 +184,6 @@ static void CA_check_lines(training_ctx_t *ctx, int32_t channel) {
     printf("DDR5 module has %d address lines\n", ca_line_count);
 }
 
-static int CA_detect(int32_t channel, int32_t rank, int32_t address, int cs_dly) {
-    int _result;
-    ca_sample_prep_current_period(channel, rank, address, 1, cs_dly);
-    _result = and_sample(channel);
-    ca_sample_prep_current_period(channel, rank, address, 0, cs_dly);
-    _result &= or_sample(channel);
-    return _result;
-}
-
 static int CA_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t address, int32_t csdly_base) {
     int works, last_good, _result, ckdly, csdly;
     printf("|");
@@ -201,7 +192,7 @@ static int CA_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_
     csdly = csdly_base;
     ctx->ca.rst_dly(channel, rank, address);
     for(ckdly = 0; ckdly < SDRAM_PHY_DELAYS && works; ++ckdly, ++csdly) {
-        _result = CA_detect(channel, rank, address, csdly/SDRAM_PHY_DELAYS);
+        _result = ctx->ca.check(channel, rank, address, csdly/SDRAM_PHY_DELAYS);
         printf("%d", !!_result);
         if (!_result && works) {
             works = 0;
@@ -229,7 +220,7 @@ static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t 
         printf("CA%2"PRIu32" dly:%"PRIu16"\n", address,
                get_ca_dly(channel, rank, address));
 #endif // DEBUG_CA_DDR5
-        _result = CA_detect(channel, rank, address, 0);
+        _result = ctx->ca.check(channel, rank, address, 0);
         printf("%d", !!_result);
 #ifdef DEBUG_CA_DDR5
         printf("\n");
@@ -263,7 +254,7 @@ static void CA_training(training_ctx_t *ctx, int32_t channel) {
             ctx->ca.rst_dly(channel, rank, address);
 
             // Check if address line is correct with 0 tap.
-            on_edge = CA_detect(channel, rank, address, 0);
+            on_edge = ctx->ca.check(channel, rank, address, 0);
 
             left_side = UNSET_DELAY;
             right_side = UNSET_DELAY;
@@ -1219,6 +1210,7 @@ training_ctx_t host_dram_ctx = {
         .exit_training_mode  = exit_ca,
         .inc_dly = ca_inc,
         .rst_dly = ca_rst,
+        .check = ca_check_if_works,
     },
     .par = {
         .rst_dly = par_rst,
@@ -1245,6 +1237,7 @@ training_ctx_t host_rcd_ctx = {
         .exit_training_mode  = exit_dcatm,
         .inc_dly = ca_inc,
         .rst_dly = ca_rst,
+        .check = NULL, // TODO: implement checker
     },
     .par = {
         .rst_dly = par_rst,
