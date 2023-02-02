@@ -45,8 +45,7 @@ int WICA = 0;
 static int CS_on_edge_detect(int32_t channel, int32_t rank) {
     int offset, _result;
     for (offset = 0; offset < 2; offset++) {
-        cs_sample_prep(channel, rank, 0, offset);
-        if (or_sample(channel))
+        if (cs_check_if_works(channel, rank, 0, offset))
             _result = offset<<1|1;
     }
     return _result;
@@ -59,8 +58,7 @@ static int CS_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int of
     last_good = 0;
     ctx->cs.rst_dly(channel, rank, 0);
     for(ckdly = 0; ckdly < SDRAM_PHY_DELAYS && works; ckdly++) {
-        cs_sample_prep(channel, rank, 0, offset);
-        _result = or_sample(channel);
+        _result = cs_check_if_works(channel, rank, 0, offset);
         printf("%d", !!_result);
         if (!_result && works) {
             works = 0;
@@ -80,9 +78,8 @@ static int CS_find_offset(training_ctx_t *ctx, int32_t channel, int32_t rank) {
     ctx->cs.rst_dly(channel, rank, 0);
     for (offset = 0; offset < 2; offset++) {
         for (csdly = 0; csdly < SDRAM_PHY_DELAYS; csdly++) {
-            cs_sample_prep(channel, rank, 0, offset);
             // Found working pattern
-            if (or_sample(channel)) {
+            if (cs_check_if_works(channel, rank, 0, offset)) {
                 offset_result[offset] = csdly;
                 break;
             }
@@ -98,8 +95,7 @@ static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* lef
     offset = CS_find_offset(ctx, channel, rank);
     ctx->cs.rst_dly(channel, rank, 0);
     for (csdly = 0; csdly < SDRAM_PHY_DELAYS; csdly++) {
-        cs_sample_prep(channel, rank, 0, offset);
-        works = or_sample(channel);
+        works = cs_check_if_works(channel, rank, 0, offset);
         printf("%d", !!works);
         if (works && *right  == UNSET_DELAY)
             *right = csdly;

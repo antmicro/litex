@@ -110,7 +110,7 @@ void send_read(int channel, int rank);
 
 void enter_cs(int channel, int rank);
 void exit_cs(int channel, int rank);
-void cs_sample_prep(int channel, int rank, int address, int l2h);
+int cs_check_if_works(int channel, int rank, int address, int pattern_shift);
 
 void enter_ca(int channel, int rank);
 void exit_ca(int channel, int rank);

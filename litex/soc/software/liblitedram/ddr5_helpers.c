@@ -1354,11 +1354,25 @@ void exit_cs(int channel, int rank) {
     send_mpc(channel, rank, 0);
 }
 
-void cs_sample_prep(int channel, int rank, int address, int l2h) {
+static void cs_sample_prep(int channel, int rank, int address, int pattern_shift) {
     cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 1, 0);
-    cmd_injector(channel, 0xa>>l2h, 1<<rank, 0x1f, 0, 0, 1, 0);
+    cmd_injector(channel, 0xa>>pattern_shift, 1<<rank, 0x1f, 0, 0, 1, 0);
     store_continuous(channel);
     cdelay(50);
+}
+
+/**
+ * cs_check_if_works
+ *
+ * Checks if during CSTM, CS and CK signals are aligned.
+ * When they are aligned, then DRAM will send 0s on all DQ's.
+ * We sample DQ's over multiple cycles, reduce them with
+ * the OR operation and check if all were 0s.
+ * JESD79-5A 4.20
+ */
+int cs_check_if_works(int channel, int rank, int address, int pattern_shift) {
+    cs_sample_prep(channel, rank, address, pattern_shift);
+    return or_sample(channel);
 }
 
 void enter_ca(int channel, int rank) {
