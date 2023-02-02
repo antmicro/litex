@@ -315,7 +315,7 @@ int or_sample(int channel) {
     start_capture(channel);
     cdelay(1000);
     stop_capture(channel);
-    return !capture_and_reduce_result(channel, 0);
+    return !!capture_and_reduce_result(channel, 0);
 }
 
 int and_sample(int channel) {
@@ -1372,7 +1372,7 @@ static void cs_sample_prep(int channel, int rank, int address, int pattern_shift
  */
 int cs_check_if_works(int channel, int rank, int address, int pattern_shift) {
     cs_sample_prep(channel, rank, address, pattern_shift);
-    return or_sample(channel);
+    return !or_sample(channel);
 }
 
 void enter_ca(int channel, int rank) {
@@ -1434,7 +1434,7 @@ int ca_check_if_works(int channel, int rank, int address, int cs_dly) {
 
     // Test change from high to low
     ca_sample_prep_current_period(channel, rank, address, 0, cs_dly);
-    ok &= or_sample(channel);
+    ok &= !or_sample(channel);
 
     return ok;
 }
