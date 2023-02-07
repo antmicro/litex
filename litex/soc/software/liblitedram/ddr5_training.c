@@ -453,43 +453,19 @@ static void CK_CS_CA_best_timings(training_ctx_t *ctx) {
     CS_CA_rescan(ctx, new_ckdly);
 }
 
-#if defined(SDRAM_PHY_ADDRESS_DELAY_CAPABLE)
+#ifdef SKIP_NO_DELAYS
 void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
-    int32_t channel, rank;
-    uint8_t CS_success, CA_success;
-    disable_dfi_2n_mode();
-
-    CS_success = 1;
-    CA_success = 1;
-    CA_setup_array(ctx);
-    for (channel = 0; channel < CHANNELS; channel++) {
-        printf("Subchannel:%c CS training\n", (char)('A'+channel));
-        CS_training(ctx, channel, &CS_success);
-        printf("CA training\n");
-        CA_check_lines(ctx, channel);
-        CA_training(ctx, channel);
-        CA_check_values(ctx, channel, &CA_success);
-    }
-    if (!(CS_success & CA_success)) {
-        enable_dfi_2n_mode();
-    } else {
-        CK_CS_CA_best_timings(ctx);
-        for (channel = 0; channel < CHANNELS; channel++) {
-            for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-                disable_dram_2n_mode(channel, rank);
-            }
-        }
-    }
-    return;
+    printf("CS/CA training impossible\n"
+           "Keeping DRAM in 2N mode\n");
 }
 #else
 void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
-#ifndef SKIP_NO_DELAYS
+#ifndef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     printf("WARNING:\n"
-           "PHY does not have io delays on address lines!!!\n"
-           "BIOS will try to check if 1N mode is possible,\n"
-           "but it may be unstable.\n"
-           "Build bios with -DSKIP_NO_DELAYS, to stay in 2N mode.\n");
+           "PHY does not have IO delays on address lines!!!\n"
+           "BIOS will try to check if 1N mode is possible, but it may be unstable.\n"
+           "Build BIOS with -DSKIP_NO_DELAYS, to skip CS/CA training and force 2N mode.\n");
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     int32_t channel, rank;
     uint8_t CS_success, CA_success;
     disable_dfi_2n_mode();
@@ -518,13 +494,8 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
             }
         }
     }
-#else
-    printf("CS/CA training impossible\n"
-           "Keeping DRAM in 2N mode\n");
-#endif
-    return;
 }
-#endif // defined(SDRAM_PHY_ADDRESS_DELAY_CAPABLE)
+#endif // SKIP_NO_DELAYS
 
 void sdram_ddr5_module_enumerate(void) {
     int channel, rank, module;
