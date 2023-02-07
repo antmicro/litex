@@ -11,6 +11,9 @@
 
 #define BYTES_PER_MODULE (SDRAM_PHY_DQ_DQS_RATIO/4)
 
+#define MAX(a, b) (a > b ? a : b)
+#define MIN(a, b) (a < b ? a : b)
+
 int enumerated = 0;
 
 // Addressing: channel, pin, 0-right eye closing, 1-left eye closing
@@ -130,7 +133,7 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         // Set up coarse delay adjustment until we get CA results
         printf("Rank delays: %2d:%2d\n", right_side, left_side);
         coarse = (right_side + left_side) / 2;
-        coarse = coarse < 0 ? 0 : coarse; // max(0, coarse)
+        coarse = MAX(0, coarse);
         printf("Coarse adjustment:%"PRId32"\n", coarse);
         ctx->cs.coarse_delays[channel][rank] = coarse;
 
@@ -366,8 +369,8 @@ static void CS_CA_min_max_midpoints(training_ctx_t *ctx, int *min, int *max) {
                 rank, ctx->cs.delays[channel][rank][0], ctx->cs.delays[channel][rank][1], temp);
 
             ctx->cs.final_delays[channel][rank] = temp;
-            *min = *min > temp ? temp : *min;
-            *max = *max < temp ? temp : *max;
+            *min = MIN(*min, temp);
+            *max = MAX(*max, temp);
         }
         for (address = 0; address < ctx->ca.line_count; address++) {
             temp = (ctx->ca.delays[channel][address][0] + ctx->ca.delays[channel][address][1])/2;
@@ -375,8 +378,8 @@ static void CS_CA_min_max_midpoints(training_ctx_t *ctx, int *min, int *max) {
                 address, ctx->ca.delays[channel][address][0], ctx->ca.delays[channel][address][1], temp);
 
             ctx->ca.final_delays[channel][address] = temp;
-            *min = *min > temp ? temp : *min;
-            *max = *max < temp ? temp : *max;
+            *min = MIN(*min, temp);
+            *max = MAX(*max, temp);
         }
 
         if (ctx->training_type == HOST_RCD) {
@@ -385,8 +388,8 @@ static void CS_CA_min_max_midpoints(training_ctx_t *ctx, int *min, int *max) {
                 ctx->par.delays[channel][0], ctx->par.delays[channel][1], temp);
 
             ctx->par.final_delays[channel] = temp;
-            *min = *min > temp ? temp : *min;
-            *max = *max < temp ? temp : *max;
+            *min = MIN(*min, temp);
+            *max = MAX(*max, temp);
         }
 
     }
