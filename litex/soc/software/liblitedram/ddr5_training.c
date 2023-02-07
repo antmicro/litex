@@ -355,7 +355,16 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
     }
 }
 
-static void CS_CA_min_max_midpoints(training_ctx_t *ctx, int *min, int *max) {
+/**
+ * CS_CA_calculate_midpoints
+ *
+ * Calculate eye midpoints for all trained signals
+ * and save them in their `final_delays`.
+ *
+ * Also find minimal and maximal used delays to use
+ * them later to shift the clock.
+ */
+static void CS_CA_calculate_midpoints(training_ctx_t *ctx, int *min, int *max) {
     int channel, rank, address;
     int temp;
     for (channel = 0; channel < CHANNELS; channel++) {
@@ -372,6 +381,7 @@ static void CS_CA_min_max_midpoints(training_ctx_t *ctx, int *min, int *max) {
             *min = MIN(*min, temp);
             *max = MAX(*max, temp);
         }
+
         for (address = 0; address < ctx->ca.line_count; address++) {
             temp = (ctx->ca.delays[channel][address][0] + ctx->ca.delays[channel][address][1])/2;
             printf("CA:%2d: min delay %2d, max delay %2d, center %2d\n",
@@ -395,10 +405,18 @@ static void CS_CA_min_max_midpoints(training_ctx_t *ctx, int *min, int *max) {
     }
 }
 
-static void CS_CA_setup_new_delays(training_ctx_t *ctx, int ck_offset) {
+/**
+ * CS_CA_set_adjusted_delays
+ *
+ * Set signal delays to ones stored in the `final_delays`.
+ * Delays are decreased by `ck_offset` to account for the
+ * clock delay.
+ */
+static void CS_CA_set_adjusted_delays(training_ctx_t *ctx, int ck_offset) {
     int channel, rank, address, cntdly;
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Adjusted Tick_offsetgs\n", 'A'+channel);
+
         // If we ever have multiple ranks, and independent tick_offsetg for them
         // Uncomment loop below
         // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
@@ -408,8 +426,8 @@ static void CS_CA_setup_new_delays(training_ctx_t *ctx, int ck_offset) {
             ctx->cs.rst_dly(channel, rank, 0);
             for (cntdly = 0; cntdly < ctx->cs.final_delays[channel][rank]; ++cntdly)
                 ctx->cs.inc_dly(channel, rank, 0);
-
         }
+
         for (address = 0; address < ctx->ca.line_count; address++) {
             ctx->ca.final_delays[channel][address] -= ck_offset;
             printf("CA:%2d center point delay:%2d\n", address, ctx->ca.final_delays[channel][address]);
@@ -428,27 +446,47 @@ static void CS_CA_setup_new_delays(training_ctx_t *ctx, int ck_offset) {
     }
 }
 
-static void CK_CS_CA_best_timings(training_ctx_t *ctx) {
+/**
+ * CK_CS_CA_finalize_timings
+ *
+ * CS and CA trainings were successful and we found an eye for
+ * all trained signals. Now we need to calculate the midpoints
+ * of such eyes.
+ *
+ * Some eyes could start on negative offset relative to the
+ * clock, so we need to fix that by delaying the clock.
+ * This way, all midpoints are in the [0, SDRAM_PHY_DELAYS)
+ * range.
+ */
+static void CK_CS_CA_finalize_timings(training_ctx_t *ctx) {
     int new_ckdly, cntdly;
     int min, max;
     min = SDRAM_PHY_DELAYS;
     max = -SDRAM_PHY_DELAYS;
 
-    CS_CA_min_max_midpoints(ctx, &min, &max);
+    // Calculate eye midpoints for all trained signals and save them in final_delays.
+    // Also find minimal and maximal used delays to use them later to shift the clock
+    CS_CA_calculate_midpoints(ctx, &min, &max);
 
     printf("Max center point delay:%2d, min center point delay:%2d, spread:%2d\n", max, min, max-min);
 
+    // Calculate new clock delay. It is the smallest of used delays
     printf("Adjusting clock delay, so min center point is at delay 0\n");
-
     new_ckdly = (SDRAM_PHY_DELAYS - min) % SDRAM_PHY_DELAYS;
 
+    // Set new clock delay
     printf("New clock delay:%2d\n", new_ckdly);
 
     ctx->ck.rst_dly(0, 0, 0);
     for (cntdly = 0; cntdly < new_ckdly; ++cntdly)
         ctx->ck.inc_dly(0, 0, 0);
-    CS_CA_setup_new_delays(ctx, min);
 
+    // Now that CK is shifted, we can set new delays calculated
+    // in `CS_CA_calculate_midpoints` adjusted by the clock offset,
+    // which is equal to the minimal midpoint.
+    CS_CA_set_adjusted_delays(ctx, min);
+
+    // Make sure that selected delays still work
     CS_CA_rescan(ctx, new_ckdly);
 }
 
@@ -482,7 +520,7 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
     if (!(CS_success & CA_success)) {
         enable_dfi_2n_mode();
     } else {
-        CK_CS_CA_best_timings(ctx);
+        CK_CS_CA_finalize_timings(ctx);
         for (channel = 0; channel < CHANNELS; channel++) {
             // If we ever have multiple ranks, and independent timing for them
             // Uncomment loop below
