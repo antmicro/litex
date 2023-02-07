@@ -1368,9 +1368,9 @@ void exit_cstm(int channel, int rank) {
     send_mpc(channel, rank, 0);
 }
 
-static void cs_sample_prep(int channel, int rank, int address, int pattern_shift) {
+static void cs_sample_prep(int channel, int rank, int address, int shift_0101) {
     cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 1, 0);
-    cmd_injector(channel, 0xa>>pattern_shift, 1<<rank, 0x1f, 0, 0, 1, 0);
+    cmd_injector(channel, 0x5<<(!!shift_0101), 1<<rank, 0x1f, 0, 0, 1, 0);
     store_continuous(channel);
     cdelay(50);
 }
@@ -1384,8 +1384,8 @@ static void cs_sample_prep(int channel, int rank, int address, int pattern_shift
  * the OR operation and check if all were 0s.
  * JESD79-5A 4.20
  */
-int cs_check_if_works(int channel, int rank, int address, int pattern_shift) {
-    cs_sample_prep(channel, rank, address, pattern_shift);
+int cs_check_if_works(int channel, int rank, int address, int shift_0101) {
+    cs_sample_prep(channel, rank, address, shift_0101);
     return !or_sample(channel);
 }
 

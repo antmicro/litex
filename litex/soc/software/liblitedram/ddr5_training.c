@@ -31,23 +31,35 @@ int enumerated = 0;
 
 int WICA = 0;
 
-static int CS_on_edge_detect(training_ctx_t *ctx, int32_t channel, int32_t rank) {
-    int offset, _result;
-    for (offset = 0; offset < 2; offset++) {
-        if (ctx->cs.check(channel, rank, 0, offset))
-            _result = offset<<1|1;
+/**
+ * CS_in_eye
+ *
+ * Checks if selected CS (rank) signal delay is in
+ * the eye of working delays.
+ *
+ * As we don't know when the DRAM/RCD started sampling,
+ * we check 0101 pattern and if it doesn't work, we shift
+ * it by one and check again.
+ */
+static int CS_in_eye(training_ctx_t *ctx, int32_t channel, int32_t rank, int *shift_0101) {
+    int _shift_0101;
+    for (_shift_0101 = 0; _shift_0101 < 2; _shift_0101++) {
+        if (ctx->cs.check(channel, rank, 0, _shift_0101)) {
+            *shift_0101 = _shift_0101;
+            return 1;
+        }
     }
-    return _result;
+    return 0;
 }
 
-static int CS_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int offset) {
+static int CS_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int shift_0101) {
     int works, last_good, _result, ckdly;
     works = 1;
     printf("|");
     last_good = 0;
     ctx->cs.rst_dly(channel, rank, 0);
     for(ckdly = 0; ckdly < SDRAM_PHY_DELAYS && works; ckdly++) {
-        _result = ctx->cs.check(channel, rank, 0, offset);
+        _result = ctx->cs.check(channel, rank, 0, shift_0101);
         printf("%d", !!_result);
         if (!_result && works) {
             works = 0;
@@ -61,30 +73,36 @@ static int CS_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int of
     return last_good;
 }
 
-static int CS_find_offset(training_ctx_t *ctx, int32_t channel, int32_t rank) {
-    int csdly, offset;
-    int offset_result[2];
-    ctx->cs.rst_dly(channel, rank, 0);
-    for (offset = 0; offset < 2; offset++) {
-        for (csdly = 0; csdly < SDRAM_PHY_DELAYS; csdly++) {
-            // Found working pattern
-            if (ctx->cs.check(channel, rank, 0, offset)) {
-                offset_result[offset] = csdly;
-                break;
-            }
-            ctx->cs.inc_dly(channel, rank, 0);
-        }
-        ctx->cs.rst_dly(channel, rank, 0);
-    }
-    return offset_result[0] < offset_result[1] ? 0 : 1;
-}
+/**
+ * CS_should_shift_pattern
+ *
+ * During the CS training we get responses based
+ * on detection of `0101` CS pattern.
+ *
+ * As we only care if the pattern is being detected
+ * (CK and CS are aligned) and not about the cycle
+ * in which sampling began, we can change the pattern
+ * to `1010` to solve that.
+ */
+static int CS_should_shift_pattern(training_ctx_t *ctx, int32_t channel, int32_t rank) {
+    int csdly, shift_0101;
 
-static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* left, int* right) {
-    int works, csdly, offset;
-    offset = CS_find_offset(ctx, channel, rank);
     ctx->cs.rst_dly(channel, rank, 0);
     for (csdly = 0; csdly < SDRAM_PHY_DELAYS; csdly++) {
-        works = ctx->cs.check(channel, rank, 0, offset);
+        if (CS_in_eye(ctx, channel, rank, &shift_0101))
+            return shift_0101;
+
+        ctx->cs.inc_dly(channel, rank, 0);
+    }
+
+    return 0;
+}
+
+static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* left, int* right, int shift_0101) {
+    int works, csdly;
+    ctx->cs.rst_dly(channel, rank, 0);
+    for (csdly = 0; csdly < SDRAM_PHY_DELAYS; csdly++) {
+        works = ctx->cs.check(channel, rank, 0, shift_0101);
         printf("%d", !!works);
         if (works && *right  == UNSET_DELAY)
             *right = csdly;
@@ -99,7 +117,7 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
     int left_side, right_side;
     int32_t csdly, coarse;
     int32_t rank;
-    int32_t on_edge;
+    int shift_0101 = 0;
     // If we ever have multiple ranks, and independent timing for them
     // Uncomment loop below
     // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
@@ -115,17 +133,16 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         // Scan clock delays only if one of patterns work (0x55 or 0xAA)
         // If neither works then we are in meta state, both clock and CS change
         // too close to each other. In such situations we only check CS delays
+        if (CS_in_eye(ctx, channel, rank, &shift_0101)) {
+            // We are already in the eye and can look for the eye start by changing CK delay
+            right_side = CS_ck_scan(ctx, channel, rank, shift_0101);
 
-        // Get working pattern
-        on_edge = CS_on_edge_detect(ctx, channel, rank);
-
-        // We got one of the patterns to work flawlessly, check clock delays
-        if (on_edge) {
-            right_side = CS_ck_scan(ctx, channel, rank, on_edge >> 1);
+            // After delaying clock, pattern could have changes, as we missed one clock cycle
+            shift_0101 = CS_should_shift_pattern(ctx, channel, rank);
         }
-        // After delaying clock, pattern could have changes, as we missed one clock cycle
+
         printf("|");
-        CS_scan(ctx, channel, rank, &left_side, &right_side);
+        CS_scan(ctx, channel, rank, &left_side, &right_side, shift_0101);
         printf("|\n");
 
         ctx->cs.rst_dly(channel, rank, 0);
@@ -311,7 +328,7 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
 
 static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
     int channel, rank, address;
-    int tmpckdly, cntdly, discard;
+    int shift_0101, cntdly, discard;
     printf("Re-scan CS/CA\n");
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c\n", 'A'+channel);
@@ -322,13 +339,13 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
             printf("Rank:%d\n", rank);
 
             ctx->cs.enter_training_mode(channel, rank);
-            tmpckdly = CS_find_offset(ctx, channel, rank);
-            CS_ck_scan(ctx, channel, rank, tmpckdly);
+            shift_0101 = CS_should_shift_pattern(ctx, channel, rank);
+            CS_ck_scan(ctx, channel, rank, shift_0101);
             ctx->ck.rst_dly(0, 0, 0);
             for (cntdly = 0; cntdly < ckdly; ++cntdly)
                 ctx->ck.inc_dly(0, 0, 0);
             printf("|");
-            CS_scan(ctx, channel, rank, &discard, &discard);
+            CS_scan(ctx, channel, rank, &discard, &discard, shift_0101);
             printf("\n");
             ctx->cs.exit_training_mode(channel, rank);
 

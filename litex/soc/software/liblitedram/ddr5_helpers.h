@@ -110,7 +110,7 @@ void send_read(int channel, int rank);
 
 void enter_cstm(int channel, int rank);
 void exit_cstm(int channel, int rank);
-int cs_check_if_works(int channel, int rank, int address, int pattern_shift);
+int cs_check_if_works(int channel, int rank, int address, int shift_0101);
 
 void enter_catm(int channel, int rank);
 void exit_catm(int channel, int rank);
