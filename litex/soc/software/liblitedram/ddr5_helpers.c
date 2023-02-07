@@ -1419,13 +1419,15 @@ void exit_catm(int channel, int rank) {
     cdelay(50);
 }
 
-static void ca_sample_prep_current_period(int channel, int rank, int address, int l2h, int cs_dly) {
-    cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
-    if (cs_dly == 0) {
-        cmd_injector(channel, 0x1, 1<<rank, l2h<<address, 0, 0, 1, 0);
+
+static void ca_sample_prep(int channel, int rank, int address, int l2h, int phase_shift) {
+    cmd_injector(    channel, 0xf,              0,       (!l2h)<<address, 0, 0, 1, 0);
+
+    if (phase_shift == 0) {
+        cmd_injector(channel, 0x1,              1<<rank,    l2h<<address, 0, 0, 1, 0);
     } else {
-        cmd_injector(channel, 0x1, 0, l2h<<address, 0, 0, 1, 0);
-        cmd_injector(channel, 0x1<<cs_dly, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
+        cmd_injector(channel, 0x1,              0,          l2h<<address, 0, 0, 1, 0);
+        cmd_injector(channel, 0x1<<phase_shift, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
     }
     store_continuous(channel);
     cdelay(50);
@@ -1457,15 +1459,15 @@ static void ca_sample_prep_current_period(int channel, int rank, int address, in
  * just as good when going low->high and high->low.
  * JESD79-5A 4.19
  */
-int ca_check_if_works(int channel, int rank, int address, int cs_dly) {
+int ca_check_if_works(int channel, int rank, int address, int phase_shift) {
     int ok;
 
     // Test change from low to high
-    ca_sample_prep_current_period(channel, rank, address, 1, cs_dly);
+    ca_sample_prep(channel, rank, address, 1, phase_shift);
     ok = and_sample(channel);
 
     // Test change from high to low
-    ca_sample_prep_current_period(channel, rank, address, 0, cs_dly);
+    ca_sample_prep(channel, rank, address, 0, phase_shift);
     ok &= !or_sample(channel);
 
     return ok;
