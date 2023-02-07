@@ -252,7 +252,7 @@ static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t 
     ctx->ca.rst_dly(channel, rank, address);
 }
 
-static void CA_training(training_ctx_t *ctx, int32_t channel) {
+static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
     int left_side, right_side;
     int32_t rank, address;
 
@@ -283,34 +283,26 @@ static void CA_training(training_ctx_t *ctx, int32_t channel) {
             CA_scan(ctx, channel, rank, address, &left_side, &right_side);
             printf("|\n");
 
-            if(right_side == UNSET_DELAY) {
-                ctx->ca.delays[channel][address][0] = UNSET_DELAY;
-                break;
-            } else if (right_side > ctx->ca.delays[channel][address][0]) {
-                ctx->ca.delays[channel][address][0] = right_side;
+            // Check if we found the eye
+            if (left_side == UNSET_DELAY || right_side == UNSET_DELAY) {
+                // If not, then exit CA training
+                printf("CA:%2"PRId32" Eye width:0 Failed\n", address);
+                *success = 0;
+
+                // Exit CA training early
+                ctx->ca.exit_training_mode(channel, rank);
+                return;
             }
 
-            if(left_side == UNSET_DELAY) {
-                ctx->ca.delays[channel][address][1] = UNSET_DELAY;
-                break;
-            } else if (left_side < ctx->ca.delays[channel][address][1]) {
+            if (right_side > ctx->ca.delays[channel][address][0])
+                ctx->ca.delays[channel][address][0] = right_side;
+
+            if (left_side < ctx->ca.delays[channel][address][1])
                 ctx->ca.delays[channel][address][1] = left_side;
-            }
         }
 
         // Exit CA training
         ctx->ca.exit_training_mode(channel, rank);
-    }
-}
-
-static void CA_check_values(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
-    int32_t address;
-    for (address = 0; address < ctx->ca.line_count; address++) {
-        if (ctx->ca.delays[channel][address][1] == UNSET_DELAY || ctx->ca.delays[channel][address][0] == UNSET_DELAY) {
-            printf("CA:%2"PRId32" Eye width:0 Failed\n", address);
-            *success &= 0;
-            return;
-        }
     }
 }
 
@@ -482,8 +474,7 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
         CS_training(ctx, channel, &CS_success);
         printf("CA training\n");
         CA_check_lines(ctx, channel);
-        CA_training(ctx, channel);
-        CA_check_values(ctx, channel, &CA_success);
+        CA_training(ctx, channel, &CA_success);
     }
     if (!(CS_success & CA_success)) {
         enable_dfi_2n_mode();
