@@ -93,6 +93,7 @@ static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* lef
 }
 
 static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
+    int left_side, right_side;
     int32_t csdly, coarse;
     int32_t rank;
     int32_t on_edge;
@@ -105,6 +106,9 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         // Enter CS training
         ctx->cs.enter_training_mode(channel, rank);
 
+        left_side = UNSET_DELAY;
+        right_side = UNSET_DELAY;
+
         // Scan clock delays only if one of patterns work (0x55 or 0xAA)
         // If neither works then we are in meta state, both clock and CS change
         // too close to each other. In such situations we only check CS delays
@@ -112,23 +116,20 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         // Get working pattern
         on_edge = CS_on_edge_detect(ctx, channel, rank);
 
-        ctx->cs.delays[channel][rank][0] = UNSET_DELAY;
-        ctx->cs.delays[channel][rank][1] = UNSET_DELAY;
-
         // We got one of the patterns to work flawlessly, check clock delays
         if (on_edge) {
-            ctx->cs.delays[channel][rank][0] = CS_ck_scan(ctx, channel, rank, on_edge >> 1);
+            right_side = CS_ck_scan(ctx, channel, rank, on_edge >> 1);
         }
         // After delaying clock, pattern could have changes, as we missed one clock cycle
         printf("|");
-        CS_scan(ctx, channel, rank, &ctx->cs.delays[channel][rank][1], &ctx->cs.delays[channel][rank][0]);
+        CS_scan(ctx, channel, rank, &left_side, &right_side);
         printf("|\n");
 
         ctx->cs.rst_dly(channel, rank, 0);
 
         // Set up coarse delay adjustment until we get CA results
-        printf("Rank delays: %2d:%2d\n", ctx->cs.delays[channel][rank][0], ctx->cs.delays[channel][rank][1]);
-        coarse = (ctx->cs.delays[channel][rank][0]+ctx->cs.delays[channel][rank][1]) / 2;
+        printf("Rank delays: %2d:%2d\n", right_side, left_side);
+        coarse = (right_side + left_side) / 2;
         coarse = coarse < 0 ? 0 : coarse; // max(0, coarse)
         printf("Coarse adjustment:%"PRId32"\n", coarse);
         ctx->cs.coarse_delays[channel][rank] = coarse;
@@ -139,11 +140,14 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         // Exit CS training
         ctx->cs.exit_training_mode(channel, rank);
 
-        if (ctx->cs.delays[channel][rank][1] == UNSET_DELAY || ctx->cs.delays[channel][rank][0] == UNSET_DELAY) {
+        if (left_side == UNSET_DELAY || right_side == UNSET_DELAY) {
             printf("CS:%2"PRId32" Eye width:0 Failed\n", rank);
-            *success &= 0;
+            *success = 0;
             return;
         }
+
+        ctx->cs.delays[channel][rank][0] = right_side;
+        ctx->cs.delays[channel][rank][1] = left_side;
     }
 }
 
