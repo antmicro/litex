@@ -447,7 +447,7 @@ static void CK_CS_CA_best_timings(training_ctx_t *ctx) {
     ctx->ck.rst_dly(0, 0, 0);
     for (cntdly = 0; cntdly < new_ckdly; ++cntdly)
         ctx->ck.inc_dly(0, 0, 0);
-    CS_CA_setup_new_delays(ctx, new_ckdly);
+    CS_CA_setup_new_delays(ctx, min);
 
     CS_CA_rescan(ctx, new_ckdly);
 }
