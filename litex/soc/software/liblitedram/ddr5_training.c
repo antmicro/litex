@@ -118,10 +118,7 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
     int32_t csdly, coarse;
     int32_t rank;
     int shift_0101 = 0;
-    // If we ever have multiple ranks, and independent timing for them
-    // Uncomment loop below
-    // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-    {rank = 0;
+    for (rank = 0; rank < ctx->ranks; rank++) {
         printf("Rank: %2"PRId32"", rank);
 
         // Enter CS training
@@ -276,10 +273,7 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
     int left_side, right_side;
     int32_t rank, address;
 
-    // If we ever have multiple ranks, and independent timing for them
-    // Uncomment loop below
-    // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-    {rank = 0;
+    for (rank = 0; rank < ctx->ranks; rank++) {
         printf("Rank:%2"PRId32"\n", rank);
         // Enter CA training
         ctx->ca.enter_training_mode(channel, rank);
@@ -332,10 +326,7 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
     printf("Re-scan CS/CA\n");
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c\n", 'A'+channel);
-        // If we ever have multiple ranks, and independent timing for them
-        // Uncomment loop below
-        // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-        {rank = 0;
+        for (rank = 0; rank < ctx->ranks; rank++) {
             printf("Rank:%d\n", rank);
 
             ctx->cs.enter_training_mode(channel, rank);
@@ -386,10 +377,7 @@ static void CS_CA_calculate_midpoints(training_ctx_t *ctx, int *min, int *max) {
     int temp;
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Timings\n", 'A'+channel);
-        // If we ever have multiple ranks, and independent timing for them
-        // Uncomment loop below
-        // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-        {rank = 0;
+        for (rank = 0; rank < ctx->ranks; rank++) {
             temp = (ctx->cs.delays[channel][rank][0] + ctx->cs.delays[channel][rank][1])/2;
             printf("Rank:%2d: min delay %2d, max delay %2d, center %2d\n",
                 rank, ctx->cs.delays[channel][rank][0], ctx->cs.delays[channel][rank][1], temp);
@@ -434,10 +422,7 @@ static void CS_CA_set_adjusted_delays(training_ctx_t *ctx, int ck_offset) {
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Adjusted Tick_offsetgs\n", 'A'+channel);
 
-        // If we ever have multiple ranks, and independent tick_offsetg for them
-        // Uncomment loop below
-        // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-        {rank = 0;
+        for (rank = 0; rank < ctx->ranks; rank++) {
             ctx->cs.final_delays[channel][rank] -= ck_offset;
             printf("Rank:%2d center point delay:%2d\n", rank, ctx->cs.final_delays[channel][rank]);
             ctx->cs.rst_dly(channel, rank, 0);
@@ -539,10 +524,7 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
     } else {
         CK_CS_CA_finalize_timings(ctx);
         for (channel = 0; channel < CHANNELS; channel++) {
-            // If we ever have multiple ranks, and independent timing for them
-            // Uncomment loop below
-            // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-            {rank = 0;
+            for (rank = 0; rank < ctx->ranks; rank++) {
                 disable_dram_2n_mode(channel, rank);
             }
         }
@@ -550,7 +532,7 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
 }
 #endif // SKIP_NO_DELAYS
 
-void sdram_ddr5_module_enumerate(void) {
+void sdram_ddr5_module_enumerate(training_ctx_t *ctx) {
     int channel, rank, module;
     if (SDRAM_PHY_MODULES/CHANNELS > 15) {
         printf("Too many modules on single rank to enumerate,\n"
@@ -560,10 +542,7 @@ void sdram_ddr5_module_enumerate(void) {
     }
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Enumerating subchannel:%c\n", (char)('A'+channel));
-        // If we ever have multiple ranks, and independent timing for them
-        // Uncomment loop below
-        // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-        {rank = 0;
+        for (rank = 0; rank < ctx->ranks; rank++) {
             printf("\tEnumerating rank:%2d\n", rank);
             // Enter PDA Enumerate Programming Mode
             send_mpc(channel, rank, 0xB);
@@ -600,7 +579,7 @@ uint16_t serial[] = {0x0000, 0xffff,
                      0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000};
 int serial_count = sizeof(serial)/sizeof(uint16_t);
 
-void sdram_ddr5_read_training(void) {
+void sdram_ddr5_read_training(training_ctx_t *ctx) {
     int channel, rank, module, i, seed;
     int cycle, delay, preamble, got, works;
     int start_cycle, start_delay,   // First working cycle delay pair
@@ -610,13 +589,7 @@ void sdram_ddr5_read_training(void) {
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Read training\n", (char)('A'+channel));
 
-        /* All PHYs so far have support for single delay far all ranks,
-           use only first rank, leave all other as inactive*/
-
-        // If we ever have multiple ranks, and independent timing for them
-        // Uncomment loop below
-        // for (rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-        {rank = 0;
+        for (rank = 0; rank < ctx->ranks; rank++) {
             /* Setup MRs */
             send_mrw(channel, rank, 0xf, 2, 1|WICA);
             send_mrw(channel, rank, 0xf, 25, 1);
@@ -758,10 +731,7 @@ void sdram_ddr5_read_training(void) {
         }
 
         printf("Simple read check\n");
-        // If we ever have multiple ranks, and independent timing for them
-        // Uncomment loop below
-        // for(rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-        {rank =0;
+        for (rank = 0; rank < ctx->ranks; rank++) {
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 printf("Channel:%c rank:%2d module:%2d serial number:", (char)('A'+channel), rank, module);
                 for (i = 0; i < 5; ++i) {
@@ -796,7 +766,7 @@ void sdram_ddr5_read_training(void) {
     }
 }
 
-void sdram_ddr5_write_training(void) {
+void sdram_ddr5_write_training(training_ctx_t *ctx) {
     int channel, rank, module, seed, cnt_seed, byte;
     int cycle, delay, got, sample, it, works;
     int start_cycle, start_delay,   // First working cycle delay pair
@@ -810,10 +780,7 @@ void sdram_ddr5_write_training(void) {
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Write leveling\n", (char)('A'+channel));
         /* Coarse alignment */
-        // If we ever have multiple ranks, and independent timing for them
-        // Uncomment loop below
-        // for(rank = 0; rank < SDRAM_PHY_RANKS; rank++) {
-        {rank = 0;
+        for (rank = 0; rank < ctx->ranks; rank++) {
             enter_write_leveling(channel);
             /* Setup MRs */
             send_mrw(channel, rank, 0xf, 2, 2);
@@ -1258,6 +1225,12 @@ training_ctx_t host_dram_ctx = {
         .inc_dly = par_inc,
     },
     .training_type = HOST_DRAM,
+
+    // So far, all PHYs have support for single delay far all ranks,
+    // use only first rank, leave all other as inactive.
+    // Use SDRAM_PHY_RANKS if we ever support multiple ranks
+    // and independent timing for them.
+    .ranks = 1,
 };
 
 #if defined(CONFIG_HAS_I2C)
@@ -1287,6 +1260,12 @@ training_ctx_t host_rcd_ctx = {
         .inc_dly = par_inc,
     },
     .training_type = HOST_RCD,
+
+    // So far, all PHYs have support for single delay far all ranks,
+    // use only first rank, leave all other as inactive.
+    // Use SDRAM_PHY_RANKS if we ever support multiple ranks
+    // and independent timing for them.
+    .ranks = 1,
 };
 #endif // defined(CONFIG_HAS_I2C)
 

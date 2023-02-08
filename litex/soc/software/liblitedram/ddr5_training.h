@@ -39,8 +39,8 @@ typedef struct {
 
         int delays[CHANNELS][14][2];
         int final_delays[CHANNELS][14];
-        // If per rank timings are available, the array above should be [CHANNELS][SDRAM_PHY_RANKS][14][2]
-        // To cover clock/ca delays per rank
+        // If per-rank timings are available, the arrays above should be [CHANNELS][SDRAM_PHY_RANKS][14][2]
+        // to cover clock/ca delays per rank
 
         training_mode_callback_t enter_training_mode;
         training_mode_callback_t exit_training_mode;
@@ -65,12 +65,13 @@ typedef struct {
         RCD_DRAM,
         TRAINING_TYPE_COUNT,
     } training_type;
+    int ranks;
 } training_ctx_t;
 
-void sdram_ddr5_module_enumerate(void);
+void sdram_ddr5_module_enumerate(training_ctx_t *ctx);
 void sdram_ddr5_cs_ca_training(training_ctx_t *ctx);
-void sdram_ddr5_read_training(void);
-void sdram_ddr5_write_training(void);
+void sdram_ddr5_read_training(training_ctx_t *ctx);
+void sdram_ddr5_write_training(training_ctx_t *ctx);
 
 extern training_ctx_t host_dram_ctx;
 #if defined(CONFIG_HAS_I2C)
