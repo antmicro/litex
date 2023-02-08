@@ -320,6 +320,15 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
     }
 }
 
+/**
+ * CS_CA_rescan
+ *
+ * Performs scan of CS and CA delays.
+ * It could be just running `ctx->cs.check` and `ctx->ca.check`
+ * on currently selected delays, but by using functions from
+ * training procedure, we get output in the same format, which
+ * can be used to compare training results.
+ */
 static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
     int channel, rank, address;
     int shift_0101, cntdly, discard;
@@ -329,35 +338,50 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
         for (rank = 0; rank < ctx->ranks; rank++) {
             printf("Rank:%d\n", rank);
 
+            //                    CS rescan                    //
             ctx->cs.enter_training_mode(channel, rank);
+
+            // Get shift_0101 value
             shift_0101 = CS_should_shift_pattern(ctx, channel, rank);
+
             CS_ck_scan(ctx, channel, rank, shift_0101);
+            // Restore CK delay after CS_ck_scan
             ctx->ck.rst_dly(0, 0, 0);
             for (cntdly = 0; cntdly < ckdly; ++cntdly)
                 ctx->ck.inc_dly(0, 0, 0);
+
             printf("|");
             CS_scan(ctx, channel, rank, &discard, &discard, shift_0101);
             printf("\n");
-            ctx->cs.exit_training_mode(channel, rank);
 
+            // Restore CS delay
             ctx->cs.rst_dly(channel, rank, 0);
             for (cntdly = 0; cntdly < ctx->cs.final_delays[channel][rank]; ++cntdly)
                 ctx->cs.inc_dly(channel, rank, 0);
 
+            ctx->cs.exit_training_mode(channel, rank);
+
+            //                    CA rescan                    //
             ctx->ca.enter_training_mode(channel, rank);
+
             for (address = 0; address < ctx->ca.line_count; address++) {
                 printf("Address:%2d\n", address);
                 CA_ck_scan(ctx, channel, rank, address, ctx->cs.final_delays[channel][rank]);
+                // Restore CK delay after CA_ck_scan
                 ctx->ck.rst_dly(0, 0, 0);
                 for (cntdly = 0; cntdly < ckdly; ++cntdly)
                     ctx->ck.inc_dly(0, 0, 0);
+
                 printf("|");
                 CA_scan(ctx, channel, rank, address, &discard, &discard);
                 printf("\n");
+
+                // Restore CA delay
                 ctx->ca.rst_dly(channel, rank, address);
                 for (cntdly = 0; cntdly < ctx->ca.final_delays[channel][address]; ++cntdly)
                     ctx->ca.inc_dly(channel, rank, address);
             }
+
             ctx->ca.exit_training_mode(channel, rank);
         }
     }
