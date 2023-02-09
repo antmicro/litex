@@ -184,19 +184,6 @@ static void CA_setup_array(training_ctx_t *ctx) {
 }
 
 /**
- * ca_check_if_has_line13
- *
- * Detect if CA13 is present
- */
-static int ca_check_if_has_line13(int32_t channel) {
-    cmd_injector(channel, 0xf, 0, 1<<13, 0, 0, 1, 0);
-    cmd_injector(channel, 0x1, 1, 1<<13, 0, 0, 1, 0);
-    store_continuous(channel);
-
-    return and_sample(channel);
-}
-
-/**
  * CA_check_lines
  *
  * Detect and assign CA lines count.
@@ -1223,6 +1210,20 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
     }
 }
 
+/**
+ * ca_check_if_has_line13
+ *
+ * Detect if CA13 is present.
+ * Requires to already be in the CATM.
+ */
+static int ca_check_if_has_line13(int32_t channel) {
+    cmd_injector(channel, 0xf, 0, 1<<13, 0, 0, 1, 0);
+    cmd_injector(channel, 0x1, 1, 1<<13, 0, 0, 1, 0);
+    store_continuous(channel);
+
+    return and_sample(channel);
+}
+
 training_ctx_t host_dram_ctx = {
     .ck = {
         .rst_dly = ck_rst,
@@ -1258,6 +1259,21 @@ training_ctx_t host_dram_ctx = {
 };
 
 #if defined(CONFIG_HAS_I2C)
+/**
+ * dca_check_if_has_line13
+ *
+ * Detect if DCA13 is present
+ * Requires to already be in the DCATM.
+ */
+static int dca_check_if_has_line13(int32_t channel) {
+    ddrphy_alert_reduce_write(1); // write 1 to reduce with AND
+    cmd_injector(channel, 0xf, 0, 1<<13, 0, 0, 1, 0);
+    cmd_injector(channel, 0x1, 1, 1<<13, 0, 0, 1, 0);
+    store_continuous(channel);
+
+    return ddrphy_alert_read();
+}
+
 training_ctx_t host_rcd_ctx = {
     .ck = {
         .rst_dly = ck_rst,
@@ -1277,7 +1293,7 @@ training_ctx_t host_rcd_ctx = {
         .inc_dly = ca_inc,
         .rst_dly = ca_rst,
         .check = dca_check_if_works,
-        .has_line13 = NULL, // TODO: implement checker
+        .has_line13 = dca_check_if_has_line13,
     },
     .par = {
         .rst_dly = par_rst,
