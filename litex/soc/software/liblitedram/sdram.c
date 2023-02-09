@@ -1216,17 +1216,7 @@ int sdram_init(void) {
 #endif // CSR_DDRCTRL_BASE
 	reset_sequence();
 #ifdef SDRAM_PHY_DDR5
-	sdram_ddr5_module_enumerate(&host_dram_ctx);
-	sdram_ddr5_cs_ca_training(&host_dram_ctx);
-	if (in_2n_mode()) {
-		printf("2N mode setup\n");
-		init_sequence_2n();
-	} else {
-		printf("1N mode setup\n");
-		init_sequence_1n();
-	}
-	sdram_ddr5_read_training(&host_dram_ctx);
-	sdram_ddr5_write_training(&host_dram_ctx);
+	sdram_ddr5_flow();
 #else
 	init_sequence();
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)

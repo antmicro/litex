@@ -78,6 +78,8 @@ extern training_ctx_t host_dram_ctx;
 extern training_ctx_t host_rcd_ctx;
 #endif // defined(CONFIG_HAS_I2C)
 
+void sdram_ddr5_flow(void);
+
 #endif // SDRAM_PHY_DDR5
 
 #endif // CSR_SDRAM_BASE

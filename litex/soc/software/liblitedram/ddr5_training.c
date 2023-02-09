@@ -2,6 +2,10 @@
 
 #if defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
 #include <liblitedram/ddr5_helpers.h>
+
+#include <liblitedram/sdram_spd.h>
+
+#include <stdbool.h>
 #include <stdio.h>
 #include <inttypes.h>
 
@@ -1307,6 +1311,65 @@ training_ctx_t host_rcd_ctx = {
     // and independent timing for them.
     .ranks = 1,
 };
+
+enum module_type {
+    RDIMM       = 0b0001,
+    UDIMM       = 0b0010,
+    SODIMM      = 0b0011,
+    LRDIMM      = 0b0100,
+    DDIM        = 0b1010,
+    SOLDER_DOWN = 0b1011,
+};
+
+/**
+ * read_module_type
+ *
+ * Reads the 3rd byte of the SPD and extracts the module type.
+ * If the SPD cannot be read, it defaults to the UDIMM.
+ */
+static enum module_type read_module_type(uint8_t spd) {
+    uint8_t module_type;
+    if (!sdram_read_spd(spd, 3, &module_type, 1, true)) {
+        printf("Couldn't read the SPD and check the module type. Defaulting to UDIMM.");
+        return UDIMM;
+    }
+
+    // Module type is in the lower nibble
+    return module_type & 0x0f;
+}
 #endif // defined(CONFIG_HAS_I2C)
+
+/**
+ * sdram_ddr5_flow
+ *
+ * Performs the entire initialization and training
+ * procedure for DDR5 memory. In runtime finds out
+ * if connected memory is RDIMM and selects proper
+ * training context.
+ */
+void sdram_ddr5_flow(void) {
+    training_ctx_t *base_ctx = &host_dram_ctx;
+
+#if defined(CONFIG_HAS_I2C)
+    bool is_rdimm = read_module_type(0) == RDIMM;
+
+    if (is_rdimm)
+        base_ctx = &host_rcd_ctx;
+#endif // defined(CONFIG_HAS_I2C)
+
+    sdram_ddr5_module_enumerate(base_ctx);
+    sdram_ddr5_cs_ca_training(base_ctx);
+
+    if (in_2n_mode()) {
+        printf("2N mode setup\n");
+        init_sequence_2n();
+    } else {
+        printf("1N mode setup\n");
+        init_sequence_1n();
+    }
+
+    sdram_ddr5_read_training(base_ctx);
+    sdram_ddr5_write_training(base_ctx);
+}
 
 #endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
