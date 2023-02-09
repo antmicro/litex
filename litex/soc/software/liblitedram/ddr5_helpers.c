@@ -1592,6 +1592,21 @@ void exit_dcstm(int channel, int rank) {
         printf("There was a problem with exiting Host->RCD CS training (DCSTM)\n");
 }
 
+/**
+ * dcs_check_if_works
+ *
+ * Checks if during DCSTM, DCS and CK signals are aligned.
+ * When they are aligned, then RCD will send 0s on all DQ's.
+ * We sample DQ's over multiple cycles, reduce them with
+ * the OR operation and check if all were 0s.
+ * JESD82-511 5.1.1
+ */
+int dcs_check_if_works(int channel, int rank, int address, int shift_0101) {
+    ddrphy_alert_reduce_write(0); // write 0 to reduce with OR
+    cs_sample_prep(channel, rank, address, shift_0101);
+    return !ddrphy_alert_read();
+}
+
 /*-----------------------------------------------------------------------*/
 /* RCD->DRAM CS Training (QCSTM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
@@ -1760,6 +1775,48 @@ void exit_dcatm(int channel, int rank) {
 
     if (!ok)
         printf("There was a problem with exiting Host->RCD CA training (DCATM)\n");
+}
+
+/**
+ * dca_check_if_works
+ *
+ * Checks if during DCATM, DCA and DCS signals are aligned.
+ * The RCD will reduce sampled DCA values with the XOR
+ * operation.
+ *
+ * To check if a specific CA line is correctly aligned, we
+ * change only the CA line we want to test. If it is aligned,
+ * the DRAM will respond with only 1s on DQ lines.
+ *
+ * First we test scenario, where selected line is set low
+ * and for one phase when DCS_n is low, we set it high.
+ * We sample DQ's over multiple cycles, reduce them with
+ * the AND operation and check if all were 1s.
+ *
+ * We also perform a second test where the selected line is
+ * inverted. So for all phases it is high and when DCS_n goes
+ * low, selected DCA also goes low.
+ * This time, we reduce sampled DQ's with the OR operation as
+ * we expect the response to be 0s.
+ *
+ * Performing both tests, ensures that selected delay works
+ * just as good when going low->high and high->low.
+ * JESD82-511 5.2.1
+ */
+int dca_check_if_works(int channel, int rank, int address, int phase_shift) {
+    int ok;
+
+    // Test change from low to high
+    ddrphy_alert_reduce_write(1); // write 1 to reduce with AND
+    ca_sample_prep(channel, rank, address, 1, phase_shift);
+    ok = ddrphy_alert_read();
+
+    // Test change from high to low
+    ddrphy_alert_reduce_write(0); // write 0 to reduce with OR
+    ca_sample_prep(channel, rank, address, 0, phase_shift);
+    ok &= !ddrphy_alert_read();
+
+    return ok;
 }
 
 /*-----------------------------------------------------------------------*/

@@ -1268,7 +1268,7 @@ training_ctx_t host_rcd_ctx = {
         .exit_training_mode  = exit_dcstm,
         .rst_dly = cs_rst,
         .inc_dly = cs_inc,
-        .check = NULL, // TODO: implement checker
+        .check = dcs_check_if_works,
     },
     .ca = {
         .line_count = 14,
@@ -1276,7 +1276,7 @@ training_ctx_t host_rcd_ctx = {
         .exit_training_mode  = exit_dcatm,
         .inc_dly = ca_inc,
         .rst_dly = ca_rst,
-        .check = NULL, // TODO: implement checker
+        .check = dca_check_if_works,
         .has_line13 = NULL, // TODO: implement checker
     },
     .par = {

@@ -124,6 +124,7 @@ void exit_write_leveling(int channel);
 #if defined(CONFIG_HAS_I2C)
 void enter_dcstm(int channel, int rank);
 void exit_dcstm(int channel, int rank);
+int dcs_check_if_works(int channel, int rank, int address, int shift_0101);
 
 void qcs_inc(int channel, int rank, int address);
 void qcs_rst(int channel, int rank, int address);
@@ -132,6 +133,7 @@ void exit_qcstm(int channel, int rank);
 
 void enter_dcatm(int channel, int rank);
 void exit_dcatm(int channel, int rank);
+int dca_check_if_works(int channel, int rank, int address, int cs_dly);
 
 void qca_inc(int channel, int rank, int address);
 void qca_rst(int channel, int rank, int address);
