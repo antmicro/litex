@@ -595,6 +595,28 @@ static const int serial_count = sizeof(serial) / sizeof(serial[0]);
 
 static int WICA = 0;
 
+/**
+ * read_serial_number
+ *
+ * Reads serial number from the mode registers.
+ * It is a 5 byte value stored in registers
+ * MR65-MR69.
+ * JESD79-5A 3.5.66-70
+ */
+static uint64_t read_serial_number(int channel, int rank, int module) {
+    int i;
+    uint64_t serial_number = 0;
+
+    // Serial number is a 5 byte value
+    for (i = 0; i < 5; i++) {
+        // Base register 65
+        send_mrr(channel, rank, 65+i);
+        serial_number = (serial_number << 8) | recover_mrr_value(channel, module);
+    }
+
+    return serial_number;
+}
+
 void sdram_ddr5_read_training(training_ctx_t *ctx) {
     int channel, rank, module, i, seed;
     int cycle, delay, preamble, got, works;
@@ -749,12 +771,13 @@ void sdram_ddr5_read_training(training_ctx_t *ctx) {
         printf("Simple read check\n");
         for (rank = 0; rank < ctx->ranks; rank++) {
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
-                printf("Channel:%c rank:%2d module:%2d serial number:", (char)('A'+channel), rank, module);
-                for (i = 0; i < 5; ++i) {
-                    send_mrr(channel, rank, 65+i);
-                    printf("%02"PRIX8, recover_mrr_value(channel, module));
-                }
-                printf("\n");
+                printf(
+                    "Channel:%c rank:%2d module:%2d serial number: 0x%010"PRIX64"\n",
+                    (char)('A'+channel),
+                    rank,
+                    module,
+                    read_serial_number(channel, rank, module)
+                );
 #ifdef INFO_DDR5
                 // Check if data is read correctly
                 send_mrw(channel, rank, module, 63, 0xDE);
