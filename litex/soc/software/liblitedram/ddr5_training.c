@@ -617,160 +617,304 @@ static uint64_t read_serial_number(int channel, int rank, int module) {
     return serial_number;
 }
 
-void sdram_ddr5_read_training(training_ctx_t *ctx) {
-    int channel, rank, module, i, seed;
-    int cycle, delay, preamble, got, works;
-    int start_cycle, start_delay,   // First working cycle delay pair
-        middle_cycle, middle_delay, // Middle between first and last working
-        end_cycle, end_delay;       // First cycle delay pair that does not work after working
-    uint32_t eye_width;             // In taps
-    for (channel = 0; channel < CHANNELS; channel++) {
-        printf("Subchannel:%c Read training\n", (char)('A'+channel));
+/**
+ * enter_rptm
+ *
+ * Enters Read Preamble Training Mode.
+ * Sets up Mode Registers to be used during the training.
+ * JESD79-5A 4.18.2
+ */
+static void enter_rptm(int channel, int rank) {
+    // Setup MRs
+    send_mrw(channel, rank, 0xf, 28, 0xA5); // select DQL to invert
+    send_mrw(channel, rank, 0xf, 29, 0xA5); // select DQU to invert
+    send_mrw(channel, rank, 0xf, 30, 0x33); // select data sources for DQ lines
 
-        for (rank = 0; rank < ctx->ranks; rank++) {
-            /* Setup MRs */
-            send_mrw(channel, rank, 0xf, 2, 1|WICA);
-            send_mrw(channel, rank, 0xf, 25, 1);
-            send_mrw(channel, rank, 0xf, 28, 0xA5);
-            send_mrw(channel, rank, 0xf, 29, 0xA5);
-            send_mrw(channel, rank, 0xf, 30, 0x33);
+    // Actual write to enter Read Preamble Training Mode
+    send_mrw(channel, rank, 0xf, 2, 1|WICA);
+}
 
-            printf("Training rank%2d\n", rank);
-            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
-                printf("Training module%2d\n", module);
-                start_cycle = -1;
-                end_cycle = 100;
-                /* Coarse alignment */
-                rd_rst(channel, module);
-                got = 0;
-#ifdef INFO_DDR5
-                printf("Preamble\n");
-#endif // INFO_DDR5
-                for (cycle = 0; cycle < 67 && got < 2; cycle ++) {
-#ifdef INFO_DDR5
-                    printf("%2d|", cycle);
-#endif // INFO_DDR5
-                    idly_rst(channel, module);
-                    for (delay = 0; delay < SDRAM_PHY_DELAYS; delay++) {
-                        send_mrr(channel, rank, 31);
-                        preamble = captured_preamble(channel, module);
-#ifdef INFO_DDR5
-                        printf("%01x", preamble);
-#endif // INFO_DDR5
-                        if (preamble == 4 && got == 0) {
-                            start_cycle = cycle;
-                            got = 1;
-                        } else if (preamble != 4 && got == 1) {
-                            end_cycle = cycle;
-                            got = 2;
-                        }
-                        idly_inc(channel, module);
-                    }
-#ifdef INFO_DDR5
-                    printf("\n");
-#endif // INFO_DDR5
-                    rd_inc(channel, module);
-                }
-                if (start_cycle == -1) {
-                    printf("Failed to find result for %2d\n", module);
-                    continue;
-                }
-                printf("Preamble starts in cycle:%2d\n", start_cycle);
-                /* Pull back 1 cycle */
-                start_cycle -= 1;
-                rd_rst(channel, module);
-                idly_rst(channel, module);
-                for (i = 0; i < start_cycle; ++i) {
-                    rd_inc(channel, module);
-                }
-                got = 0;
-                cycle = start_cycle;
-                start_cycle = -1; start_delay = 1;
-                end_cycle = -1; end_delay = -1;
-                printf("Data scan:\n");
-                while (got != 2 && cycle < 67) {
-                    printf("%2d|", cycle);
-#ifdef DEBUG_DDR5
-                    printf("\n");
-#endif // DEBUG_DDR5
-                    idly_rst(channel, module);
-                    for(delay = 0; delay < SDRAM_PHY_DELAYS; ++delay){
-#ifdef DEBUG_DDR5
-                        printf("DQ dly:%"PRIu16"\n",
-                               get_rd_dq_dly(channel, module));
-#endif // DEBUG_DDR5
-                        works = 1;
+/**
+ * exit_rptm
+ *
+ * Exits Read Preamble Training Mode.
+ * Clears Mode Registers set up in enter_rptm to default values.
+ * JESD79-5A 4.18.2
+ */
+static void exit_rptm(int channel, int rank) {
+    // Setup MRs
+    send_mrw(channel, rank, 0xf, 25, 0); // restore Serial mode
+    send_mrw(channel, rank, 0xf, 26, 0x5a); // restore default data
+    send_mrw(channel, rank, 0xf, 27, 0x3c); // restore default data
+    send_mrw(channel, rank, 0xf, 28, 0); // don't invert DQL[7:0]
+    send_mrw(channel, rank, 0xf, 29, 0); // don't invert DQU[7:0]
+
+    // Actual write to exit Read Preamble Training Mode
+    send_mrw(channel, rank, 0xf, 2, 0|WICA);
+}
+
+/**
+ * rd_cycle_dly_idly_check_if_works
+ *
+ * Checks if for selected read cycle delay and
+ * input DQ delay Mode Register readout is returning
+ * correct data.
+ *
+ * Two tests are being performed:
+ *  - Serial - we get data we wrote before
+ *  - LFSR   - we get subsequent values of LFSR we seeded
+ *
+ * JESD79-5A 4.18.2
+ */
+static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module) {
+    int works = 1;
+    int seed;
+
 #ifndef DDR5_TRAINING_SIM
-                        for (seed = 0; seed < serial_count && works; ++seed){
-                            /* Setup MRs */
-                            send_mrw(channel, rank, 0xf, 25, 0);
-                            send_mrw(channel, rank, module, 26, serial[seed]&0xff);
-                            send_mrw(channel, rank, module, 27, serial[seed]>>8);
-                            send_mrr(channel, rank, 31);
-                            works &= compare_serial(channel, module, serial[seed],
-                                                    0xA5, 0x33);
-                        }
+    // Check if Serial readout works
+    for (seed = 0; seed < serial_count && works; seed++) {
+        /* Setup MRs */
+        send_mrw(channel, rank, module, 25, 0); // select Serial mode
+        send_mrw(channel, rank, module, 26, serial[seed]&0xff);
+        send_mrw(channel, rank, module, 27, serial[seed]>>8);
+        send_mrr(channel, rank, 31);
+        works &= compare_serial(channel, module, serial[seed], 0xA5, 0x33);
+    }
 #endif // DDR5_TRAINING_SIM
-                        for (seed = 0; seed < seeds_count && works; ++seed){
-                            /* Setup MRs */
-                            send_mrw(channel, rank, 0xf, 25, 1);
-                            send_mrw(channel, rank, module, 26, seeds0[seed]);
-                            send_mrw(channel, rank, module, 27, seeds1[seed]);
-                            send_mrr(channel, rank, 31);
-                            works &= compare(channel, module,
-                                             seeds0[seed], seeds1[seed],
-                                             0xA5, 0x33);
-                        }
-                        printf("%d", works);
-                        if (works && got == 0) {
-                            start_cycle = cycle;
-                            start_delay = delay;
-                            got = 1;
-                        } else if (!works && got == 1) {
-                            end_cycle = cycle;
-                            end_delay = delay;
-                            got = 2;
-                        }
-                        idly_inc(channel, module);
-#ifdef DEBUG_DDR5
-                        printf("\n");
-#endif // DEBUG_DDR5
-                    }
-                    printf("|\n");
-                    ++cycle;
-                    rd_inc(channel, module);
-                }
-                printf("m%2d|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
-                    module, start_cycle, start_delay, end_cycle, end_delay);
-                eye_width = (end_cycle-start_cycle)*SDRAM_PHY_DELAYS + end_delay - start_delay;
-                middle_cycle = start_cycle + (start_delay + eye_width/2)/SDRAM_PHY_DELAYS;
-                middle_delay = (start_delay + eye_width/2)%SDRAM_PHY_DELAYS;
-                printf("eye_width:%2"PRIu32"; eye center: cycle:%2d,delay:%2d\n",
-                    eye_width, middle_cycle, middle_delay);
 
-                // Setting read delay to eye center
-                rd_rst(channel, module);
-                idly_rst(channel, module);
-                for (i = 0; i < middle_cycle; ++i) {
-                    rd_inc(channel, module);
-                }
-                for (i = 0; i < middle_delay; ++i) {
-                    idly_inc(channel, module);
-                }
+    // Check if LFSR readout works
+    for (seed = 0; seed < seeds_count && works; ++seed) {
+        /* Setup MRs */
+        send_mrw(channel, rank, module, 25, 1); // select LFSR mode
+        send_mrw(channel, rank, module, 26, seeds0[seed]);
+        send_mrw(channel, rank, module, 27, seeds1[seed]);
+        send_mrr(channel, rank, 31);
+        works &= compare(channel, module, seeds0[seed], seeds1[seed], 0xA5, 0x33);
+    }
 
-                send_mrw(channel, rank, module, 25, 0);
-                send_mrw(channel, rank, module, 26, 0xff);
-                send_mrw(channel, rank, module, 27, 0xff);
-                send_mrw(channel, rank, module, 28, 0);
-                send_mrw(channel, rank, module, 29, 0);
+    return works;
+}
+
+/**
+ * find_read_preamble_cycle
+ *
+ * Finds the first cycle in which we detect the read preamble.
+ * It will be used to configure the read cycle delay in the basephy.
+ *
+ * This delay depends on the CL set in the MR0 of the DRAM.
+ * `read_training_data_scan` performs a more extensive check to find
+ * the read DQ delay.
+ */
+static int find_read_preamble_cycle(int channel, int rank, int module) {
+    int rd_cycle_dly, idly, preamble;
+    int eye_start = -1; // in this stage we don't care about eye end
+
+    enum {
+        BEFORE,
+        INSIDE,
+        AFTER,
+    } eye_state = BEFORE;
+
+#ifdef INFO_DDR5
+    printf("Finding read preamble\n");
+#endif // INFO_DDR5
+
+    /* Coarse alignment */
+    rd_rst(channel, module);
+    for (rd_cycle_dly = 0; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye_state != AFTER; rd_cycle_dly ++) {
+#ifdef INFO_DDR5
+        printf("%2d|", rd_cycle_dly);
+#endif // INFO_DDR5
+
+        idly_rst(channel, module);
+        for (idly = 0; idly < SDRAM_PHY_DELAYS; idly++) {
+            send_mrr(channel, rank, 31);
+            preamble = captured_preamble(channel, module);
+
+#ifdef INFO_DDR5
+            printf("%01x", preamble);
+#endif // INFO_DDR5
+
+            // Should be 1tCK preamble 0b10 (JESD79-5A 4.18.3),
+            // but due to the way basephy.py works we sample 2 cycles,
+            // so we get 4 bits 0b0010, which gets reversed to 0b0100.
+            if (preamble == 4 && eye_state == BEFORE) {
+                eye_start = rd_cycle_dly;
+                eye_state = INSIDE;
+            } else if (preamble != 4 && eye_state == INSIDE) {
+                eye_state = AFTER;
             }
-            /* Finish preamble and read training*/
-            send_mrw(channel, rank, 0xf, 2, 0|WICA);
+            idly_inc(channel, module);
         }
 
-        printf("Simple read check\n");
+#ifdef INFO_DDR5
+        printf("\n");
+#endif // INFO_DDR5
+
+        rd_inc(channel, module);
+    }
+
+    return eye_start;
+}
+
+/**
+ * read_training_data_scan
+ *
+ * Performs a search for working pair of read cycle and DQ delays.
+ * It finds the first eye of working delays and selects its center
+ * to configure the read cycle and DQ delays.
+ */
+static void read_training_data_scan(int channel, int rank, int module, int preamble_cycle) {
+    int eye_start = -1, eye_end = -1;
+    enum {
+        BEFORE,
+        INSIDE,
+        AFTER,
+    } eye_state = BEFORE;
+
+    int rd_cycle_dly, idly;
+    int works;
+
+    // Pull back 1 cycle as DQ and DQS can be misaligned
+    preamble_cycle -= 1;
+
+    printf("Data scan:\n");
+
+    // Set read cycle delay
+    rd_rst(channel, module);
+    for (rd_cycle_dly = 0; rd_cycle_dly < preamble_cycle; rd_cycle_dly++) {
+        rd_inc(channel, module);
+    }
+
+    for (rd_cycle_dly = preamble_cycle; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye_state != AFTER; rd_cycle_dly++) {
+        printf("%2d|", rd_cycle_dly);
+
+#ifdef DEBUG_DDR5
+        printf("\n");
+#endif // DEBUG_DDR5
+
+        idly_rst(channel, module);
+        for(idly = 0; idly < SDRAM_PHY_DELAYS; idly++){
+
+#ifdef DEBUG_DDR5
+            printf("DQ dly:%"PRIu16"\n", get_rd_dq_dly(channel, module));
+#endif // DEBUG_DDR5
+
+            works = rd_cycle_dly_idly_check_if_works(channel, rank, module);
+            printf("%d", works);
+
+            if (works && eye_state == BEFORE) {
+                eye_start = rd_cycle_dly * SDRAM_PHY_DELAYS + idly;
+                eye_state = INSIDE;
+            } else if (!works && eye_state == INSIDE) {
+                eye_end = rd_cycle_dly * SDRAM_PHY_DELAYS + idly;
+                eye_state = AFTER;
+            }
+
+#ifdef DEBUG_DDR5
+            printf("\n");
+#endif // DEBUG_DDR5
+
+            idly_inc(channel, module);
+        }
+
+        printf("|\n");
+        rd_inc(channel, module);
+    }
+
+    int eye_width = eye_end - eye_start;
+    int eye_center = eye_start + (eye_width / 2);
+    int eye_center_cycle = eye_center / SDRAM_PHY_DELAYS;
+    int eye_center_delay = eye_center % SDRAM_PHY_DELAYS;
+
+    printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
+        eye_width, eye_center_cycle, eye_center_delay);
+
+    // Setting read delay to eye center
+    rd_rst(channel, module);
+    for (rd_cycle_dly = 0; rd_cycle_dly < eye_center_cycle; rd_cycle_dly++) {
+        rd_inc(channel, module);
+    }
+
+    idly_rst(channel, module);
+    for (idly = 0; idly < eye_center_delay; idly++) {
+        idly_inc(channel, module);
+    }
+}
+
+#ifdef INFO_DDR5
+/**
+ * simple_read_check
+ *
+ * Performs a simple read check, in which a 0xDEADBEEF
+ * is being written to the scratch pad register of the DRAM
+ * one byte at a time. After each write, a read is being
+ * performed and the read value is being compared with the one
+ * written before.
+ */
+static int simple_read_check(int channel, int rank, int module) {
+    int works = 1;
+
+    printf("Simple read check: ");
+
+    // Check if data is read correctly
+    uint8_t test_data[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    for (int i = 0; i < 4; i++) {
+        send_mrw(channel, rank, module, DRAM_SCRATCH_PAD, test_data[i]);
+        send_mrr(channel, rank, DRAM_SCRATCH_PAD);
+
+        uint8_t read_back = recover_mrr_value(channel, module);
+        works &= read_back == test_data[i];
+
+        printf("%"PRIX8, read_back);
+    }
+    printf("\n");
+
+    return works;
+}
+#endif // INFO_DDR5
+
+/**
+ * sdram_ddr5_read_training
+ *
+ * Performs read preamble training for each module.
+ *
+ * It consists of 3 major steps:
+ * 1. Find read preamble cycle
+ * 2. With the preamble cycle, find the best read DQ delay
+ * 3. Perform a simple read check
+ */
+void sdram_ddr5_read_training(training_ctx_t *ctx) {
+    int channel, rank, module;
+    for (channel = 0; channel < CHANNELS; channel++) {
+        printf("Subchannel:%c Read training\n", (char)('A'+channel));
         for (rank = 0; rank < ctx->ranks; rank++) {
+            printf("Training rank%2d\n", rank);
+
+            // Enter Read Preamble Training Mode
+            enter_rptm(channel, rank);
+
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+                printf("Training module%2d\n", module);
+
+                // Find cycle in which read preamble starts
+                int preamble_cycle = find_read_preamble_cycle(channel, rank, module);
+
+                if (preamble_cycle == -1) {
+                    printf("Failed to find read preamble for module %2d\n", module);
+                    continue;
+                }
+                printf("Read preamble starts in cycle:%2d\n", preamble_cycle);
+
+                read_training_data_scan(channel, rank, module, preamble_cycle);
+            }
+
+            // Exit Read Preamble Training Mode
+            exit_rptm(channel, rank);
+
+            // We must perform read checks below after exiting RPTM
+            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+                // Read the serial number
                 printf(
                     "Channel:%c rank:%2d module:%2d serial number: 0x%010"PRIX64"\n",
                     (char)('A'+channel),
@@ -778,29 +922,17 @@ void sdram_ddr5_read_training(training_ctx_t *ctx) {
                     module,
                     read_serial_number(channel, rank, module)
                 );
+
 #ifdef INFO_DDR5
-                // Check if data is read correctly
-                send_mrw(channel, rank, module, 63, 0xDE);
-                send_mrr(channel, rank, 63);
-                printf("%"PRIX8, recover_mrr_value(channel, module));
-                send_mrw(channel, rank, module, 63, 0xAD);
-                send_mrr(channel, rank, 63);
-                printf("%"PRIX8, recover_mrr_value(channel, module));
-                send_mrw(channel, rank, module, 63, 0xBE);
-                send_mrr(channel, rank, 63);
-                printf("%"PRIX8, recover_mrr_value(channel, module));
-                send_mrw(channel, rank, module, 63, 0xEF);
-                send_mrr(channel, rank, 63);
-                printf("%"PRIX8"\n", recover_mrr_value(channel, module));
-#endif //INFO_DDR5
-            }
-#ifdef INFO_DDR5
-            // Check if registers are correct
-            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+                if (!simple_read_check(channel, rank, module)) {
+                    printf("Simple read check failure!\n");
+                    continue;
+                }
+
                 printf("Channel:%c rank:%d module:%d\n", (char)('A'+channel), rank, module);
                 read_registers(channel, rank, module);
-            }
 #endif // INFO_DDR5
+            }
         }
     }
 }

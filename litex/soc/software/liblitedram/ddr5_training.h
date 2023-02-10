@@ -8,8 +8,15 @@
 #ifdef SDRAM_PHY_DDR5
 #include <liblitedram/ddr5_helpers.h>
 
+// DRAM Mode Registers Definitions
+#define DRAM_SCRATCH_PAD 63
+
 // Use max int16_t, all Fs could be interpreted as -1
 #define UNSET_DELAY 0xefff
+
+// max CL is 66 (JESD79-5A 3.5.2)
+// if in 2N Mode, 1 more cycle is used for the command
+#define MAX_READ_CYCLE_DELAY (66 + 1)
 
 typedef void (*action_callback_t)(int channel, int rank, int address);
 typedef void (*training_mode_callback_t)(int channel, int rank);
