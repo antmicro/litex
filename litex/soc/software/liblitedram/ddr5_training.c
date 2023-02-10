@@ -18,8 +18,6 @@
 #define MAX(a, b) (a > b ? a : b)
 #define MIN(a, b) (a < b ? a : b)
 
-int enumerated = 0;
-
 // Addressing: channel, pin, 0-right eye closing, 1-left eye closing
 //      \______________/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 //      --------<============>-------------
@@ -32,8 +30,6 @@ int enumerated = 0;
 // while delaying signal itself to "the right"
 //      \______________/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 //      --------------<============>-------------
-
-int WICA = 0;
 
 /**
  * CS_in_eye
@@ -547,6 +543,8 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
 }
 #endif // SKIP_NO_DELAYS
 
+int enumerated = 0;
+
 void sdram_ddr5_module_enumerate(training_ctx_t *ctx) {
     int channel, rank, module;
     if (SDRAM_PHY_MODULES/CHANNELS > 15) {
@@ -571,28 +569,31 @@ void sdram_ddr5_module_enumerate(training_ctx_t *ctx) {
     enumerated = 1;
 }
 
+static const uint8_t seeds0[] = {
+    0x1c, 0x5a, 0x24,
 #ifndef DDR5_TRAINING_SIM
-int seeds0[] = {0x1c, 0x5a, 0x24,
-#else
-int seeds0[] = {
+    0x36, 0xaa, 0xc1,
 #endif
-                0x36, 0xaa, 0xc1};
+};
 
+static const uint8_t seeds1[] = {
+    0x72, 0x55, 0x95,
 #ifndef DDR5_TRAINING_SIM
-int seeds1[] = {0x59, 0x3c, 0x48,
-#else
-int seeds1[] = {
+    0x59, 0x3c, 0x48,
 #endif
-                0x72, 0x55, 0x95};
+};
 
-int seeds_count = sizeof(seeds0)/sizeof(int);
+static const int seeds_count = sizeof(seeds0) / sizeof(seeds0[0]);
 
-uint16_t serial[] = {0x0000, 0xffff,
-                     0xfffe, 0xfffd, 0xfffb, 0xfff7, 0xffef, 0xffdf, 0xffbf, 0xff7f,
-                     0xfeff, 0xfdff, 0xfbff, 0xf7ff, 0xefff, 0xdfff, 0xbfff, 0x7fff,
-                     0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080,
-                     0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000};
-int serial_count = sizeof(serial)/sizeof(uint16_t);
+static const uint16_t serial[] = {
+    0x0000, 0xffff,
+    0xfffe, 0xfffd, 0xfffb, 0xfff7, 0xffef, 0xffdf, 0xffbf, 0xff7f,
+    0xfeff, 0xfdff, 0xfbff, 0xf7ff, 0xefff, 0xdfff, 0xbfff, 0x7fff,
+    0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080,
+    0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000};
+static const int serial_count = sizeof(serial) / sizeof(serial[0]);
+
+static int WICA = 0;
 
 void sdram_ddr5_read_training(training_ctx_t *ctx) {
     int channel, rank, module, i, seed;
