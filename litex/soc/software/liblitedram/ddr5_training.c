@@ -1069,29 +1069,32 @@ static int wltm_align_external_cycle(int channel, int rank, int module, int widt
  * Scans output delays of the DQS signals to find the eye's edge.
  * It is used in both, External and Internal Write Leveling procedures.
  *
+ * Pulls transition cycle back as we could
  * Sets write DQS cycle delay to the value of transition cycle and scans
  * output delays until it finds the first one that works.
  */
 static int wltm_align_to_eye_edge(int channel, int rank, int module, int width, int *transition_cycle) {
-    int wr_dqs_cycle_dly;
     eye_t eye = DEFAULT_EYE;
 
+    // Passed transition_cycle could have been working with output delay 0.
+    // We found the cycle using output delay of 0, so we need to go one
+    // cycle back first.
+    *transition_cycle -= 1;
+
     wr_dqs_rst(channel, module, width);
-    for (wr_dqs_cycle_dly = 0; wr_dqs_cycle_dly < *transition_cycle; wr_dqs_cycle_dly++)
+    for (int wr_dqs_cycle_dly = 0; wr_dqs_cycle_dly < *transition_cycle; wr_dqs_cycle_dly++)
         wr_dqs_inc(channel, module, width);
 
     printf("DQS edge scan:\n");
 
-    // Break out when 0 to 1 transition was found
-    for (; *transition_cycle < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE; (*transition_cycle)++) {
+    do {
         printf("%2d|", *transition_cycle);
         wleveling_scan(channel, rank, module, width, &eye);
         printf("|\n");
 
         wr_dqs_inc(channel, module, width);
-    }
-    // One loop add too much
-    (*transition_cycle) -= 1;
+        (*transition_cycle)++;
+    } while (*transition_cycle < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE);
 
     return eye.start;
 }
@@ -1186,9 +1189,6 @@ static void write_leveling(int channel, int rank, int module, int width) {
         transition_cycle, transition_cycle + SDRAM_PHY_MIN_WR_LATENCY);
 
     // After finding the transition cycle, we search for the eye's edge.
-    // We found the cycle using output delay of 0, so we need to go one
-    // cycle back first.
-    transition_cycle -= 1;
     int transition_delay = wltm_align_to_eye_edge(channel, rank, module, width, &transition_cycle);
 
 #ifdef INFO_DDR5
@@ -1232,7 +1232,6 @@ static void write_leveling(int channel, int rank, int module, int width) {
     // After finding a correct WICA setting, we need to once again find the eye's edge.
     // This is the upper part of the third column of the Internal Write Leveling
     // flowchart (JESD79-5A Figure 92).
-    transition_cycle -= 1;
     transition_delay = wltm_align_to_eye_edge(channel, rank, module, width, &transition_cycle);
 
     // Just like at the beginning of the Internal Write Leveling,
