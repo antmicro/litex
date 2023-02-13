@@ -607,7 +607,8 @@ static const uint16_t serial[] = {
     0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000};
 static const int serial_count = sizeof(serial) / sizeof(serial[0]);
 
-static int WICA = 0;
+// MR2:OP[7] value to use, whenever MR2 is being modified
+static int use_internal_write_timing = 0;
 
 /**
  * read_serial_number
@@ -645,7 +646,7 @@ static void enter_rptm(int channel, int rank) {
     send_mrw(channel, rank, MODULE_BROADCAST, 30, 0x33); // select data sources for DQ lines
 
     // Actual write to enter Read Preamble Training Mode
-    send_mrw(channel, rank, MODULE_BROADCAST, 2, 1|WICA);
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 1|use_internal_write_timing);
 }
 
 /**
@@ -664,7 +665,7 @@ static void exit_rptm(int channel, int rank) {
     send_mrw(channel, rank, MODULE_BROADCAST, 29, 0); // don't invert DQU[7:0]
 
     // Actual write to exit Read Preamble Training Mode
-    send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|WICA);
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing);
 }
 
 /**
@@ -952,7 +953,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
     uint8_t mr5;
     uint16_t wrdata, rddata;
     uint32_t eye_width;             // In taps
-    WICA = 1<<7;
+    use_internal_write_timing = 1<<7;
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Write leveling\n", (char)('A'+channel));
         /* Coarse alignment */
@@ -1042,7 +1043,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                 }
 
                 printf("DQS internal cycle alignment\n|");
-                send_mrw(channel, rank, module, 2, 2|WICA);
+                send_mrw(channel, rank, module, 2, 2|use_internal_write_timing);
                 got = 0;
                 cycle = 0;
                 do {
@@ -1101,7 +1102,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                     odly_dqs_inc(channel, module);
                 }
             }
-            send_mrw(channel, rank, 0xf, 2, 0|WICA);
+            send_mrw(channel, rank, 0xf, 2, 0|use_internal_write_timing);
             exit_write_leveling(channel);
 #ifdef DEBUG_DDR5
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
