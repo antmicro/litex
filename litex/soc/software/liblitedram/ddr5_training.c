@@ -100,17 +100,25 @@ static int CS_should_shift_pattern(training_ctx_t *ctx, int32_t channel, int32_t
 
 static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* left, int* right, int shift_0101) {
     int works, csdly;
+    eye_t eye = DEFAULT_EYE;
+
     ctx->cs.rst_dly(channel, rank, 0);
     for (csdly = 0; csdly < SDRAM_PHY_DELAYS; csdly++) {
         works = ctx->cs.check(channel, rank, 0, shift_0101);
         printf("%d", !!works);
-        if (works && *right  == UNSET_DELAY)
-            *right = csdly;
-        if ((!works || csdly == SDRAM_PHY_DELAYS - 1) && *right != UNSET_DELAY && *left == UNSET_DELAY)
-            *left = csdly;
+        if (works && eye.state == BEFORE) {
+            eye.start = csdly;
+            eye.state = INSIDE;
+        } else if ((!works || csdly == SDRAM_PHY_DELAYS - 1) && eye.state == INSIDE) {
+            eye.end = csdly;
+            eye.state = AFTER;
+        }
         ctx->cs.inc_dly(channel, rank, 0);
     }
     ctx->cs.rst_dly(channel, rank, 0);
+
+    *right = eye.start;
+    *left = eye.end;
 }
 
 static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
@@ -229,7 +237,8 @@ static int CA_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_
 }
 
 static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t address, int* left, int* right) {
-    int cadly, _result;
+    int works, cadly;
+    eye_t eye = DEFAULT_EYE;
 
     ctx->ca.rst_dly(channel, rank, address);
     for (cadly = 0; cadly < SDRAM_PHY_DELAYS; cadly++) {
@@ -238,22 +247,27 @@ static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t 
         printf("CA%2"PRIu32" dly:%"PRIu16"\n", address, get_ca_dly(channel, rank, address));
 #endif // DEBUG_CA_DDR5
 
-        _result = ctx->ca.check(channel, rank, address, 0);
-        printf("%d", !!_result);
+        works = ctx->ca.check(channel, rank, address, 0);
+        printf("%d", !!works);
 
 #ifdef DEBUG_CA_DDR5
         printf("\n");
 #endif // DEBUG_CA_DDR5
 
-        if (_result && *right == UNSET_DELAY)
-            *right = cadly;
-
-        if ((!_result || cadly == SDRAM_PHY_DELAYS - 1) && *right != UNSET_DELAY && *left == UNSET_DELAY)
-            *left = cadly;
+        if (works && eye.state == BEFORE) {
+            eye.start = cadly;
+            eye.state = INSIDE;
+        } else if ((!works || cadly == SDRAM_PHY_DELAYS - 1) && eye.state == INSIDE) {
+            eye.end = cadly;
+            eye.state = AFTER;
+        }
 
         ctx->ca.inc_dly(channel, rank, address);
     }
     ctx->ca.rst_dly(channel, rank, address);
+
+    *right = eye.start;
+    *left = eye.end;
 }
 
 static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
@@ -707,13 +721,9 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module) {
  */
 static int find_read_preamble_cycle(int channel, int rank, int module) {
     int rd_cycle_dly, idly, preamble;
-    int eye_start = -1; // in this stage we don't care about eye end
 
-    enum {
-        BEFORE,
-        INSIDE,
-        AFTER,
-    } eye_state = BEFORE;
+    // in this stage we don't care about eye end
+    eye_t eye = DEFAULT_EYE;
 
 #ifdef INFO_DDR5
     printf("Finding read preamble\n");
@@ -721,7 +731,7 @@ static int find_read_preamble_cycle(int channel, int rank, int module) {
 
     /* Coarse alignment */
     rd_rst(channel, module);
-    for (rd_cycle_dly = 0; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye_state != AFTER; rd_cycle_dly ++) {
+    for (rd_cycle_dly = 0; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye.state != AFTER; rd_cycle_dly ++) {
 #ifdef INFO_DDR5
         printf("%2d|", rd_cycle_dly);
 #endif // INFO_DDR5
@@ -738,11 +748,11 @@ static int find_read_preamble_cycle(int channel, int rank, int module) {
             // Should be 1tCK preamble 0b10 (JESD79-5A 4.18.3),
             // but due to the way basephy.py works we sample 2 cycles,
             // so we get 4 bits 0b0010, which gets reversed to 0b0100.
-            if (preamble == 4 && eye_state == BEFORE) {
-                eye_start = rd_cycle_dly;
-                eye_state = INSIDE;
-            } else if (preamble != 4 && eye_state == INSIDE) {
-                eye_state = AFTER;
+            if (preamble == 4 && eye.state == BEFORE) {
+                eye.start = rd_cycle_dly;
+                eye.state = INSIDE;
+            } else if (preamble != 4 && eye.state == INSIDE) {
+                eye.state = AFTER;
             }
             idly_inc(channel, module);
         }
@@ -754,7 +764,7 @@ static int find_read_preamble_cycle(int channel, int rank, int module) {
         rd_inc(channel, module);
     }
 
-    return eye_start;
+    return eye.start;
 }
 
 /**
@@ -765,12 +775,7 @@ static int find_read_preamble_cycle(int channel, int rank, int module) {
  * to configure the read cycle and DQ delays.
  */
 static void read_training_data_scan(int channel, int rank, int module, int preamble_cycle) {
-    int eye_start = -1, eye_end = -1;
-    enum {
-        BEFORE,
-        INSIDE,
-        AFTER,
-    } eye_state = BEFORE;
+    eye_t eye = DEFAULT_EYE;
 
     int rd_cycle_dly, idly;
     int works;
@@ -786,7 +791,7 @@ static void read_training_data_scan(int channel, int rank, int module, int pream
         rd_inc(channel, module);
     }
 
-    for (rd_cycle_dly = preamble_cycle; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye_state != AFTER; rd_cycle_dly++) {
+    for (rd_cycle_dly = preamble_cycle; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye.state != AFTER; rd_cycle_dly++) {
         printf("%2d|", rd_cycle_dly);
 
 #ifdef DEBUG_DDR5
@@ -803,12 +808,12 @@ static void read_training_data_scan(int channel, int rank, int module, int pream
             works = rd_cycle_dly_idly_check_if_works(channel, rank, module);
             printf("%d", works);
 
-            if (works && eye_state == BEFORE) {
-                eye_start = rd_cycle_dly * SDRAM_PHY_DELAYS + idly;
-                eye_state = INSIDE;
-            } else if (!works && eye_state == INSIDE) {
-                eye_end = rd_cycle_dly * SDRAM_PHY_DELAYS + idly;
-                eye_state = AFTER;
+            if (works && eye.state == BEFORE) {
+                eye.start = rd_cycle_dly * SDRAM_PHY_DELAYS + idly;
+                eye.state = INSIDE;
+            } else if (!works && eye.state == INSIDE) {
+                eye.end = rd_cycle_dly * SDRAM_PHY_DELAYS + idly;
+                eye.state = AFTER;
             }
 
 #ifdef DEBUG_DDR5
@@ -822,10 +827,10 @@ static void read_training_data_scan(int channel, int rank, int module, int pream
         rd_inc(channel, module);
     }
 
-    int eye_width = eye_end - eye_start;
-    int eye_center = eye_start + (eye_width / 2);
-    int eye_center_cycle = eye_center / SDRAM_PHY_DELAYS;
-    int eye_center_delay = eye_center % SDRAM_PHY_DELAYS;
+    int eye_width = eye.end - eye.start;
+    eye.center = eye.start + (eye_width / 2);
+    int eye_center_cycle = eye.center / SDRAM_PHY_DELAYS;
+    int eye_center_delay = eye.center % SDRAM_PHY_DELAYS;
 
     printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
         eye_width, eye_center_cycle, eye_center_delay);

@@ -13,6 +13,24 @@
 #define CHANNELS 1
 #endif
 
+typedef struct {
+    enum {
+        BEFORE,
+        INSIDE,
+        AFTER,
+    } state;
+    int start;
+    int center;
+    int end;
+} eye_t;
+
+#define DEFAULT_EYE   { \
+    .state  = BEFORE,   \
+    .start  = -1,       \
+    .center = -1,       \
+    .end    = -1,       \
+}
+
 int prep_payload (int cs, int command, int wrdata_en,
                   uint32_t wrdata_mask, int rddata_en);
 void upload_payload(int channel, int phases, int payload);
