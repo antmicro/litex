@@ -1485,30 +1485,32 @@ void enter_write_leveling(int channel) {
 #endif
 }
 
-void wleveling_scan(int *cycle, int *got, int *start_cycle, int *start_delay,
-                    int channel, int rank, int module) {
-    int sample, delay, it;
-    printf("%2d|", *cycle);
+int wr_dqs_check_if_works(int channel, int rank, int module) {
+    send_wleveling_write(channel, rank);
+    return wleveling_sample(channel, module);
+}
+
+void wleveling_scan(int channel, int rank, int module, eye_t *eye) {
+    int works, delay;
+
     odly_dqs_rst(channel, module);
     for(delay = 0; delay < SDRAM_PHY_DELAYS; ++delay) {
-        sample = 1;
+        works = 1;
+
         // Check multiple times, as we can be on the edge of transition
         // Make sure we aren't in meta stable delay
-        for (it = 0; it<16; it++) {
-             send_wleveling_write(channel, rank);
-             sample &= wleveling_sample(channel, module);
-         }
-         printf("%d", sample);
-         if (sample && (*got) == 0) {
-             *start_cycle = *cycle;
-             *start_delay = delay;
-             *got = 1;
-         }
-         odly_dqs_inc(channel, module);
-     }
-     printf("|\n");
-     ++(*cycle);
-     wr_dqs_inc(channel, module);
+        for (int i = 0; i < 16; i++) {
+            works &= wr_dqs_check_if_works(channel, rank, module);
+        }
+
+        printf("%d", works);
+        if (works && eye->state == BEFORE) {
+            eye->start = delay;
+            eye->state = INSIDE;
+        }
+
+        odly_dqs_inc(channel, module);
+    }
 }
 
 void exit_write_leveling(int channel) {

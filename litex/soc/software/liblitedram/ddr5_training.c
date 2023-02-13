@@ -943,21 +943,284 @@ void sdram_ddr5_read_training(training_ctx_t *ctx) {
     }
 }
 
+/**
+ * enter_wltm
+ *
+ * Enters Write Leveling Training Mode.
+ * JESD79-5A 4.21.2
+ */
 static void enter_wltm(int channel, int rank) {
     enter_write_leveling(channel);
 
+    // Set MR2:OP[1]
     send_mrw(channel, rank, MODULE_BROADCAST, 2, 2);
 }
 
+/**
+ * exit_wltm
+ *
+ * Exits Write Leveling Training Mode.
+ * It keeps the setting of MR2:OP[7] so the results
+ * of Internal Write Leveling are actually used.
+ * JESD79-5A 4.21.2
+ */
 static void exit_wltm(int channel, int rank) {
+    // Unset MR2:OP[1] while keeping MR2:OP[7]
     send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing);
 
     exit_write_leveling(channel);
 }
 
+/**
+ * wltm_align_external_cycle
+ *
+ * Finds the first cycle in which we get response that DQS delay is correct.
+ * It's a part of the External Write Leveling procedure.
+ *
+ * Starting from `minimal_wr_dqs_cycle_dly`, it checks each cycle delay and
+ * stops at the first one with response indicating it works.
+ * JESD79-5A 4.21.3
+ */
+static int wltm_align_external_cycle(int channel, int rank, int module) {
+    int works, wr_dqs_cycle_dly;
+    eye_t eye = DEFAULT_EYE;
+
+    // As per JESD79-5A 4.21.3, strobe pulses are sent no earlier than
+    // CWL/2 after the WR command.
+    // We need to offset that by the basephy's internal minimal WR command latency.
+    const int minimal_wr_dqs_cycle_dly = SDRAM_PHY_CWL/2 - SDRAM_PHY_MIN_WR_LATENCY;
+
+    // Set starting write DQS cycle delay
+    wr_dqs_rst(channel, module);
+    for (wr_dqs_cycle_dly = 0; wr_dqs_cycle_dly < minimal_wr_dqs_cycle_dly; wr_dqs_cycle_dly++)
+        wr_dqs_inc(channel, module);
+
+    // Now find the first working cycle delay
+    for (; wr_dqs_cycle_dly < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE; wr_dqs_cycle_dly++) {
+        works = 1;
+        printf("%2d|", wr_dqs_cycle_dly);
+
+        // Check multiple times, as we can be on the edge of transition
+        // Make sure we aren't in meta stable delay
+        for (int i = 0; i < 16; i++) {
+            int temp = wr_dqs_check_if_works(channel, rank, module);
+            printf("%d", temp);
+            works &= temp;
+        }
+
+        printf("|%d\n", works);
+
+        if (works && eye.state == BEFORE) {
+            eye.start = wr_dqs_cycle_dly;
+            eye.state = INSIDE;
+        }
+
+        wr_dqs_inc(channel, module);
+    }
+
+    return eye.start;
+}
+
+/**
+ * wltm_align_to_eye_edge
+ *
+ * Scans output delays of the DQS signals to find the eye's edge.
+ * It is used in both, External and Internal Write Leveling procedures.
+ *
+ * Sets write DQS cycle delay to the value of transition cycle and scans
+ * output delays until it finds the first one that works.
+ */
+static int wltm_align_to_eye_edge(int channel, int rank, int module, int transition_cycle) {
+    int wr_dqs_cycle_dly;
+    eye_t eye = DEFAULT_EYE;
+
+    wr_dqs_rst(channel, module);
+    for (wr_dqs_cycle_dly = 0; wr_dqs_cycle_dly < transition_cycle; wr_dqs_cycle_dly++)
+        wr_dqs_inc(channel, module);
+
+    printf("DQS edge scan:\n");
+
+    // Break out when 0 to 1 transition was found
+    for (wr_dqs_cycle_dly = transition_cycle; wr_dqs_cycle_dly < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE; wr_dqs_cycle_dly++) {
+        printf("%2d|", wr_dqs_cycle_dly);
+        wleveling_scan(channel, rank, module, &eye);
+        printf("|\n");
+
+        wr_dqs_inc(channel, module);
+    }
+
+    return eye.start;
+}
+
+/**
+ * wltm_align_internal_cycle
+ *
+ * Performs scan of Write Leveling Internal Cycle Alignment values.
+ * First it enables the usage of Internal Write Timings in MR2:OP[7].
+ * And then it searches WICA values from [0, 7) range until it finds
+ * the first one that works.
+ * JESD79-5A 4.21.4
+ */
+static void wltm_align_internal_cycle(int channel, int rank, int module) {
+    int works;
+    int wica = 0;
+    eye_t eye = DEFAULT_EYE;
+
+    printf("DQS internal cycle alignment\n|");
+
+    // Enable Internal Write Timing (stored in MR3)
+    // JESD79-5A 3.5.4 and 3.5.5
+    use_internal_write_timing = 1 << 7;
+    send_mrw(channel, rank, module, 2, 2|use_internal_write_timing);
+
+    do {
+        // Set WICA value (MR3:OP[3:0] = WICA)
+        send_mrw(channel, rank, module, 3, wica);
+
+        works = 1;
+        // Check multiple times, as we can be on the edge of transition
+        // Make sure we aren't in meta stable delay
+        for (int i = 0; i < 16; i++) {
+            works &= wr_dqs_check_if_works(channel, rank, module);
+        }
+
+        printf("WICA:%d,%d|", wica, works);
+        wica++;
+
+        if (works && eye.state == BEFORE) {
+            eye.state = INSIDE;
+        }
+
+        // JEDEC defines delays from 0 to -6 tCK, their operand values are [0, 7)
+        // support for operands [7, 15] is optional, that's why we limit wica < 7
+    } while (eye.state != INSIDE && wica < 7);
+
+    printf("\n");
+}
+
+/**
+ * write_leveling
+ *
+ * This function wraps together External and Internal Write Leveling.
+ *
+ * It's purpose is to find the best DQS delay (a combination of full
+ * cycle delays (1 DFI phase) and partial, phase delays).
+ *
+ * It consists of following major steps:
+ * 1. External Write Leveling
+ *   - align external cycle
+ *   - align to the eye's edge
+ * 2. Internal Write Leveling
+ *   - align internal cycle
+ *   - align to the eye's edge
+ *
+ * In each of the steps above, we receive a response from the DRAM
+ * indicating if selected delay combination is working or not.
+ *
+ * JESD79-5A 4.21
+ */
+static void write_leveling(int channel, int rank, int module) {
+    enter_wltm(channel, rank);
+
+    printf("WL m:%2d\n", module);
+
+    // ==================== External Write Leveling ====================
+
+    // Find the first cycle in which we get response that DQS delay is correct.
+    // As the eye width is 2 tCK (JESD79-5A Table 113, tWL_Pulse_Width) we can first
+    // find the cycle and later align to the eye's edge with output delays.
+    // That's why we search for the cycle after resetting output delays.
+    odly_dqs_rst(channel, module);
+    int transition_cycle = wltm_align_external_cycle(channel, rank, module);
+
+    if (transition_cycle == -1) {
+        printf("Failed to find a transition cycle for module %2d\n", module);
+        return;
+    }
+
+    printf("DQS write leveling response transition starts in cycle:%2d (adjusted %2d)\n",
+        transition_cycle, transition_cycle + SDRAM_PHY_MIN_WR_LATENCY);
+
+    // After finding the transition cycle, we search for the eye's edge.
+    // We found the cycle using output delay of 0, so we need to go one
+    // cycle back first.
+    transition_cycle -= 1;
+    int transition_delay = wltm_align_to_eye_edge(channel, rank, module, transition_cycle);
+
+#ifdef INFO_DDR5
+    printf("cycle:%2d delay:%2d\n", transition_cycle, transition_delay);
+#endif // INFO_DDR5
+
+    // ==================== Internal Write Leveling ====================
+
+    // JEDEC specifies that we need to adjust DQS delay before and after
+    // Internal Write Leveling, based on write preamble length.
+    // We use 2 tCK write preamble, so first we adjust by -0.75 tCK and
+    // after finishing Internal Write Leveling, we adjust by +1.25 tCK.
+    // JESD79-5A 4.21.4, Table 110
+    transition_cycle -= 1;
+    transition_delay += SDRAM_PHY_DELAYS/4;
+    if (transition_delay >= SDRAM_PHY_DELAYS) {
+        transition_cycle += 1;
+        transition_delay -= SDRAM_PHY_DELAYS;
+    }
+
+#ifdef INFO_DDR5
+    printf("After adjusting by WL_ADJ_start (-0.75 tCK); cycle:%2d delay:%2d\n",
+        transition_cycle, transition_delay);
+#endif // INFO_DDR5
+
+    // Set new cycle delay
+    wr_dqs_rst(channel, module);
+    for (int i = 0; i < transition_cycle; i++)
+        wr_dqs_inc(channel, module);
+
+    // Set new output delay
+    odly_dqs_rst(channel, module);
+    for (int i = 0; i < transition_delay; i++)
+        odly_dqs_inc(channel, module);
+
+    // Perform search for working Write Leveling Internal Cycle Alignment (WICA).
+    // This is the lower part of the first column of the Internal Write Leveling
+    // flowchart (JESD79-5A Figure 92).
+    wltm_align_internal_cycle(channel, rank, module);
+
+    // After finding a correct WICA setting, we need to once again find the eye's edge.
+    // This is the upper part of the third column of the Internal Write Leveling
+    // flowchart (JESD79-5A Figure 92).
+    transition_cycle -= 1;
+    transition_delay = wltm_align_to_eye_edge(channel, rank, module, transition_cycle);
+
+    // Just like at the beginning of the Internal Write Leveling,
+    // we need to adjust the DQS delay based on write preamble length.
+    // We use 2 tCK write preamble, so we adjust by +1.25 tCK.
+    // JESD79-5A 4.21.4, Table 110
+    transition_cycle += 1;
+    transition_delay += SDRAM_PHY_DELAYS/4;
+    if (transition_delay >= SDRAM_PHY_DELAYS) {
+        transition_cycle += 1;
+        transition_delay -= SDRAM_PHY_DELAYS;
+    }
+
+    printf("Final timing values: cycles:%2d(adjusted %2d) delay:%2d\n",
+        transition_cycle, transition_cycle + SDRAM_PHY_MIN_WR_LATENCY, transition_delay);
+
+    // Set new cycle delay
+    wr_dqs_rst(channel, module);
+    for (int i = 0; i < transition_cycle; i++) {
+        wr_dqs_inc(channel, module);
+    }
+
+    // Set new output delay
+    odly_dqs_rst(channel, module);
+    for (int i = 0; i < transition_delay; i++) {
+        odly_dqs_inc(channel, module);
+    }
+}
+
 void sdram_ddr5_write_training(training_ctx_t *ctx) {
     int channel, rank, module, seed, cnt_seed, byte;
-    int cycle, delay, got, sample, it, works;
+    int cycle, delay, got, it, works;
     int start_cycle, start_delay,   // First working cycle delay pair
         middle_cycle, middle_delay, // Middle between first and last working
         end_cycle, end_delay;       // First cycle delay pair that does not work after working
@@ -965,159 +1228,24 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
     uint8_t mr5;
     uint16_t wrdata, rddata;
     uint32_t eye_width;             // In taps
-    use_internal_write_timing = 1<<7;
+
     for (channel = 0; channel < CHANNELS; channel++) {
         printf("Subchannel:%c Write leveling\n", (char)('A'+channel));
         /* Coarse alignment */
         for (rank = 0; rank < ctx->ranks; rank++) {
+            // Perform Write Leveling (both External and Internal)
             enter_wltm(channel, rank);
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
-                printf("WL m:%2d\n", module);
-                start_cycle = -1;
-                wr_dqs_rst(channel, module);
-                cycle = 0;
-                for(delay = SDRAM_PHY_MIN_WR_LATENCY; delay < SDRAM_PHY_CWL/2; ++delay, ++cycle) {
-                    wr_dqs_inc(channel, module);
-                }
-                got = 0;
-                for (; cycle < 63 && got < 1; ++cycle) {
-                    sample = 1;
-                    // Check multiple times, as we can be on the edge of transition
-                    // Make sure we aren't in meta stable delay
-                    printf("%2d|", cycle);
-                    for (it = 0; it<16; it++) {
-                        send_wleveling_write(channel, rank);
-                        temp = wleveling_sample(channel, module);
-                        sample &= temp;
-#ifdef DEBUG_DDR5
-                        printf("%d:%d|", sample, temp);
-#else
-                        printf("%d", sample);
-#endif // DEBUG_DDR5
-                    }
-                    printf("|\n");
-                    if (sample && got == 0) {
-                        start_cycle = cycle;
-                        got = 1;
-                    }
-                    wr_dqs_inc(channel, module);
-                }
-                if (start_cycle == -1) {
-                    printf("Failed to find result for %2d\n", module);
-                    continue;
-                }
-                wr_dqs_rst(channel, module);
-                printf("DQS write leveling starts in cycle:%2d (adjusted %2d)\n",
-                    start_cycle, start_cycle + SDRAM_PHY_MIN_WR_LATENCY);
-                /* Pull back 1 cycle */
-                start_cycle -= 1;
-                wr_dqs_rst(channel, module);
-                odly_dqs_rst(channel, module);
-                for (it = 0; it < start_cycle; ++it) {
-                    wr_dqs_inc(channel, module);
-                }
-
-                got = 0;
-                cycle = start_cycle;
-                start_cycle = -1; start_delay = 1;
-                printf("DQS edge scan:\n");
-                // Break out when 0 to 1 transition was found
-                do {
-                    wleveling_scan(&cycle, &got, &start_cycle, &start_delay, channel, rank, module);
-                } while (got != 1);
-
-#ifdef INFO_DDR5
-                printf("cycle:%2d delay:%2d\n", start_cycle, start_delay);
-#endif // INFO_DDR5
-
-                // Pull back 0.75 clock as specified by JEDEC
-                // to train WICA
-                start_cycle -= 1;
-                start_delay += SDRAM_PHY_DELAYS/4;
-                if (start_delay >= SDRAM_PHY_DELAYS) {
-                    start_cycle += 1;
-                    start_delay -= SDRAM_PHY_DELAYS;
-                }
-
-#ifdef INFO_DDR5
-                printf("After -0.75; cycle:%2d delay:%2d\n", start_cycle, start_delay);
-#endif // INFO_DDR5
-
-                wr_dqs_rst(channel, module);
-                odly_dqs_rst(channel, module);
-                for (it = 0; it < start_cycle; ++it) {
-                    wr_dqs_inc(channel, module);
-                }
-                for (it = 0; it < start_delay; ++it) {
-                    odly_dqs_inc(channel, module);
-                }
-
-                printf("DQS internal cycle alignment\n|");
-                send_mrw(channel, rank, module, 2, 2|use_internal_write_timing);
-                got = 0;
-                cycle = 0;
-                do {
-                    send_mrw(channel, rank, module, 3, cycle);
-                    sample = 1;
-                    // Check multiple times, as we can be on the edge of transition
-                    // Make sure we aren't in meta stable delay
-                    for (it = 0; it<16; it++) {
-                        send_wleveling_write(channel, rank);
-                        sample &= wleveling_sample(channel, module);
-                    }
-                    printf("WICA:%d,%d|", cycle, sample);
-                    ++cycle;
-                    if (sample && got == 0) {
-                        got = 1;
-                    }
-                } while (got != 1 && cycle < 7 );
-                printf("\n");
-
-                start_cycle -= 1;
-
-                wr_dqs_rst(channel, module);
-                odly_dqs_rst(channel, module);
-                for (it = 0; it < start_cycle; ++it) {
-                    wr_dqs_inc(channel, module);
-                }
-
-                got = 0;
-                cycle = start_cycle;
-                start_cycle = -1; start_delay = -1;
-                printf("Scan for internal edge:\n");
-                // Break out when 0 to 1 transition was found
-                do {
-                    wleveling_scan(&cycle, &got, &start_cycle, &start_delay, channel, rank, module);
-                } while (got != 1);
-
-                // Push forward 1.25 clock as specified by JEDEC
-                // after training WICA
-
-                start_cycle += 1;
-                start_delay += SDRAM_PHY_DELAYS/4;
-                if (start_delay >= SDRAM_PHY_DELAYS) {
-                    start_cycle += 1;
-                    start_delay -= SDRAM_PHY_DELAYS;
-                }
-
-                printf("Final timing values: cycles:%2d(adjusted %2d) delay:%2d\n",
-                    start_cycle, start_cycle + SDRAM_PHY_MIN_WR_LATENCY, start_delay);
-
-                wr_dqs_rst(channel, module);
-                odly_dqs_rst(channel, module);
-                for (it = 0; it < start_cycle; ++it) {
-                    wr_dqs_inc(channel, module);
-                }
-                for (it = 0; it < start_delay; ++it) {
-                    odly_dqs_inc(channel, module);
-                }
+                write_leveling(channel, rank, module);
             }
             exit_wltm(channel, rank);
+
 #ifdef DEBUG_DDR5
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 read_registers(channel, rank, module);
             }
 #endif // DEBUG_DDR5
+
             printf("DQ write training\n");
             mr5 = 0;
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {

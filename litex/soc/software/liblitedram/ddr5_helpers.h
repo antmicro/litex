@@ -138,9 +138,9 @@ void exit_catm(int channel, int rank);
 int ca_check_if_works(int channel, int rank, int address, int cs_dly);
 
 void enter_write_leveling(int channel);
-void wleveling_scan(int *cycle, int *got, int *start_cycle, int *start_delay,
-                    int channel, int rank, int module);
 void exit_write_leveling(int channel);
+int wr_dqs_check_if_works(int channel, int rank, int module);
+void wleveling_scan(int channel, int rank, int module, eye_t *eye_state);
 
 #if defined(CONFIG_HAS_I2C)
 void enter_dcstm(int channel, int rank);

@@ -18,6 +18,9 @@
 // if in 2N Mode, 1 more cycle is used for the command
 #define MAX_READ_CYCLE_DELAY (66 + 1)
 
+// as per spec, WL = RL - 2 (JESD79-5A 3.5.2 NOTE 2)
+#define MAX_WRITE_CYCLE_DELAY (MAX_READ_CYCLE_DELAY - 2)
+
 typedef void (*action_callback_t)(int channel, int rank, int address);
 typedef void (*training_mode_callback_t)(int channel, int rank);
 
