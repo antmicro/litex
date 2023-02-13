@@ -640,12 +640,12 @@ static uint64_t read_serial_number(int channel, int rank, int module) {
  */
 static void enter_rptm(int channel, int rank) {
     // Setup MRs
-    send_mrw(channel, rank, 0xf, 28, 0xA5); // select DQL to invert
-    send_mrw(channel, rank, 0xf, 29, 0xA5); // select DQU to invert
-    send_mrw(channel, rank, 0xf, 30, 0x33); // select data sources for DQ lines
+    send_mrw(channel, rank, MODULE_BROADCAST, 28, 0xA5); // select DQL to invert
+    send_mrw(channel, rank, MODULE_BROADCAST, 29, 0xA5); // select DQU to invert
+    send_mrw(channel, rank, MODULE_BROADCAST, 30, 0x33); // select data sources for DQ lines
 
     // Actual write to enter Read Preamble Training Mode
-    send_mrw(channel, rank, 0xf, 2, 1|WICA);
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 1|WICA);
 }
 
 /**
@@ -657,14 +657,14 @@ static void enter_rptm(int channel, int rank) {
  */
 static void exit_rptm(int channel, int rank) {
     // Setup MRs
-    send_mrw(channel, rank, 0xf, 25, 0); // restore Serial mode
-    send_mrw(channel, rank, 0xf, 26, 0x5a); // restore default data
-    send_mrw(channel, rank, 0xf, 27, 0x3c); // restore default data
-    send_mrw(channel, rank, 0xf, 28, 0); // don't invert DQL[7:0]
-    send_mrw(channel, rank, 0xf, 29, 0); // don't invert DQU[7:0]
+    send_mrw(channel, rank, MODULE_BROADCAST, 25, 0); // restore Serial mode
+    send_mrw(channel, rank, MODULE_BROADCAST, 26, 0x5a); // restore default data
+    send_mrw(channel, rank, MODULE_BROADCAST, 27, 0x3c); // restore default data
+    send_mrw(channel, rank, MODULE_BROADCAST, 28, 0); // don't invert DQL[7:0]
+    send_mrw(channel, rank, MODULE_BROADCAST, 29, 0); // don't invert DQU[7:0]
 
     // Actual write to exit Read Preamble Training Mode
-    send_mrw(channel, rank, 0xf, 2, 0|WICA);
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|WICA);
 }
 
 /**

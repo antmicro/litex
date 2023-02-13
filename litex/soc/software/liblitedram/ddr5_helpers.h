@@ -31,6 +31,9 @@ typedef struct {
     .end    = -1,       \
 }
 
+// 0xf addresses all DRAM modules on selected rank
+#define MODULE_BROADCAST (0xf)
+
 int prep_payload (int cs, int command, int wrdata_en,
                   uint32_t wrdata_mask, int rddata_en);
 void upload_payload(int channel, int phases, int payload);
