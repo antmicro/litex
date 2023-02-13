@@ -943,6 +943,18 @@ void sdram_ddr5_read_training(training_ctx_t *ctx) {
     }
 }
 
+static void enter_wltm(int channel, int rank) {
+    enter_write_leveling(channel);
+
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 2);
+}
+
+static void exit_wltm(int channel, int rank) {
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing);
+
+    exit_write_leveling(channel);
+}
+
 void sdram_ddr5_write_training(training_ctx_t *ctx) {
     int channel, rank, module, seed, cnt_seed, byte;
     int cycle, delay, got, sample, it, works;
@@ -958,9 +970,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
         printf("Subchannel:%c Write leveling\n", (char)('A'+channel));
         /* Coarse alignment */
         for (rank = 0; rank < ctx->ranks; rank++) {
-            enter_write_leveling(channel);
-            /* Setup MRs */
-            send_mrw(channel, rank, 0xf, 2, 2);
+            enter_wltm(channel, rank);
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 printf("WL m:%2d\n", module);
                 start_cycle = -1;
@@ -1102,8 +1112,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                     odly_dqs_inc(channel, module);
                 }
             }
-            send_mrw(channel, rank, 0xf, 2, 0|use_internal_write_timing);
-            exit_write_leveling(channel);
+            exit_wltm(channel, rank);
 #ifdef DEBUG_DDR5
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 read_registers(channel, rank, module);
