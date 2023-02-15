@@ -22,7 +22,7 @@ from operator import itemgetter
 import collections
 
 from migen.fhdl.structure import *
-from migen.fhdl.structure import _Operator, _Slice, _Assign, _Fragment
+from migen.fhdl.structure import _Operator, _Slice, _Assign, _Fragment, _Part
 from migen.fhdl.tools import *
 from migen.fhdl.tools import _TargetLister
 from migen.fhdl.conv_output import ConvOutput
@@ -252,6 +252,18 @@ def _print_slice(ns, node):
     r, s = _print_expression(ns, node.value)
     return r + sr, s
 
+# Print Part ---------------------------------------------------------------------------------------
+
+def _print_part(ns, node):
+    if (isinstance(node.value, Signal) and len(node.value) == 1):
+        assert node.width == 1
+        sr = "" # Avoid slicing 1-bit Signals.
+    else:
+        offset, _ = _print_expression(ns, node.offset)
+        sr = f"[{offset}+:{node.width}]" if node.width > 1 else f"[{offset}]"
+    r, s = _print_expression(ns, node.value)
+    return r + sr, s
+
 # Print Cat ----------------------------------------------------------------------------------------
 
 def _print_cat(ns, node):
@@ -281,6 +293,10 @@ def _print_expression(ns, node):
     # Slice.
     elif isinstance(node, _Slice):
         return _print_slice(ns, node)
+
+    # Part.
+    elif isinstance(node, _Part):
+        return _print_part(ns, node)
 
     # Cat.
     elif isinstance(node, Cat):

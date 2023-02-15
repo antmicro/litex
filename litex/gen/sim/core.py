@@ -17,7 +17,7 @@ from functools import wraps
 from migen.fhdl.structure import *
 from migen.fhdl.structure import (_Value, _Statement,
                                   _Operator, _Slice, _ArrayProxy,
-                                  _Assign, _Fragment)
+                                  _Assign, _Fragment, _Part)
 from migen.fhdl.bitcontainer import value_bits_sign
 from migen.fhdl.tools import (list_targets, list_signals,
                               insert_resets, lower_specials)
@@ -144,6 +144,10 @@ class Evaluator:
             v = self.eval(node.value, postcommit)
             idx = range(node.start, node.stop)
             return sum(((v >> i) & 1) << j for j, i in enumerate(idx))
+        elif isinstance(node, _Part):
+            v = self.eval(node.value, postcommit)
+            offset = self.eval(node.offset, postcommit)
+            return sum(((v >> (offset + i)) & 1) << i for i in range(node.width))
         elif isinstance(node, Cat):
             shift = 0
             r = 0
