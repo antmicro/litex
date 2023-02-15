@@ -77,6 +77,12 @@ class XilinxClocking(Module, AutoCSR):
                 self.specials += Instance(
                     "BUFMR", i_I=clkout, o_O=clkout_buf, name=name,
                 )
+            elif buf == "bufmrce":
+                if ce is None:
+                    raise ValueError("BUFMRCE requires user to provide a clock enable ce Signal")
+                self.specials += Instance(
+                    "BUFMRCE", i_I=clkout, o_O=clkout_buf, i_CE=ce, name=name,
+                )
             elif buf == "bufgce":
                 if ce is None:
                     raise ValueError("BUFGCE requires user to provide a clock enable ce Signal")
