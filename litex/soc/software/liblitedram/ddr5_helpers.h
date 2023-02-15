@@ -143,6 +143,8 @@ int wr_dqs_check_if_works(int channel, int rank, int module);
 void wleveling_scan(int channel, int rank, int module, eye_t *eye_state);
 
 #if defined(CONFIG_HAS_I2C)
+void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed);
+
 void enter_dcstm(int channel, int rank);
 void exit_dcstm(int channel, int rank);
 int dcs_check_if_works(int channel, int rank, int address, int shift_0101);

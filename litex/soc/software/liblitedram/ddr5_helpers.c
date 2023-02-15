@@ -1531,6 +1531,76 @@ void exit_write_leveling(int channel) {
 
 #if defined(CONFIG_HAS_I2C)
 
+void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
+    bool ok = true;
+    uint8_t rcd = rank / 2;
+
+    uint8_t coarse, fine;
+    int offset_speed, bin_size;
+
+    // Special case, -1 means: enable PLL bypass mode
+    if (target_speed == -1) {
+        coarse = 0x0f;
+
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, 5, &coarse, 1, false);
+
+        if (!ok)
+            printf("There was a problem with enabling PLL bypass mode in the RCD\n");
+
+        return;
+    }
+
+    // Speed bins are of form:
+    //     bin_size * coarse - 20 * fine < target_speed <= bin_size * coarse
+
+    if (2000 <= target_speed && target_speed <= 2100) {
+        // Down-bin data rate speed bin is 100 MT/s wide
+        bin_size = 100;
+
+        // Down-bin data rate starts at 2000 MT/s, so we subtract that offset
+        offset_speed = target_speed - 2000;
+
+        // Special value for down-bin data rate speed bin (JESD82-511 8.7.1)
+        coarse = 0x0e;
+    } else {
+        if (!(2800 <= target_speed && target_speed <= 6400)) {
+            printf("Unsupported speed bin %d MT/s. Defaulting to 2800 MT/s.\n", target_speed);
+            target_speed = 2800;
+        }
+
+        // Normal speed bin if 400 MT/s wide
+        bin_size = 400;
+
+        // Speed bins start at 2800 MT/s, so we subtract that offset
+        offset_speed = target_speed - 2800;
+
+        // We calculate the coarse speed bin. As the range is left
+        // side exclusive, we subtract one from the offset_speed.
+        coarse = (offset_speed - 1) / 400;
+    }
+
+    // Catch a special case when target_speed is either
+    // 2000 MT/s or 2800 MT/s. Technically they are not
+    // allowed by the spec, but we treat them as if they
+    // are 2001 MT/s or 2801 MT/s.
+    if (offset_speed == 0)
+        offset_speed = 1;
+
+    int in_bin_offset = offset_speed % bin_size;
+    fine = (bin_size - in_bin_offset) / 20;
+
+    // Catch special case, when target_speed is at the end of the speed bin
+    if (in_bin_offset == 0)
+        fine = 0;
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 5, &coarse, 1, false);
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 6, &fine, 1, false);
+
+    if (!ok)
+        printf("There was a problem with setting DIMM speed in the RCD\n");
+}
+
 /*-----------------------------------------------------------------------*/
 /* Host->RCD CS Training (DCSTM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
