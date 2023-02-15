@@ -10,6 +10,29 @@
 
 #if defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_DDR4_RDIMM)
 
+#ifdef SDRAM_PHY_DDR5SIMPHY
+bool sdram_rcd_read(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_num, uint8_t reg_num, uint8_t *data, bool byte_read) {
+	for (int i = 0; i < 4; i++) {
+		// Right now reading RCD in simulation is not supported
+		data[i] = 0;
+	}
+
+	return true;
+}
+
+bool sdram_rcd_write(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_num, uint8_t reg_num, const uint8_t *data, uint8_t size, bool byte_write) {
+	rcd_xmockmaster_channel_write(function);
+	rcd_xmockmaster_page_num_write(page_num);
+
+	for (int i = 0; i < size; i++) {
+		rcd_xmockmaster_reg_num_write(reg_num + i);
+		rcd_xmockmaster_data_write(data[i]);
+		rcd_xmockmaster_execute_write(0);
+	}
+
+	return true;
+}
+#else
 static bool sdram_rcd_byte_read(uint8_t rcd, const uint8_t *rap_buf, uint8_t len, uint8_t *data, uint8_t internal_cmd) {
 	bool ok = true;
 	uint8_t sidebus_cmd = 0x00 | ((internal_cmd & 0b11) << 2); // | ((pec_en & 0b1) << 4);
@@ -135,6 +158,7 @@ bool sdram_rcd_write(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_nu
 	else
 		return sdram_rcd_block_write(rcd, rap_buf, (4 + size), RCD_WRITE_CMD(size));
 }
+#endif /* SDRAM_PHY_DDR5SIMPHY */
 
 #endif /* defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_DDR4_RDIMM) */
 
