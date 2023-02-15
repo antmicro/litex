@@ -94,6 +94,7 @@ class XilinxVivadoToolchain(GenericToolchain):
         "mr_ff":           ("mr_ff",      "true"), # user-defined attribute
         "ars_ff1":         ("ars_ff1",    "true"), # user-defined attribute
         "ars_ff2":         ("ars_ff2",    "true"), # user-defined attribute
+        "ars_bufg":        ("ars_bufg",   "true"), # user-defined attribute
         "no_shreg_extract": None
     }
 

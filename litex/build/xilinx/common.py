@@ -67,11 +67,12 @@ class XilinxMultiReg:
 # Common AsyncResetSynchronizer --------------------------------------------------------------------
 
 class XilinxAsyncResetSynchronizerImpl(Module):
-    def __init__(self, cd, async_reset):
+    def __init__(self, cd, async_reset, bufg=False):
         if not hasattr(async_reset, "attr"):
             i, async_reset = async_reset, Signal()
             self.comb += async_reset.eq(i)
         rst_meta = Signal()
+        rst_meta2 = Signal()
         self.specials += [
             Instance("FDPE",
                 attr   = {"async_reg", "ars_ff1"},
@@ -89,15 +90,26 @@ class XilinxAsyncResetSynchronizerImpl(Module):
                 i_CE   = 1,
                 i_C    = cd.clk,
                 i_D    = rst_meta,
-                o_Q    = cd.rst
-            )
+                o_Q    = cd.rst if not bufg else rst_meta2
+            ),
         ]
+        if bufg:
+            self.specials += [
+                Instance("BUFG",
+                    attr = {"ars_bufg"},
+                    i_I = rst_meta2,
+                    o_O = cd.rst
+                )
+            ]
 
 
 class XilinxAsyncResetSynchronizer:
     @staticmethod
     def lower(dr):
-        return XilinxAsyncResetSynchronizerImpl(dr.cd, dr.async_reset)
+        bufg = False
+        if hasattr(dr, "bufg"):
+            bufg = dr.bufg
+        return XilinxAsyncResetSynchronizerImpl(dr.cd, dr.async_reset, bufg)
 
 # Common DifferentialInput -------------------------------------------------------------------------
 
@@ -381,10 +393,10 @@ class XilinxSDROutputUS:
     @staticmethod
     def lower(dr):
         return XilinxSDROutputImplUS(dr.i, dr.o, dr.clk)
-        
+
 # Ultrascale SDRInput ------------------------------------------------------------------------------
 class XilinxSDRInputImplUS(Module):
-    def __init__(self, i, o, clk): 
+    def __init__(self, i, o, clk):
         self.specials += Instance("FDCE",
             i_C   = clk,
             i_CE  = 1,
