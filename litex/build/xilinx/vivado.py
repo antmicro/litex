@@ -95,6 +95,8 @@ class XilinxVivadoToolchain(GenericToolchain):
         "ars_ff1":         ("ars_ff1",    "true"), # user-defined attribute
         "ars_ff2":         ("ars_ff2",    "true"), # user-defined attribute
         "ars_bufg":        ("ars_bufg",   "true"), # user-defined attribute
+        "slow_ff":         ("slow_ff",    "true"), # user-defined attribute
+        "slow_in":         ("slow_in",    "true"), # user-defined attribute
         "no_shreg_extract": None
     }
 
@@ -204,6 +206,18 @@ class XilinxVivadoToolchain(GenericToolchain):
                 "-of_objects [get_cells -hierarchical -filter {{ars_ff1 == TRUE}}]] "
             "-to [get_pins -filter {{REF_PIN_NAME == D}} "
                 "-of_objects [get_cells -hierarchical -filter {{ars_ff2 == TRUE}}]]"
+        )
+        # The output from slow_ff is a false path
+        self.platform.add_platform_command(
+            "set_false_path -quiet "
+            "-through [get_pins -filter {{REF_PIN_NAME == Q}} "
+                "-of_objects [get_cells -hierarchical -filter {{slow_ff == TRUE}}]]"
+        )
+        # The input to ff from slow source is a false path
+        self.platform.add_platform_command(
+            "set_false_path -quiet "
+            "-to [get_pins -filter {{REF_PIN_NAME == D}} "
+                "-of_objects [get_cells -hierarchical -filter {{slow_in == TRUE}}]]"
         )
 
     def build_timing_constraints(self, vns):
