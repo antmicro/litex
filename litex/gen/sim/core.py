@@ -200,6 +200,15 @@ class Evaluator:
             value &= 2**(node.stop - node.start)-1
             full_value |= value << node.start
             self.assign(node.value, full_value)
+        elif isinstance(node, _Part):
+            full_value = self.eval(node.value, True)
+            offset = self.eval(node.offset, True)
+            start = offset
+            stop = offset + node.width
+            full_value &= ~((2**stop-1) - (2**start-1))
+            value &= 2**(stop - start)-1
+            full_value |= value << start
+            self.assign(node.value, full_value)
         elif isinstance(node, _ArrayProxy):
             idx = min(len(node.choices) - 1, self.eval(node.key))
             self.assign(node.choices[idx], value)
