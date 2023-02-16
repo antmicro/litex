@@ -206,28 +206,31 @@ class _FIFOWrapper(Module):
 
 
 class SyncFIFO(_FIFOWrapper):
-    def __init__(self, layout, depth, buffered=False):
+    def __init__(self, layout, depth, buffered=False, *, custom_fifo_cls=None):
         assert depth >= 0
+        self.level = Signal()
         if depth >= 2:
+            fifo_cls = fifo.SyncFIFOBuffered if buffered else fifo.SyncFIFO
+            if custom_fifo_cls is not None:
+                fifo_cls = custom_fifo_cls
             _FIFOWrapper.__init__(self,
-                fifo_class = fifo.SyncFIFOBuffered if buffered else fifo.SyncFIFO,
+                fifo_class = fifo_cls,
                 layout     = layout,
                 depth      = depth)
             self.depth = self.fifo.depth
-            self.level = self.fifo.level
+            if hasattr(self.fifo, "level"):
+                self.level = self.fifo.level
         elif depth == 1:
             buf = Buffer(layout)
             self.submodules += buf
             self.sink   = buf.sink
             self.source = buf.source
             self.depth  = 1
-            self.level  = Signal()
         elif depth == 0:
             self.sink   = Endpoint(layout)
             self.source = Endpoint(layout)
             self.comb += self.sink.connect(self.source)
             self.depth = 0
-            self.level = Signal()
 
 
 class AsyncFIFO(_FIFOWrapper):
