@@ -21,13 +21,13 @@ bool sdram_rcd_read(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_num
 }
 
 bool sdram_rcd_write(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_num, uint8_t reg_num, const uint8_t *data, uint8_t size, bool byte_write) {
-	rcd_xmockmaster_channel_write(function);
-	rcd_xmockmaster_page_num_write(page_num);
+	i2cmockmaster_internal_channel_write(function);
+	i2cmockmaster_internal_page_num_write(page_num);
 
 	for (int i = 0; i < size; i++) {
-		rcd_xmockmaster_reg_num_write(reg_num + i);
-		rcd_xmockmaster_data_write(data[i]);
-		rcd_xmockmaster_execute_write(0);
+		i2cmockmaster_internal_reg_num_write(reg_num + i);
+		i2cmockmaster_internal_data_write(data[i]);
+		i2cmockmaster_internal_execute_write(0);
 	}
 
 	return true;
