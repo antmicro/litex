@@ -1752,9 +1752,9 @@ void exit_dcstm(int channel, int rank) {
  * JESD82-511 5.1.1
  */
 int dcs_check_if_works(int channel, int rank, int address, int shift_0101) {
-    ddrphy_alert_reduce_write(0); // write 0 to reduce with OR
+    ddrphy_CSRModule_alert_reduce_write(0); // write 0 to reduce with OR
     cs_sample_prep(channel, rank, address, shift_0101);
-    return !ddrphy_alert_read();
+    return !ddrphy_CSRModule_alert_read();
 }
 
 /*-----------------------------------------------------------------------*/
@@ -1957,14 +1957,14 @@ int dca_check_if_works(int channel, int rank, int address, int phase_shift) {
     int ok;
 
     // Test change from low to high
-    ddrphy_alert_reduce_write(1); // write 1 to reduce with AND
+    ddrphy_CSRModule_alert_reduce_write(1); // write 1 to reduce with AND
     ca_sample_prep(channel, rank, address, 1, phase_shift);
-    ok = ddrphy_alert_read();
+    ok = ddrphy_CSRModule_alert_read();
 
     // Test change from high to low
-    ddrphy_alert_reduce_write(0); // write 0 to reduce with OR
+    ddrphy_CSRModule_alert_reduce_write(0); // write 0 to reduce with OR
     ca_sample_prep(channel, rank, address, 0, phase_shift);
-    ok &= !ddrphy_alert_read();
+    ok &= !ddrphy_CSRModule_alert_read();
 
     return ok;
 }

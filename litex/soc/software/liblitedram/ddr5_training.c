@@ -1615,12 +1615,12 @@ training_ctx_t host_dram_ctx = {
  * Requires to already be in the DCATM.
  */
 static int dca_check_if_has_line13(int32_t channel) {
-    ddrphy_alert_reduce_write(1); // write 1 to reduce with AND
+    ddrphy_CSRModule_alert_reduce_write(1); // write 1 to reduce with AND
     cmd_injector(channel, 0xf, 0, 1<<13, 0, 0, 1, 0);
     cmd_injector(channel, 0x1, 1, 1<<13, 0, 0, 1, 0);
     store_continuous(channel);
 
-    return ddrphy_alert_read();
+    return ddrphy_CSRModule_alert_read();
 }
 
 training_ctx_t host_rcd_ctx = {
