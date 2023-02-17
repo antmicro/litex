@@ -1629,7 +1629,7 @@ enum module_type {
 static enum module_type read_module_type(uint8_t spd) {
     uint8_t module_type;
     if (!sdram_read_spd(spd, 3, &module_type, 1, true)) {
-        printf("Couldn't read the SPD and check the module type. Defaulting to UDIMM.");
+        printf("Couldn't read the SPD and check the module type. Defaulting to UDIMM.\n");
         return UDIMM;
     }
 
@@ -1652,12 +1652,24 @@ void sdram_ddr5_flow(void) {
 #if defined(CONFIG_HAS_I2C)
     bool is_rdimm = read_module_type(0) == RDIMM;
 
-    if (is_rdimm)
+    if (is_rdimm) {
+        rcd_set_dimm_operating_speed(0, 0, -1); // FIXME: should initialize all RCDs
         base_ctx = &host_rcd_ctx;
+        sdram_ddr5_cs_ca_training(base_ctx);
+        // base_ctx = &rcd_dram_ctx; // TODO: uncomment when RCD->DRAM training is implemented
+    }
 #endif // defined(CONFIG_HAS_I2C)
 
+    setup_dram_mrs_sequence();
+
     sdram_ddr5_module_enumerate(base_ctx);
+
+     // TODO: guard below can be removed when RCD->DRAM training is implemented
+     // and base_ctx is changed to rcd_dram_ctx after performing CS/CA training
+     // with host_rcd_ctx first.
+#if !defined(CONFIG_HAS_I2C)
     sdram_ddr5_cs_ca_training(base_ctx);
+#endif // !defined(CONFIG_HAS_I2C)
 
     if (in_2n_mode()) {
         printf("2N mode setup\n");
