@@ -143,6 +143,8 @@ int wr_dqs_check_if_works(int channel, int rank, int module);
 void wleveling_scan(int channel, int rank, int module, eye_t *eye_state);
 
 #if defined(CONFIG_HAS_I2C)
+uint8_t get_rcd_id(int rank);
+
 enum dca_rate {
     SDR1 = 0b00,
     SDR2 = 0b10,

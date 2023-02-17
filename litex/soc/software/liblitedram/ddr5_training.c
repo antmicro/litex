@@ -287,7 +287,7 @@ static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t 
 static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[4];
 
     // we need to modify RW02[5:4]

@@ -1532,6 +1532,15 @@ void exit_write_leveling(int channel) {
 #if defined(CONFIG_HAS_I2C)
 
 /**
+ * get_rcd_id
+ * 
+ * Calculates RCDs slave id based on the rank number.
+ */
+uint8_t get_rcd_id(int rank) {
+    return rank / 2;
+}
+
+/**
  * rcd_set_dca_rate
  *
  * Sets selected DCA mode in the RCD.
@@ -1540,7 +1549,7 @@ void exit_write_leveling(int channel) {
  */
 void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate) {
     bool ok = true;
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
 
     uint8_t rw_data[4];
 
@@ -1571,7 +1580,7 @@ void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate) {
  */
 void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
     bool ok = true;
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
 
     uint8_t coarse, fine;
     int offset_speed, bin_size;
@@ -1652,7 +1661,7 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
 void enter_dcstm(int channel, int rank) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[4];
 
     // we need to modify RW01 and RW02
@@ -1684,7 +1693,7 @@ void enter_dcstm(int channel, int rank) {
 void exit_dcstm(int channel, int rank) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[4];
 
     // we need to modify RW02
@@ -1732,7 +1741,7 @@ static uint8_t qcs_delays[2][SDRAM_PHY_RANKS] = {}; // init with 0s
 void qcs_inc(int channel, int rank, int address) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
 
     uint8_t *qcs_dly = &qcs_delays[channel][rank];
      *qcs_dly = (*qcs_dly + 1) & 0x7f; // delay is a is 6-bit value + 1 bit for full cycle delay
@@ -1756,7 +1765,7 @@ void qcs_inc(int channel, int rank, int address) {
 void qcs_rst(int channel, int rank, int address) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
 
     qcs_delays[channel][rank] = 0;
 
@@ -1779,7 +1788,7 @@ void qcs_rst(int channel, int rank, int address) {
 void enter_qcstm(int channel, int rank) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[4];
 
     // we need to modify RW03
@@ -1807,7 +1816,7 @@ void enter_qcstm(int channel, int rank) {
 void exit_qcstm(int channel, int rank) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[4];
 
     // we need to modify RW03
@@ -1838,7 +1847,7 @@ void exit_qcstm(int channel, int rank) {
 void enter_dcatm(int channel, int rank) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[4];
 
     // we need to modify RW01 and RW02
@@ -1870,7 +1879,7 @@ void enter_dcatm(int channel, int rank) {
 void exit_dcatm(int channel, int rank) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[4];
 
     // we need to modify RW02
@@ -1945,7 +1954,7 @@ static uint8_t qca_delays[2][14] = {}; // init with 0s
 void qca_inc(int channel, int rank, int address) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
 
     uint8_t *qca_dly = &qca_delays[channel][address];
      *qca_dly = (*qca_dly + 1) & 0x7f; // delay is a is 6-bit value + 1 bit for full cycle delay
@@ -1969,7 +1978,7 @@ void qca_inc(int channel, int rank, int address) {
 void qca_rst(int channel, int rank, int address) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
 
     qca_delays[channel][address] = 0;
 
@@ -1994,7 +2003,7 @@ void qca_rst(int channel, int rank, int address) {
 void enter_qcatm(int channel, int rank) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[4];
 
     // we need to modify RW00, RW01
@@ -2031,7 +2040,7 @@ void enter_qcatm(int channel, int rank) {
 void exit_qcatm(int channel, int rank) {
     bool ok = true;
 
-    uint8_t rcd = rank / 2;
+    uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[4];
 
     // we need to modify RW00, RW01
