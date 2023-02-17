@@ -1682,6 +1682,12 @@ static enum module_type read_module_type(uint8_t spd) {
     // Module type is in the lower nibble
     return module_type & 0x0f;
 }
+
+static void rcd_init(void) {
+    // FIXME: this function should initialize all RCDs
+    rcd_set_dca_rate(0, 0, DDR);
+    rcd_set_dimm_operating_speed(0, 0, -1);
+}
 #endif // defined(CONFIG_HAS_I2C)
 
 /**
@@ -1699,7 +1705,7 @@ void sdram_ddr5_flow(void) {
     bool is_rdimm = read_module_type(0) == RDIMM;
 
     if (is_rdimm) {
-        rcd_set_dimm_operating_speed(0, 0, -1); // FIXME: should initialize all RCDs
+        rcd_init();
         base_ctx = &host_rcd_ctx;
         sdram_ddr5_cs_ca_training(base_ctx);
         // base_ctx = &rcd_dram_ctx; // TODO: uncomment when RCD->DRAM training is implemented
