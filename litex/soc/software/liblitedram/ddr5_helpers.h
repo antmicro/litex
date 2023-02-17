@@ -143,6 +143,13 @@ int wr_dqs_check_if_works(int channel, int rank, int module);
 void wleveling_scan(int channel, int rank, int module, eye_t *eye_state);
 
 #if defined(CONFIG_HAS_I2C)
+enum dca_rate {
+    SDR1 = 0b00,
+    SDR2 = 0b10,
+    DDR  = 0b01,
+};
+
+void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate);
 void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed);
 
 void enter_dcstm(int channel, int rank);

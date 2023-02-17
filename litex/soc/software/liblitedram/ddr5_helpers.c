@@ -1531,6 +1531,44 @@ void exit_write_leveling(int channel) {
 
 #if defined(CONFIG_HAS_I2C)
 
+/**
+ * rcd_set_dca_rate
+ *
+ * Sets selected DCA mode in the RCD.
+ * It's a part of RCD initialization sequence (JESD82-511 3.4.3).
+ * JESD82-511 3.4
+ */
+void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate) {
+    bool ok = true;
+    uint8_t rcd = rank / 2;
+
+    uint8_t rw_data[4];
+
+    // we need to modify RW00[1:0]
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    rw_data[0] &= ~(0b11 << 0);       // clear last setting
+    rw_data[0] |= (0b11 & rate << 0); // and set a new one
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, &rw_data[0], 1, false);
+
+    if (!ok)
+        printf("There was a problem with setting DCA rate in the RCD\n");
+}
+
+/**
+ * rcd_set_dimm_operating_speed
+ *
+ * As part of RCD initialization sequence, the host must set DIMMs
+ * operating speed in the RCD.
+ * This setting is stored in RW05 and RW06.
+ * Additionally PLL bypass mode is supported.
+ *
+ * `target_speed` is operating speed in MT/s, so target_speed=3200
+ * for 3200 MT/s.
+ * Pass target_speed=-1 to enable PLL bypass mode.
+ */
 void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
     bool ok = true;
     uint8_t rcd = rank / 2;
