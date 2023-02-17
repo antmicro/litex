@@ -3,6 +3,7 @@
 #if defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
 #include <liblitedram/ddr5_helpers.h>
 
+#include <liblitedram/sdram_rcd.h>
 #include <liblitedram/sdram_spd.h>
 
 #include <stdbool.h>
@@ -270,6 +271,39 @@ static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t 
     *left = eye.end;
 }
 
+#if defined(CONFIG_HAS_I2C)
+/**
+ * dca_training_xor_sampling_edge
+ *
+ * Selects a sampling edge for Clock-to-DCAy_* training mode in the RCD.
+ * Writes value of the `edge` parameter to RW02[5:4].
+ *
+ * Allowed values of `edge`:
+ *   - 0: rising and falling edge
+ *   - 1: only rising edge
+ *   - 2: only falling edge
+ * Any other value is not allowed.
+ */
+static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) {
+    bool ok = true;
+
+    uint8_t rcd = rank / 2;
+    uint8_t rw_data[4];
+
+    // we need to modify RW02[5:4]
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    rw_data[2] &= ~(0b11 << 4);       // clear last setting
+    rw_data[2] |= (0b11 & edge) << 4; // and set a new one
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 2, &rw_data[2], 1, false);
+
+    if (!ok)
+        printf("There was a problem with changing DCA XOR sampling edge\n");
+}
+#endif // defined(CONFIG_HAS_I2C)
+
 static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
     int left_side, right_side;
     int32_t rank, address;
@@ -280,6 +314,18 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         ctx->ca.enter_training_mode(channel, rank);
 
         for (address = 0; address < ctx->ca.line_count; address++) {
+#if defined(CONFIG_HAS_I2C)
+            if (ctx->training_type == HOST_RCD) {
+                if (address < ctx->ca.line_count / 2) {
+                    // If address line belongs to Channel A select rising edge
+                    dca_training_xor_sampling_edge(channel, rank, 1);
+                } else {
+                    // If address line belongs to Channel B select falling edge
+                    dca_training_xor_sampling_edge(channel, rank, 2);
+                }
+            }
+#endif // defined(CONFIG_HAS_I2C)
+
             printf("CA line:%2"PRId32"", address);
 
             left_side = UNSET_DELAY;
