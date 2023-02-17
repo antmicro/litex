@@ -1817,7 +1817,7 @@ void enter_dcatm(int channel, int rank) {
     rw_data[2] |=   0b01 << (2 * channel);  // set new bits
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 2, rw_data, 4, false);
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, rw_data, 4, false);
 
     if (!ok)
         printf("There was a problem with entering Host->RCD CA training (DCATM)\n");
