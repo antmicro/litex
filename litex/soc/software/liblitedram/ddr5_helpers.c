@@ -1895,6 +1895,7 @@ int dca_check_if_works(int channel, int rank, int address, int phase_shift) {
 /* RCD->DRAM CA Training (QCATM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
 
+#ifdef SDRAM_PHY_RCD_DRAM_TRAINING_CAPABLE
 static uint8_t qca_delays[2][14] = {}; // init with 0s
 
 /**
@@ -2013,6 +2014,8 @@ void exit_qcatm(int channel, int rank) {
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CA training (QCATM)\n");
 }
+#endif // SDRAM_PHY_RCD_DRAM_TRAINING_CAPABLE
+
 #endif // defined(CONFIG_HAS_I2C)
 
 #endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
