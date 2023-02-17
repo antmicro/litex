@@ -77,7 +77,10 @@ int sdram_timings_spd(struct sdram_spd_ctx_s *ctx);
 #define SPD_RW_PREAMBLE    0b1010
 #define SPD_RW_ADDR(a210)  ((SPD_RW_PREAMBLE << 3) | ((a210) & 0b111))
 
-#if defined(SDRAM_PHY_DDR4)
+#if defined(SDRAM_PHY_DDR5)
+#define SDRAM_SPD_PAGES 8
+#define SDRAM_SPD_PAGE_SIZE 128
+#elif defined(SDRAM_PHY_DDR4)
 #define SDRAM_SPD_PAGES 2
 #define SDRAM_SPD_PAGE_SIZE 256
 #elif defined(SDRAM_PHY_DDR3)

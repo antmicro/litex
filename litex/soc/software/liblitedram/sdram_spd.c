@@ -247,11 +247,22 @@ int sdram_timings_spd(struct sdram_spd_ctx_s *ctx)
 /*-----------------------------------------------------------------------*/
 /* SPD reading                                                           */
 /*-----------------------------------------------------------------------*/
-#if defined(SDRAM_PHY_DDR4)
+#if defined(SDRAM_PHY_DDR5)
+/*
+ * In DDR5, pages are selected by writing to the MR11[2:0] of the SPD.
+ * When MR11[3] is set, paging is disabled and SPD expects 2-byte addresses.
+ */
+static bool sdram_select_spd_page(uint8_t spd, uint8_t page) {
+	if (page > 7)
+		return false;
+
+	return i2c_write(SPD_RW_ADDR(spd), 11, &page, 1, 1);
+}
+#elif defined(SDRAM_PHY_DDR4)
 /*
  * In DDR4, addresses 0x36 (SPA0) and 0x37 (SPA1) are used to switch between two 256 byte pages.
  */
-static bool sdram_select_spd_page(uint8_t page) {
+static bool sdram_select_spd_page(uint8_t spd, uint8_t page) {
 	uint8_t i2c_addr;
 
 	if (page == 0) {
@@ -265,7 +276,7 @@ static bool sdram_select_spd_page(uint8_t page) {
 	return i2c_poll(i2c_addr);
 }
 #else
-static bool sdram_select_spd_page(uint8_t page) {
+static bool sdram_select_spd_page(uint8_t spd, uint8_t page) {
 	return true;
 }
 #endif
@@ -280,7 +291,7 @@ bool sdram_read_spd(uint8_t spd, uint16_t addr, uint8_t *buf, uint16_t len, bool
 
 	while (addr < SDRAM_SPD_SIZE && len > 0) {
 		page = addr / SDRAM_SPD_PAGE_SIZE;
-		ok &= sdram_select_spd_page(page);
+		ok &= sdram_select_spd_page(spd, page);
 
 		offset = addr % SDRAM_SPD_PAGE_SIZE;
 
@@ -290,7 +301,12 @@ bool sdram_read_spd(uint8_t spd, uint16_t addr, uint8_t *buf, uint16_t len, bool
 			temp_len = len;
 		}
 
+#if defined(SDRAM_PHY_DDR5)
+		// In DDR5 SPDs, highest bit of the address selects between NVM location and internal registers
+		ok &= i2c_read(SPD_RW_ADDR(spd), 0x80 | offset, &buf[read_bytes], len, temp_send_stop, 1);
+#else
 		ok &= i2c_read(SPD_RW_ADDR(spd), offset, &buf[read_bytes], len, temp_send_stop, 1);
+#endif
 		len -= temp_len;
 		read_bytes += temp_len;
 		addr += temp_len;
