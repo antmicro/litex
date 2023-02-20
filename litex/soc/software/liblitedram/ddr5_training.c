@@ -1693,6 +1693,27 @@ static enum module_type read_module_type(uint8_t spd) {
     return module_type & 0x0f;
 }
 
+static uint8_t read_module_width(uint8_t spd) {
+    uint8_t buf;
+
+    // Module width is stored in SPD[6][7:5]
+    //     000: x4
+    //     001: x8
+    //     010: x16
+    //     011: x32
+
+    if (!sdram_read_spd(spd, 6, &buf, 1, false)) {
+        printf("Couldn't read module width from the SPD, defaulting to x%d.\n", SDRAM_PHY_DQ_DQS_RATIO);
+        return SDRAM_PHY_DQ_DQS_RATIO;
+    }
+
+    // minimal supported is x4
+    uint8_t shift = (buf & 0xe0) >> 5;
+    uint8_t module_width = 4 << shift;
+
+    return module_width;
+}
+
 static void rcd_init(training_ctx_t *ctx) {
     // FIXME: this function should initialize all RCDs
     rcd_set_dca_rate(0, 0, DDR);
@@ -1726,6 +1747,10 @@ void sdram_ddr5_flow(void) {
 #if defined(CONFIG_HAS_I2C)
     // TODO: read SPD die width
     bool is_rdimm = read_module_type(0) == RDIMM;
+    int die_width = read_module_width(0); // FIXME: handle multiple sticks and SPDs
+    host_dram_ctx.die_width = die_width;
+    host_rcd_ctx.die_width = die_width;
+    // rcd_dram_ctx.die_width = die_width; // TODO: uncomment when RCD->DRAM training is implemented
 
     if (is_rdimm) {
         rcd_init(&host_rcd_ctx);
