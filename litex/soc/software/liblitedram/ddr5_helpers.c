@@ -1744,6 +1744,38 @@ void rcd_forward_all_dram_cmds(int channel, int rank, bool forward) {
         printf("There was a problem with changing CMD blocking in the RCD\n");
 }
 
+/**
+ * rcd_release_qcs
+ *
+ * Releases QCS signals for a selected channel.
+ *
+ * When `sideband` is true, it will send CMD14 or CMD15
+ * to RW04 of the RCD.
+ * When `sideband` is false, it will send a single NOP
+ * on the DCS/DCA interface.
+ *
+ * It's a part of RCD initialization sequence.
+ * JESD82-511 3.8 Figure 23
+ */
+void rcd_release_qcs(int channel, int rank, bool sideband) {
+    if (sideband) {
+        bool ok = true;
+        uint8_t rcd = get_rcd_id(rank);
+
+        // we send CH_[AB]_QCS_HIGH commands (CMD14 or CMD15)
+        // to the RW04 register (JESD82-511 8.6.5)
+        uint8_t cmd = 14 + !!channel;
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, 4, &cmd, 1, false);
+
+        if (!ok)
+            printf("There was a problem with releasing the QCS for channel %c\n", 'A'+channel);
+    } else {
+        cmd_injector(channel, 0x01, 1<<rank, 0x1f, 0, 0, 0, 1);
+        issue_single(channel);
+        cdelay(10);
+    }
+}
+
 /*-----------------------------------------------------------------------*/
 /* Host->RCD CS Training (DCSTM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
