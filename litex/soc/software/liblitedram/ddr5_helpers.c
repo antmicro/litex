@@ -1716,6 +1716,34 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
         printf("There was a problem with setting DIMM speed in the RCD\n");
 }
 
+/**
+ * rcd_forward_all_dram_cmds
+ *
+ * Sets "DRAM Interface Forward All CMDs" field of RCDs RW01 register.
+ *
+ * After Host->RCD training is complete, command blocking in the RCD
+ * shall be disabled. It's a part of RCD initialization sequence.
+ * JESD82-511 3.8 Figure 23
+ */
+void rcd_forward_all_dram_cmds(int channel, int rank, bool forward) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+
+    uint8_t rw_data[4];
+
+    // we need to modify RW01[1]
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    rw_data[1] &= ~(0b1 << 1);          // clear last setting
+    rw_data[1] |= (0b1 & forward << 1); // and set a new one
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 1, &rw_data[1], 1, false);
+
+    if (!ok)
+        printf("There was a problem with changing CMD blocking in the RCD\n");
+}
+
 /*-----------------------------------------------------------------------*/
 /* Host->RCD CS Training (DCSTM) Helpers                                 */
 /*-----------------------------------------------------------------------*/

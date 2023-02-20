@@ -1699,6 +1699,8 @@ static void rcd_init(training_ctx_t *ctx) {
     rcd_set_dimm_operating_speed(0, 0, -1);
 
     sdram_ddr5_cs_ca_training(ctx);
+
+    rcd_forward_all_dram_cmds(0, 0, true); // FIXME: this should forward for all RCDs
 }
 #endif // defined(CONFIG_HAS_I2C)
 

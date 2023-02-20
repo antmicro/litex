@@ -1,7 +1,10 @@
 #ifndef LIBLITEDRAM_DDR5_HELPERS_H
 #define LIBLITEDRAM_DDR5_HELPERS_H
 
+#include <stdbool.h>
+
 #include <generated/csr.h>
+
 #ifdef CSR_SDRAM_BASE
 #include <generated/sdram_phy.h>
 
@@ -156,6 +159,7 @@ enum dca_rate {
 
 void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate);
 void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed);
+void rcd_forward_all_dram_cmds(int channel, int rank, bool forward);
 
 void enter_dcstm(int channel, int rank);
 void exit_dcstm(int channel, int rank);
