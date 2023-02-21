@@ -1717,6 +1717,25 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
 }
 
 /**
+ * rcd_clear_qrst
+ *
+ * Clears DRAMs QRST signal.
+ */
+void rcd_clear_qrst(int channel, int rank) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+
+    // we send Clear CH_[AB]_DRAM Reset commands (CMD6 or CMD8)
+    // to the RW04 register (JESD82-511 8.6.5)
+    uint8_t cmd = 6 + (2 * channel);
+
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 4, &cmd, 1, false);
+
+    if (!ok)
+        printf("There was a problem with clearing DRAM reset for channel %c\n", 'A'+channel);
+}
+
+/**
  * rcd_forward_all_dram_cmds
  *
  * Sets "DRAM Interface Forward All CMDs" field of RCDs RW01 register.
