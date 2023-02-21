@@ -97,6 +97,7 @@ class XilinxVivadoToolchain(GenericToolchain):
         "ars_bufg":        ("ars_bufg",   "true"), # user-defined attribute
         "slow_ff":         ("slow_ff",    "true"), # user-defined attribute
         "slow_in":         ("slow_in",    "true"), # user-defined attribute
+        "ps_sf":           ("ps_sf",      "true"), # user-defined attribute
         "no_shreg_extract": None
     }
 
@@ -341,7 +342,11 @@ class XilinxVivadoToolchain(GenericToolchain):
         # Routing
         tcl.append("\n# Routing\n")
         tcl.append(f"route_design -directive {self.vivado_route_directive}")
-        tcl.append(f"phys_opt_design -directive {self.vivado_post_route_phys_opt_directive}")
+        if not isinstance(self.vivado_post_route_phys_opt_directive, list):
+            tcl.append(f"phys_opt_design -directive {self.vivado_post_route_phys_opt_directive}")
+        else:
+            for opt_directive in self.vivado_post_route_phys_opt_directive:
+                tcl.append(f"phys_opt_design -directive {opt_directive}")
         tcl.append(f"write_checkpoint -force {self._build_name}_route.dcp")
         tcl.append("\n# Routing report\n")
         tcl.append("report_timing_summary -no_header -no_detailed_paths")
