@@ -298,14 +298,22 @@ static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) 
 
 static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
     int left_side, right_side;
-    int32_t rank, address;
+    int32_t rank, address, start_address, end_address;
 
     for (rank = 0; rank < ctx->ranks; rank++) {
         printf("Rank:%2"PRId32"\n", rank);
         // Enter CA training
         ctx->ca.enter_training_mode(channel, rank);
 
-        for (address = 0; address < ctx->ca.line_count; address++) {
+        if (ctx->training_type == HOST_RCD) {
+            start_address = channel * 7;     // Select between DCAy_A and DCAy_B
+            end_address = (channel + 1) * 7; // RDIMM always have 14 DCA lines
+        } else {
+            start_address = 0;
+            end_address = ctx->ca.line_count;
+        }
+
+        for (address = start_address; address < end_address; address++) {
 #if defined(CONFIG_HAS_I2C)
             if (ctx->training_type == HOST_RCD) {
                 if (address < ctx->ca.line_count / 2) {
