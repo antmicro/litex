@@ -647,6 +647,7 @@ static const uint8_t seeds1[] = {
 
 static const int seeds_count = sizeof(seeds0) / sizeof(seeds0[0]);
 
+#ifndef DDR5_TRAINING_SIM
 static const uint16_t serial[] = {
     0x0000, 0xffff,
     0xfffe, 0xfffd, 0xfffb, 0xfff7, 0xffef, 0xffdf, 0xffbf, 0xff7f,
@@ -654,6 +655,7 @@ static const uint16_t serial[] = {
     0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080,
     0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000};
 static const int serial_count = sizeof(serial) / sizeof(serial[0]);
+#endif
 
 // MR2:OP[7] value to use, whenever MR2 is being modified
 static int use_internal_write_timing = 0;
