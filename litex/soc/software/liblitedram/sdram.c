@@ -1225,6 +1225,7 @@ int sdram_init(void) {
 #endif /* SDRAM_PHY_DDR5 */
 	sdram_software_control_off();
 
+#ifndef SDRAM_PHY_DDR5
 	printf("\nSelected bitslips and delays:\n");
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
 	printf("Clock delay: %d\n", sdram_clock_delay);
@@ -1256,6 +1257,7 @@ int sdram_init(void) {
 		printf("%3d", read_dq_delay[i]);
 	printf("\n");
 #endif // SDRAM_PHY_READ_LEVELING_CAPABLE
+#endif /* not SDRAM_PHY_DDR5 */
 
 #ifndef SDRAM_TEST_DISABLE
 	if(!memtest((unsigned int *) MAIN_RAM_BASE, MEMTEST_DATA_SIZE)) {
