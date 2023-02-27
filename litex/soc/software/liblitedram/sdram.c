@@ -1214,10 +1214,10 @@ int sdram_init(void) {
 	ddrctrl_init_done_write(0);
 	ddrctrl_init_error_write(0);
 #endif // CSR_DDRCTRL_BASE
-	reset_sequence();
 #ifdef SDRAM_PHY_DDR5
 	sdram_ddr5_flow();
 #else
+	reset_sequence();
 	init_sequence();
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 	sdram_leveling();

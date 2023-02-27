@@ -1702,6 +1702,7 @@ static void rcd_init(void) {
  */
 void sdram_ddr5_flow(void) {
     training_ctx_t *base_ctx = &host_dram_ctx;
+    reset_sequence();
 
 #if defined(CONFIG_HAS_I2C)
     bool is_rdimm = read_module_type(0) == RDIMM;
