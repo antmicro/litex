@@ -76,6 +76,7 @@ typedef struct {
         TRAINING_TYPE_COUNT,
     } training_type;
     int ranks;
+    int die_width;
 } training_ctx_t;
 
 void sdram_ddr5_module_enumerate(training_ctx_t *ctx);

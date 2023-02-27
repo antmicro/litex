@@ -122,18 +122,20 @@ void setup_rddata_cnt(int channel, int value) {
 
 #ifndef SDRAM_PHY_SUBCHANNELS
 #define DFII_CMDINJECTOR_DATA_BYTES (SDRAM_PHY_DFI_DATABITS/8)
+#define SUBCHANNEL_WIDTH (SDRAM_PHY_DFI_DATABITS/2)
 #else
 #define DFII_CMDINJECTOR_DATA_BYTES (SDRAM_PHY_DFI_DATABITS/16)
+#define SUBCHANNEL_WIDTH (SDRAM_PHY_DFI_DATABITS/4)
 #endif
-#define BYTES_PER_MODULE (SDRAM_PHY_DQ_DQS_RATIO/4)
-#define MODULE_BITMASK ((1<<SDRAM_PHY_DQ_DQS_RATIO)-1)
 
-uint16_t get_data_module_phase(int channel, int module, int phase) {
+uint16_t get_data_module_phase(int channel, int module, int width, int phase) {
     uint16_t ret_value;
     int pebo;   // module's positive_edge_byte_offset
     int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
     int ibo;    // module's in byte offset (x4 ICs)
+    int byte_off;
     uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
+    uint16_t die_mask = (1<<width)-1;
     ret_value = 0;
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel) {
@@ -148,21 +150,23 @@ uint16_t get_data_module_phase(int channel, int module, int phase) {
     csr_rd_buf_uint8(CSR_SDRAM_DFII_CMDINJECTOR_RDDATA_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
 #endif
     // CSR are read as BIG Endian
-    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE;
-    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE + BYTES_PER_MODULE/2;
+    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4);
+    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4) + (width/8);
 
     ibo = 0; // Non zero only if x4 ICs are used
-    ret_value |= (data[pebo] >> ibo) & MODULE_BITMASK;
-    ibo = (0x4*BYTES_PER_MODULE) % 8;
-    ret_value |= ((data[nebo] >> ibo) & MODULE_BITMASK) << SDRAM_PHY_DQ_DQS_RATIO;
+    ret_value |= (data[pebo] >> ibo) & die_mask;
+    ibo = (0x4*(width/4)) % 8;
+    ret_value |= ((data[nebo] >> ibo) & die_mask) << width;
     return ret_value;
 }
 
-void set_data_module_phase(int channel, int module, int phase, uint16_t wrdata) {
+void set_data_module_phase(int channel, int module, int width, int phase, uint16_t wrdata) {
     int pebo;   // module's positive_edge_byte_offset
     int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
     int ibo;    // module's in byte offset (x4 ICs)
+    int byte_off, mask_offset;
     uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
+    uint8_t die_mask = ( 1 << width) - 1;
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel) {
         sdram_dfii_b_cmdinjector_wrdata_select_write(phase);
@@ -177,12 +181,13 @@ void set_data_module_phase(int channel, int module, int phase, uint16_t wrdata) 
 #endif
 
     // CSR are read as BIG Endian
-    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE;
-    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE + BYTES_PER_MODULE/2;
+    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4);
+    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4) + (width/8);
     ibo = 0; // Non zero only if x4 ICs are used
-    data[pebo] = (data[pebo]&(~MODULE_BITMASK)) | (wrdata & MODULE_BITMASK);
-    ibo = (0x4*BYTES_PER_MODULE) % 8;
-    data[nebo] = (data[nebo]&(~(MODULE_BITMASK << ibo))) | ((wrdata >> 8*(BYTES_PER_MODULE/2)) & (MODULE_BITMASK << ibo));
+    data[pebo] = (data[pebo]&(~die_mask)) | (wrdata & die_mask);
+    ibo = (0x4*(width/4)) % 8;
+    data[nebo] = (data[nebo]&(~(die_mask << ibo))) | ((wrdata >> 8*(width/8)) & (die_mask << ibo));
+
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel) {
         sdram_dfii_b_cmdinjector_wrdata_select_write(phase);
@@ -271,12 +276,14 @@ uint32_t capture_and_reduce_result(int channel, int operation) {
     return data[0]&1;
 }
 
-uint32_t capture_and_reduce_module(int channel, int module, int operation) {
+uint32_t capture_and_reduce_module(int channel, int module, int width, int operation) {
     uint16_t ret_value;
     int pebo;   // module's positive_edge_byte_offset
     int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
     int ibo;    // module's in byte offset (x4 ICs)
+    int byte_off;
     uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
+    uint16_t die_mask = (1<<width)-1;
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel) {
         csr_rd_buf_uint8(CSR_SDRAM_DFII_B_CMDINJECTOR_RESULT_ARRAY_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
@@ -288,20 +295,20 @@ uint32_t capture_and_reduce_module(int channel, int module, int operation) {
 #endif
     ret_value = 0;
     // CSR are read as BIG Endian
-    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE;
-    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / BYTES_PER_MODULE) - 1 - module) * BYTES_PER_MODULE + BYTES_PER_MODULE/2;
+    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4);
+    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4) + (width/8);
 
     ibo = 0; // Non zero only if x4 ICs are used
-    ret_value |= (data[pebo] >> ibo) & MODULE_BITMASK;
-    ibo = (0x4*BYTES_PER_MODULE) % 8;
-    ret_value |= ((data[nebo] >> ibo) & MODULE_BITMASK) << SDRAM_PHY_DQ_DQS_RATIO;
+    ret_value |= (data[pebo] >> ibo) & die_mask;
+    ibo = (0x4*(width/4)) % 8;
+    ret_value |= ((data[nebo] >> ibo) & die_mask) << width;
     if(operation) {
-        ret_value &= ret_value >> (8 * (BYTES_PER_MODULE/2));
+        ret_value &= ret_value >> (8 * (width/8));
         ret_value &= ret_value >> 4;
         ret_value &= ret_value >> 2;
         ret_value &= ret_value >> 1;
     } else {
-        ret_value |= ret_value >> (8 * (BYTES_PER_MODULE/2));
+        ret_value |= ret_value >> (8 * (width/8));
         ret_value |= ret_value >> 4;
         ret_value |= ret_value >> 2;
         ret_value |= ret_value >> 1;
@@ -327,20 +334,20 @@ int and_sample(int channel) {
     return !!capture_and_reduce_result(channel, 1);
 }
 
-int wleveling_sample(int channel, int module) {
+int wleveling_sample(int channel, int module, int width) {
     setup_capture(channel, 3);
     cdelay(100);
     start_capture(channel);
     cdelay(1000);
     stop_capture(channel);
-    return !!capture_and_reduce_module(channel, module, 1);
+    return !!capture_and_reduce_module(channel, module, width, 1);
 }
 
-void read_registers(int channel, int rank, int module) {
+void read_registers(int channel, int rank, int module, int width) {
     int i;
     for (i = 0; i < 256; ++i) {
         send_mrr(channel, rank, i);
-        printf("\tMR:%3d %02"PRIX8"\n", i, recover_mrr_value(channel, module));
+        printf("\tMR:%3d %02"PRIX8"\n", i, recover_mrr_value(channel, module, width));
     }
 }
 
@@ -370,19 +377,20 @@ void disable_dram_2n_mode(int channel, int rank) {
     printf("Switching DRAM on channel:%c rank:%d to 1N mode\n", 'A'+channel, rank);
 }
 
-static void phy_select(int channel, int select) {
+static void phy_select(int channel, int select, int width) {
+    int mask = 1;
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        ddrphy_B_dly_sel_write(1<<select);
+        ddrphy_B_dly_sel_write(mask<<select);
     } else {
-        ddrphy_A_dly_sel_write(1<<select);
+        ddrphy_A_dly_sel_write(mask<<select);
     }
 #else
-    ddrphy_dly_sel_write(1<<select);
+    ddrphy_dly_sel_write(mask<<select);
 #endif
 }
 
-static void phy_deselect(int channel, int select) {
+static void phy_deselect(int channel, int select, int width) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         ddrphy_B_dly_sel_write(0);
@@ -394,7 +402,7 @@ static void phy_deselect(int channel, int select) {
 #endif
 }
 
-static void phy_dq_select(int channel, int select) {
+static void phy_dq_select(int channel, int select, int width) {
 #ifdef SDRAM_DELAY_PER_DQ
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -408,7 +416,7 @@ static void phy_dq_select(int channel, int select) {
 #endif // SDRAM_DELAY_PER_DQ
 }
 
-static void phy_dq_deselect(int channel, int select) {
+static void phy_dq_deselect(int channel, int select, int width) {
 #ifdef SDRAM_DELAY_PER_DQ
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -755,12 +763,12 @@ uint8_t lfsr_next(uint8_t input) {
     return temp;
 }
 
-int compare_serial(int channel, int module, uint16_t data, int inv, int select) {
+int compare_serial(int channel, int module, int width, uint16_t data, int inv, int select) {
     uint16_t module_data[8];
     int phase;
     int bit, it, _bit;
     for (phase = 0; phase < 8; ++phase) {
-        module_data[phase] = get_data_module_phase(channel, module, phase);
+        module_data[phase] = get_data_module_phase(channel, module, width, phase);
 #ifdef DEBUG_DDR5
         printf("%d:%x,", phase, module_data[phase]);
 #endif
@@ -770,7 +778,7 @@ int compare_serial(int channel, int module, uint16_t data, int inv, int select) 
 #endif
     for (bit = 0; bit < SDRAM_PHY_DQ_DQS_RATIO; ++bit) {
         for (it = 0; it < 16; ++it) {
-            _bit = (module_data[it>>1] >> (bit+((it&1)*SDRAM_PHY_DQ_DQS_RATIO))) & 1;
+            _bit = (module_data[it>>1] >> (bit+((it&1)*width))) & 1;
             if (inv & (1<<bit))
                 _bit = !_bit;
             if (_bit != ((data>>it)&1)) {
@@ -784,13 +792,13 @@ int compare_serial(int channel, int module, uint16_t data, int inv, int select) 
     return 1;
 }
 
-int compare(int channel, int module, int data0, int data1, int inv, int select) {
+int compare(int channel, int module, int width, int data0, int data1, int inv, int select) {
     uint16_t module_data[8];
     uint8_t lfsr;
     int phase;
     int bit, it, _bit;
     for (phase = 0; phase < 8; ++phase) {
-        module_data[phase] = get_data_module_phase(channel, module, phase);
+        module_data[phase] = get_data_module_phase(channel, module, width, phase);
 #ifdef DEBUG_DDR5
         printf("%d:%x,", phase, module_data[phase]);
 #endif
@@ -798,10 +806,10 @@ int compare(int channel, int module, int data0, int data1, int inv, int select) 
 #ifdef DEBUG_DDR5
     printf("\n");
 #endif
-    for (bit = 0; bit < SDRAM_PHY_DQ_DQS_RATIO; ++bit) {
+    for (bit = 0; bit < width; ++bit) {
         lfsr = (select & 1<<bit) ? data1 : data0;
         for (it = 0; it < 16; ++it) {
-            _bit = (module_data[it>>1] >> (bit+((it&1)*SDRAM_PHY_DQ_DQS_RATIO))) & 1;
+            _bit = (module_data[it>>1] >> (bit+((it&1)*width))) & 1;
             if (inv & (1<<bit))
                 _bit = !_bit;
             if (_bit != (lfsr&1)) {
@@ -818,7 +826,7 @@ int compare(int channel, int module, int data0, int data1, int inv, int select) 
 
 void cs_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, rank);
+    phy_select(channel, rank, 0);
     /* Reset CS delay */
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel)
@@ -828,13 +836,13 @@ void cs_rst(int channel, int rank, int address) {
 #else
         ddrphy_csdly_rst_write(1);
 #endif //SDRAM_PHY_SUBCHANNELS
-    phy_deselect(channel, rank);
+    phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void cs_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, rank);
+    phy_select(channel, rank, 0);
     /* Increment CS delay */
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel)
@@ -844,13 +852,13 @@ void cs_inc(int channel, int rank, int address) {
 #else
     ddrphy_csdly_inc_write(1);
 #endif //SDRAM_PHY_SUBCHANNELS
-    phy_deselect(channel, rank);
+    phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void ca_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address);
+    phy_select(channel, address, 0);
     /* Reset CA delay */
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel)
@@ -860,13 +868,13 @@ void ca_rst(int channel, int rank, int address) {
 #else
     ddrphy_cadly_rst_write(1);
 #endif //SDRAM_PHY_SUBCHANNELS
-    phy_deselect(channel, address);
+    phy_deselect(channel, address, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void ca_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address);
+    phy_select(channel, address, 0);
     /* Increment CA delay */
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel)
@@ -876,21 +884,21 @@ void ca_inc(int channel, int rank, int address) {
 #else
     ddrphy_cadly_inc_write(1);
 #endif //SDRAM_PHY_SUBCHANNELS
-    phy_deselect(channel, address);
+    phy_deselect(channel, address, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 uint16_t get_ca_dly(int channel, int rank, int address) {
     uint16_t temp;
-    phy_select(channel, address);
+    phy_select(channel, address, 0);
     temp = get_ca_dly_internal(channel);
-    phy_deselect(channel, address);
+    phy_deselect(channel, address, 0);
     return temp;
 }
 
 void par_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address);
+    phy_select(channel, address, 0);
     /* Reset PAR delay */
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel)
@@ -898,13 +906,13 @@ void par_rst(int channel, int rank, int address) {
     else
         ddrphy_A_pardly_rst_write(1);
 #endif //SDRAM_PHY_SUBCHANNELS
-    phy_deselect(channel, address);
+    phy_deselect(channel, address, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void par_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address);
+    phy_select(channel, address, 0);
     /* Reset PAR delay */
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel)
@@ -912,223 +920,238 @@ void par_inc(int channel, int rank, int address) {
     else
         ddrphy_A_pardly_inc_write(1);
 #endif //SDRAM_PHY_SUBCHANNELS
-    phy_deselect(channel, address);
+    phy_deselect(channel, address, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void ck_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address);
+    phy_select(channel, address, 0);
     /* Reset CK delay */
     ddrphy_ckdly_rst_write(1);
-    phy_deselect(channel, address);
+    phy_deselect(channel, address, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void ck_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address);
+    phy_select(channel, address, 0);
     /* Increment CK delay */
     ddrphy_ckdly_inc_write(1);
-    phy_deselect(channel, address);
+    phy_deselect(channel, address, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
-void rd_rst(int channel, int module) {
-    phy_select(channel, module);
+void rd_rst(int channel, int module, int width) {
+    phy_select(channel, module, width);
     rd_rst_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void rd_inc(int channel, int module) {
-    phy_select(channel, module);
+void rd_inc(int channel, int module, int width) {
+    phy_select(channel, module, width);
     rd_inc_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void idly_rst(int channel, int module) {
-    phy_select(channel, module);
+void idly_rst(int channel, int module, int width) {
+    phy_select(channel, module, width);
     idly_rst_internal(channel);
-    for(int i=0; i < SDRAM_PHY_DQ_DQS_RATIO; ++i) {
-        phy_dq_select(channel, i);
+    for(int i=0; i < width; ++i) {
+        phy_dq_select(channel, i, width);
         idly_dq_rst_internal(channel);
-        phy_dq_deselect(channel, i);
+        phy_dq_deselect(channel, i, width);
     }
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void idly_inc(int channel, int module) {
-    phy_select(channel, module);
+void idly_inc(int channel, int module, int width) {
+    phy_select(channel, module, width);
     idly_inc_internal(channel);
-    for(int i=0; i < SDRAM_PHY_DQ_DQS_RATIO; ++i) {
-        phy_dq_select(channel, i);
+    for(int i=0; i < width; ++i) {
+        phy_dq_select(channel, i, width);
         idly_dq_inc_internal(channel);
-        phy_dq_deselect(channel, i);
+        phy_dq_deselect(channel, i, width);
     }
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void idly_dq_rst(int channel, int module, int dq_line) {
-    phy_dq_select(channel, dq_line);
-    phy_select(channel, module);
+void idly_dq_rst(int channel, int module, int width, int dq_line) {
+    phy_dq_select(channel, dq_line, width);
+    phy_select(channel, module, width);
     idly_dq_rst_internal(channel);
-    phy_deselect(channel, module);
-    phy_dq_deselect(channel, dq_line);
+    phy_deselect(channel, module, width);
+    phy_dq_deselect(channel, dq_line, width);
 }
 
-void idly_dq_inc(int channel, int module, int dq_line) {
-    phy_dq_select(channel, dq_line);
-    phy_select(channel, module);
+void idly_dq_inc(int channel, int module, int width, int dq_line) {
+    phy_dq_select(channel, dq_line, width);
+    phy_select(channel, module, width);
     idly_dq_inc_internal(channel);
-    phy_deselect(channel, module);
-    phy_dq_deselect(channel, dq_line);
+    phy_deselect(channel, module, width);
+    phy_dq_deselect(channel, dq_line, width);
 }
 
-uint16_t get_rd_dq_dly(int channel, int module) {
+uint16_t get_rd_dq_dly(int channel, int module, int width) {
     uint16_t temp;
-    phy_select(channel, module);
+    phy_select(channel, module, width);
     temp = get_rd_dq_dly_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
     return temp;
 }
 
-uint16_t get_rd_dqs_dly(int channel, int module) {
+uint16_t get_rd_dqs_dly(int channel, int module, int width) {
     uint16_t temp;
-    phy_select(channel, module);
+    if (width == 8) {
+        module *= 2;
+    }
+    phy_select(channel, module, 4);
     temp = get_rd_dqs_dly_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
     return temp;
 }
 
-void wr_dqs_rst(int channel, int module) {
-    phy_select(channel, module);
+void wr_dqs_rst(int channel, int module, int width) {
+    phy_select(channel, module, width);
     wr_rst_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void wr_dqs_inc(int channel, int module) {
-    phy_select(channel, module);
+void wr_dqs_inc(int channel, int module, int width) {
+    phy_select(channel, module, width);
     wr_inc_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void odly_dqs_rst(int channel, int module) {
-    phy_select(channel, module);
+void odly_dqs_rst(int channel, int module, int width) {
+    phy_select(channel, module, width);
     odly_dqs_rst_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void odly_dqs_inc(int channel, int module) {
-    phy_select(channel, module);
+void odly_dqs_inc(int channel, int module, int width) {
+    phy_select(channel, module, width);
     odly_dqs_inc_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-uint16_t get_wr_dqs_dly(int channel, int module) {
+uint16_t get_wr_dqs_dly(int channel, int module, int width) {
     uint16_t temp;
-    phy_select(channel, module);
+    if (width == 8) {
+        module *= 2;
+    }
+    phy_select(channel, module, 4);
     temp = get_wr_dqs_dly_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
     return temp;
 }
 
-void wr_dq_rst(int channel, int module) {
-    phy_select(channel, module);
+void wr_dq_rst(int channel, int module, int width) {
+    phy_select(channel, module, width);
     wr_dq_rst_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void wr_dq_inc(int channel, int module) {
-    phy_select(channel, module);
+void wr_dq_inc(int channel, int module, int width) {
+    phy_select(channel, module, width);
     wr_dq_inc_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void odly_dm_rst(int channel, int module) {
-    phy_select(channel, module);
+void odly_dm_rst(int channel, int module, int width) {
+    phy_select(channel, module, width);
     odly_dm_rst_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void odly_dm_inc(int channel, int module) {
-    phy_select(channel, module);
+void odly_dm_inc(int channel, int module, int width) {
+    phy_select(channel, module, width);
     odly_dm_inc_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void odly_dq_rst(int channel, int module) {
-    phy_select(channel, module);
-    for(int i=0; i < SDRAM_PHY_DQ_DQS_RATIO; ++i) {
-        phy_dq_select(channel, i);
+void odly_dq_rst(int channel, int module, int width) {
+    phy_select(channel, module, width);
+    for(int i=0; i < width; ++i) {
+        phy_dq_select(channel, i, width);
         odly_dq_rst_internal(channel);
-        phy_dq_deselect(channel, i);
+        phy_dq_deselect(channel, i, width);
     }
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void odly_dq_inc(int channel, int module) {
-    phy_select(channel, module);
-    for(int i=0; i < SDRAM_PHY_DQ_DQS_RATIO; ++i) {
-        phy_dq_select(channel, i);
+void odly_dq_inc(int channel, int module, int width) {
+    phy_select(channel, module, width);
+    for(int i=0; i < width; ++i) {
+        phy_dq_select(channel, i, width);
         odly_dq_inc_internal(channel);
-        phy_dq_deselect(channel, i);
+        phy_dq_deselect(channel, i, width);
     }
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
 }
 
-void odly_per_dq_rst(int channel, int module, int dq) {
-    phy_select(channel, module);
-    phy_dq_select(channel, dq);
+void odly_per_dq_rst(int channel, int module, int width, int dq) {
+    phy_select(channel, module, width);
+    phy_dq_select(channel, dq, width);
     odly_dq_rst_internal(channel);
-    phy_dq_deselect(channel, dq);
-    phy_deselect(channel, module);
+    phy_dq_deselect(channel, dq, width);
+    phy_deselect(channel, module, width);
 }
 
-void odly_per_dq_inc(int channel, int module, int dq) {
-    phy_select(channel, module);
-    phy_dq_select(channel, dq);
+void odly_per_dq_inc(int channel, int module, int width, int dq) {
+    phy_select(channel, module, width);
+    phy_dq_select(channel, dq, width);
     odly_dq_inc_internal(channel);
-    phy_dq_deselect(channel, dq);
-    phy_deselect(channel, module);
+    phy_dq_deselect(channel, dq, width);
+    phy_deselect(channel, module, width);
 }
 
-uint16_t get_wr_dq_dly(int channel, int module) {
+uint16_t get_wr_dq_dly(int channel, int module, int width) {
     uint16_t temp;
-    phy_select(channel, module);
+    if (width == 8) {
+        module *= 2;
+    }
+    phy_select(channel, module, 4);
     temp = get_wr_dq_dly_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
     return temp;
 }
 
-uint16_t get_wr_dm_dly(int channel, int module) {
+uint16_t get_wr_dm_dly(int channel, int module, int width) {
     uint16_t temp;
-    phy_select(channel, module);
+    if (width == 8) {
+        module *= 2;
+    }
+    phy_select(channel, module, 4);
     temp = get_wr_dm_dly_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
     return temp;
 }
 
-int captured_preamble(int channel, int module) {
+int captured_preamble(int channel, int module, int width) {
     int temp;
-    phy_select(channel, module);
+    if (width == 8) {
+        module *= 2;
+    }
+    phy_select(channel, module, 4);
     temp = read_captured_preamble_internal(channel);
-    phy_deselect(channel, module);
+    phy_deselect(channel, module, width);
     return temp;
 }
 
-uint8_t recover_mrr_value(int channel, int module) {
+uint8_t recover_mrr_value(int channel, int module, int width) {
     uint16_t temp;
     uint8_t ret, i;
     ret = 0;
     for (i = 4; i < 8; ++i){
-        temp = get_data_module_phase(channel, module, i);
+        temp = get_data_module_phase(channel, module, width, i);
         ret |= ((temp&1) << ((i-4)*2));
-        ret |= (((temp >> SDRAM_PHY_DQ_DQS_RATIO) & 1) << ((i-4)*2 + 1));
+        ret |= (((temp >> width) & 1) << ((i-4)*2 + 1));
     }
     return ret;
 }
 
-void setup_enumerate(int channel, int rank, int module) {
+void setup_enumerate(int channel, int rank, int module, int width) {
     int module_, i;
 #ifdef SDRAM_PHY_SUBCHANNELS
     for (module_ = 0; module_ < SDRAM_PHY_MODULES/2; module_++) {
@@ -1136,10 +1159,10 @@ void setup_enumerate(int channel, int rank, int module) {
     for (module_ = 0; module_ < SDRAM_PHY_MODULES; module_++) {
 #endif // SDRAM_PHY_SUBCHANNELS
         for (i = 0; i < 4; ++i)
-            set_data_module_phase(channel, module_, i, 0xffff);
+            set_data_module_phase(channel, module_, width, i, 0xffff);
     }
     for (i = 0; i < 4; ++i)
-        set_data_module_phase(channel, module, i, 0);
+        set_data_module_phase(channel, module, width, i, 0);
     cmd_injector(channel, 0xf, 0, 0, 1, 0, 0, 0);
     store_continuous(channel);
     cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
@@ -1485,22 +1508,22 @@ void enter_write_leveling(int channel) {
 #endif
 }
 
-int wr_dqs_check_if_works(int channel, int rank, int module) {
+int wr_dqs_check_if_works(int channel, int rank, int module, int width) {
     send_wleveling_write(channel, rank);
-    return wleveling_sample(channel, module);
+    return wleveling_sample(channel, module, width);
 }
 
-void wleveling_scan(int channel, int rank, int module, eye_t *eye) {
+void wleveling_scan(int channel, int rank, int module, int width, eye_t *eye) {
     int works, delay;
 
-    odly_dqs_rst(channel, module);
+    odly_dqs_rst(channel, module, width);
     for(delay = 0; delay < SDRAM_PHY_DELAYS; ++delay) {
         works = 1;
 
         // Check multiple times, as we can be on the edge of transition
         // Make sure we aren't in meta stable delay
         for (int i = 0; i < 16; i++) {
-            works &= wr_dqs_check_if_works(channel, rank, module);
+            works &= wr_dqs_check_if_works(channel, rank, module, width);
         }
 
         printf("%d", works);
@@ -1509,7 +1532,7 @@ void wleveling_scan(int channel, int rank, int module, eye_t *eye) {
             eye->state = INSIDE;
         }
 
-        odly_dqs_inc(channel, module);
+        odly_dqs_inc(channel, module, width);
     }
 }
 

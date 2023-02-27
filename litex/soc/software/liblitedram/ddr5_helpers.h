@@ -43,19 +43,19 @@ void cmd_injector(int channel, int phases, int cs, int command,
 void setup_rddata_cnt(int channel, int value);
 void store_continuous(int channel);
 void issue_single(int channel);
-uint16_t get_data_module_phase(int channel, int module, int phase);
-void set_data_module_phase(int channel, int module, int phase, uint16_t wrdata);
+uint16_t get_data_module_phase(int channel, int module, int width, int phase);
+void set_data_module_phase(int channel, int module, int width, int phase, uint16_t wrdata);
 
 void setup_capture(int channel, int setup);
 void start_capture(int channel);
 void stop_capture(int channel);
 uint32_t capture_and_reduce_result(int channel, int operation);
-uint32_t capture_and_reduce_module(int channel, int module, int operation);
+uint32_t capture_and_reduce_module(int channel, int module, int width, int operation);
 int or_sample(int channel);
 int and_sample(int channel);
-int wleveling_sample(int channel, int module);
+int wleveling_sample(int channel, int module, int width);
 
-void read_registers(int channel, int rank, int module);
+void read_registers(int channel, int rank, int module, int width);
 
 void enable_dfi_2n_mode(void);
 void disable_dfi_2n_mode(void);
@@ -80,45 +80,45 @@ void par_rst(int channel, int rank, int address);
 void par_inc(int channel, int rank, int address);
 
 uint8_t lfsr_next(uint8_t input);
-int compare_serial(int channel, int module,
+int compare_serial(int channel, int module, int width,
                    uint16_t data,
                    int inv, int select);
-int compare(int channel, int module,
+int compare(int channel, int module, int width,
             int data0, int data1,
             int inv, int select);
 
-void rd_rst(int channel, int module);
-void rd_inc(int channel, int module);
-void idly_rst(int channel, int module);
-void idly_inc(int channel, int module);
-void idly_dq_rst(int channel, int module, int dq_line);
-void idly_dq_inc(int channel, int module, int dq_line);
+void rd_rst(int channel, int module, int width);
+void rd_inc(int channel, int module, int width);
+void idly_rst(int channel, int module, int width);
+void idly_inc(int channel, int module, int width);
+void idly_dq_rst(int channel, int module, int dq_line, int width);
+void idly_dq_inc(int channel, int module, int dq_line, int width);
 
-uint16_t get_rd_dq_dly(int channel, int module);
-uint16_t get_rd_dqs_dly(int channel, int module);
+uint16_t get_rd_dq_dly(int channel, int module, int width);
+uint16_t get_rd_dqs_dly(int channel, int module, int width);
 
-void wr_dqs_rst(int channel, int module);
-void wr_dqs_inc(int channel, int module);
-void odly_dqs_rst(int channel, int module);
-void odly_dqs_inc(int channel, int module);
+void wr_dqs_rst(int channel, int module, int width);
+void wr_dqs_inc(int channel, int module, int width);
+void odly_dqs_rst(int channel, int module, int width);
+void odly_dqs_inc(int channel, int module, int width);
 
-uint16_t get_wr_dqs_dly(int channel, int module);
+uint16_t get_wr_dqs_dly(int channel, int module, int width);
 
-void wr_dq_rst(int channel, int module);
-void wr_dq_inc(int channel, int module);
-void odly_dm_rst(int channel, int module);
-void odly_dm_inc(int channel, int module);
-void odly_dq_rst(int channel, int module);
-void odly_dq_inc(int channel, int module);
-void odly_per_dq_rst(int channel, int module, int dq);
-void odly_per_dq_inc(int channel, int module, int dq);
+void wr_dq_rst(int channel, int module, int width);
+void wr_dq_inc(int channel, int module, int width);
+void odly_dm_rst(int channel, int module, int width);
+void odly_dm_inc(int channel, int module, int width);
+void odly_dq_rst(int channel, int module, int width);
+void odly_dq_inc(int channel, int module, int width);
+void odly_per_dq_rst(int channel, int module, int width, int dq);
+void odly_per_dq_inc(int channel, int module, int width, int dq);
 
-uint16_t get_wr_dq_dly(int channel, int module);
-uint16_t get_wr_dm_dly(int channel, int module);
+uint16_t get_wr_dq_dly(int channel, int module, int width);
+uint16_t get_wr_dm_dly(int channel, int module, int width);
 
-int captured_preamble(int channel, int module);
-uint8_t recover_mrr_value(int channel, int module);
-void setup_enumerate(int channel, int rank, int module);
+int captured_preamble(int channel, int module, int width);
+uint8_t recover_mrr_value(int channel, int module, int width);
+void setup_enumerate(int channel, int rank, int module, int width);
 void send_mpc(int channel, int rank, int cmd);
 void send_mrw(int channel, int rank, int module, int reg, int value);
 void send_mrr(int channel, int rank, int reg);
@@ -139,8 +139,8 @@ int ca_check_if_works(int channel, int rank, int address, int cs_dly);
 
 void enter_write_leveling(int channel);
 void exit_write_leveling(int channel);
-int wr_dqs_check_if_works(int channel, int rank, int module);
-void wleveling_scan(int channel, int rank, int module, eye_t *eye_state);
+int wr_dqs_check_if_works(int channel, int rank, int module, int width);
+void wleveling_scan(int channel, int rank, int module, int width, eye_t *eye_state);
 
 #if defined(CONFIG_HAS_I2C)
 uint8_t get_rcd_id(int rank);
