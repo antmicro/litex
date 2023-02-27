@@ -46,6 +46,8 @@ void issue_single(int channel);
 uint16_t get_data_module_phase(int channel, int module, int width, int phase);
 void set_data_module_phase(int channel, int module, int width, int phase, uint16_t wrdata);
 
+void enable_phy(void);
+
 void setup_capture(int channel, int setup);
 void start_capture(int channel);
 void stop_capture(int channel);
@@ -139,6 +141,7 @@ int ca_check_if_works(int channel, int rank, int address, int cs_dly);
 
 void enter_write_leveling(int channel);
 void exit_write_leveling(int channel);
+void clear_phy_fifos(int channel);
 int wr_dqs_check_if_works(int channel, int rank, int module, int width);
 void wleveling_scan(int channel, int rank, int module, int width, eye_t *eye_state);
 

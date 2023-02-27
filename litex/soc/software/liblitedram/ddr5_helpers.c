@@ -158,12 +158,14 @@ uint16_t get_data_module_phase(int channel, int module, int width, int phase) {
     csr_rd_buf_uint8(CSR_SDRAM_DFII_CMDINJECTOR_RDDATA_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
 #endif
     // CSR are read as BIG Endian
-    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4);
-    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4) + (width/8);
-
-    ibo = 0; // Non zero only if x4 ICs are used
+    ibo      = (width*module) & 0x7;
+    byte_off = (width*module) >> 3;
+    pebo = DFII_CMDINJECTOR_DATA_BYTES - 1 - byte_off;
     ret_value |= (data[pebo] >> ibo) & die_mask;
-    ibo = (0x4*(width/4)) % 8;
+
+    ibo      = (width*module + SUBCHANNEL_WIDTH) & 0x7;
+    byte_off = (width*module + SUBCHANNEL_WIDTH) >> 3;
+    nebo = DFII_CMDINJECTOR_DATA_BYTES - 1 - byte_off;
     ret_value |= ((data[nebo] >> ibo) & die_mask) << width;
     return ret_value;
 }
@@ -189,12 +191,15 @@ void set_data_module_phase(int channel, int module, int width, int phase, uint16
 #endif
 
     // CSR are read as BIG Endian
-    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4);
-    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4) + (width/8);
-    ibo = 0; // Non zero only if x4 ICs are used
-    data[pebo] = (data[pebo]&(~die_mask)) | (wrdata & die_mask);
-    ibo = (0x4*(width/4)) % 8;
-    data[nebo] = (data[nebo]&(~(die_mask << ibo))) | ((wrdata >> 8*(width/8)) & (die_mask << ibo));
+    ibo      = (width*module) & 0x7;
+    byte_off = (width*module) >> 3;
+    pebo = DFII_CMDINJECTOR_DATA_BYTES - 1 - byte_off;
+    data[pebo] = (data[pebo]&((uint8_t)(~die_mask) >> ibo)) | ((wrdata & die_mask) << ibo);
+
+    ibo      = (width*module + SUBCHANNEL_WIDTH) & 0x7;
+    byte_off = (width*module + SUBCHANNEL_WIDTH) >> 3;
+    nebo = DFII_CMDINJECTOR_DATA_BYTES - 1 - byte_off;
+    data[nebo] = (data[nebo]&((uint8_t)(~die_mask) >> ibo)) | (((wrdata >> width) & die_mask) << ibo);
 
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel) {
@@ -212,6 +217,10 @@ void set_data_module_phase(int channel, int module, int width, int phase, uint16
     sdram_dfii_cmdinjector_wrdata_store_write(1);
 #endif
     return;
+}
+
+void enable_phy(void) {
+    ddrphy_CSRModule_enable_fifos_write(1);
 }
 
 void setup_capture(int channel, int setup) {
@@ -303,12 +312,14 @@ uint32_t capture_and_reduce_module(int channel, int module, int width, int opera
 #endif
     ret_value = 0;
     // CSR are read as BIG Endian
-    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4);
-    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4) + (width/8);
-
-    ibo = 0; // Non zero only if x4 ICs are used
+    ibo      = (width*module) & 0x7;
+    byte_off = (width*module) >> 3;
+    pebo = DFII_CMDINJECTOR_DATA_BYTES - 1 - byte_off;
     ret_value |= (data[pebo] >> ibo) & die_mask;
-    ibo = (0x4*(width/4)) % 8;
+
+    ibo      = (width*module + SUBCHANNEL_WIDTH) & 0x7;
+    byte_off = (width*module + SUBCHANNEL_WIDTH) >> 3;
+    nebo = DFII_CMDINJECTOR_DATA_BYTES - 1 - byte_off;
     ret_value |= ((data[nebo] >> ibo) & die_mask) << width;
     if(operation) {
         ret_value &= ret_value >> (8 * (width/8));
@@ -387,6 +398,10 @@ void disable_dram_2n_mode(int channel, int rank) {
 
 static void phy_select(int channel, int select, int width) {
     int mask = 1;
+    if (width == 8) {
+        mask = 3;
+        select *= 2;
+    }
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         ddrphy_CSRModule_B_dly_sel_write(mask<<select);
@@ -1556,6 +1571,28 @@ void exit_write_leveling(int channel) {
 #endif
 }
 
+void clear_phy_fifos(int channel) {
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        ddrphy_CSRModule_B_discard_rd_fifo_write(1);
+    } else {
+        ddrphy_CSRModule_A_discard_rd_fifo_write(1);
+    }
+#else
+    ddrphy_CSRModule_discard_rd_fifo_write(1);
+#endif
+    cdelay(1000);
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        ddrphy_CSRModule_B_discard_rd_fifo_write(0);
+    } else {
+        ddrphy_CSRModule_A_discard_rd_fifo_write(0);
+    }
+#else
+    ddrphy_CSRModule_discard_rd_fifo_write(0);
+#endif
+}
+
 /*-----------------------------------------------------------------------*/
 /* RCD Training Helpers                                                  */
 /*-----------------------------------------------------------------------*/
@@ -1564,7 +1601,7 @@ void exit_write_leveling(int channel) {
 
 /**
  * get_rcd_id
- * 
+ *
  * Calculates RCDs slave id based on the rank number.
  */
 uint8_t get_rcd_id(int rank) {

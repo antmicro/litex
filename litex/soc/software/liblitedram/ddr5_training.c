@@ -1010,6 +1010,7 @@ static void exit_wltm(int channel, int rank) {
     send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing);
 
     exit_write_leveling(channel);
+    clear_phy_fifos(channel);
 }
 
 /**
@@ -1702,9 +1703,11 @@ static void rcd_init(void) {
  */
 void sdram_ddr5_flow(void) {
     training_ctx_t *base_ctx = &host_dram_ctx;
+    enable_phy();
     reset_sequence();
 
 #if defined(CONFIG_HAS_I2C)
+    // TODO: read SPD die width
     bool is_rdimm = read_module_type(0) == RDIMM;
 
     if (is_rdimm) {
