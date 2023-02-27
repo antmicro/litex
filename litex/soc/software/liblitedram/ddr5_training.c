@@ -1715,7 +1715,7 @@ void sdram_ddr5_flow(void) {
     }
 #endif // defined(CONFIG_HAS_I2C)
 
-    setup_dram_mrs_sequence();
+    //setup_dram_mrs_sequence();
 
     sdram_ddr5_module_enumerate(base_ctx);
 
