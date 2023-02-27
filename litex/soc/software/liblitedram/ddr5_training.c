@@ -1080,24 +1080,26 @@ static int wltm_align_external_cycle(int channel, int rank, int module) {
  * Sets write DQS cycle delay to the value of transition cycle and scans
  * output delays until it finds the first one that works.
  */
-static int wltm_align_to_eye_edge(int channel, int rank, int module, int transition_cycle) {
+static int wltm_align_to_eye_edge(int channel, int rank, int module, int *transition_cycle) {
     int wr_dqs_cycle_dly;
     eye_t eye = DEFAULT_EYE;
 
     wr_dqs_rst(channel, module);
-    for (wr_dqs_cycle_dly = 0; wr_dqs_cycle_dly < transition_cycle; wr_dqs_cycle_dly++)
+    for (wr_dqs_cycle_dly = 0; wr_dqs_cycle_dly < *transition_cycle; wr_dqs_cycle_dly++)
         wr_dqs_inc(channel, module);
 
     printf("DQS edge scan:\n");
 
     // Break out when 0 to 1 transition was found
-    for (wr_dqs_cycle_dly = transition_cycle; wr_dqs_cycle_dly < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE; wr_dqs_cycle_dly++) {
-        printf("%2d|", wr_dqs_cycle_dly);
+    for (; *transition_cycle < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE; (*transition_cycle)++) {
+        printf("%2d|", *transition_cycle);
         wleveling_scan(channel, rank, module, &eye);
         printf("|\n");
 
         wr_dqs_inc(channel, module);
     }
+    // One loop add too much
+    (*transition_cycle) -= 1;
 
     return eye.start;
 }
@@ -1195,7 +1197,7 @@ static void write_leveling(int channel, int rank, int module) {
     // We found the cycle using output delay of 0, so we need to go one
     // cycle back first.
     transition_cycle -= 1;
-    int transition_delay = wltm_align_to_eye_edge(channel, rank, module, transition_cycle);
+    int transition_delay = wltm_align_to_eye_edge(channel, rank, module, &transition_cycle);
 
 #ifdef INFO_DDR5
     printf("cycle:%2d delay:%2d\n", transition_cycle, transition_delay);
@@ -1239,7 +1241,7 @@ static void write_leveling(int channel, int rank, int module) {
     // This is the upper part of the third column of the Internal Write Leveling
     // flowchart (JESD79-5A Figure 92).
     transition_cycle -= 1;
-    transition_delay = wltm_align_to_eye_edge(channel, rank, module, transition_cycle);
+    transition_delay = wltm_align_to_eye_edge(channel, rank, module, &transition_cycle);
 
     // Just like at the beginning of the Internal Write Leveling,
     // we need to adjust the DQS delay based on write preamble length.
