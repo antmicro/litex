@@ -110,7 +110,8 @@ static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* lef
         if (works && eye.state == BEFORE) {
             eye.start = csdly;
             eye.state = INSIDE;
-        } else if ((!works || csdly == SDRAM_PHY_DELAYS - 1) && eye.state == INSIDE) {
+        }
+        if ((!works || csdly == SDRAM_PHY_DELAYS - 1) && eye.state == INSIDE) {
             eye.end = csdly;
             eye.state = AFTER;
         }
@@ -258,7 +259,8 @@ static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t 
         if (works && eye.state == BEFORE) {
             eye.start = cadly;
             eye.state = INSIDE;
-        } else if ((!works || cadly == SDRAM_PHY_DELAYS - 1) && eye.state == INSIDE) {
+        }
+        if ((!works || cadly == SDRAM_PHY_DELAYS - 1) && eye.state == INSIDE) {
             eye.end = cadly;
             eye.state = AFTER;
         }
@@ -1304,7 +1306,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                 printf("m%2d|\n", module);
                 cycle = 0;
                 got = 0;
-                start_cycle = -1; start_delay = 1;
+                start_cycle = -1; start_delay = -1;
                 end_cycle = -1; end_delay = -1;
                 printf("Data scan:\n");
                 while (got != 2 && cycle < 65) {
