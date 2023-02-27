@@ -13,36 +13,44 @@
 static int N2_mode = 1;
 extern int enumerated;
 
-int prep_payload (int cs, int command, int wrdata_en,
-                  uint32_t wrdata_mask, int rddata_en) {
-    int payload;
-#ifdef SDRAM_PHY_SUBCHANNELS
-    payload = cs << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_CS_OFFSET | \
-              command << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_CA_OFFSET | \
-              wrdata_en << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_WRDATA_EN_OFFSET | \
-              (wrdata_mask & WRDATA_BITMASK) << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_WRDATA_MASK_OFFSET | \
-              rddata_en << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_RDDATA_EN_OFFSET;
-#else
-    payload = cs << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_CS_OFFSET | \
-              command << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_CA_OFFSET | \
-              wrdata_en << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_WRDATA_EN_OFFSET | \
-              (wrdata_mask & WRDATA_BITMASK) << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_WRDATA_MASK_OFFSET | \
-              rddata_en << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_RDDATA_EN_OFFSET;
-#endif
-    return payload;
-}
-
-void upload_payload(int channel, int phases, int payload) {
+void prep_payload(int channel, int cs, int command, int wrdata_en,
+                  uint64_t wrdata_mask, int rddata_en) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        sdram_dfii_b_cmdinjector_command_storage_write(payload);
+        sdram_dfii_b_cmdinjector_command_storage_write(
+            command << CSR_SDRAM_DFII_B_CMDINJECTOR_COMMAND_STORAGE_CA_OFFSET |
+            cs << CSR_SDRAM_DFII_B_CMDINJECTOR_COMMAND_STORAGE_CS_OFFSET |
+            wrdata_en << CSR_SDRAM_DFII_B_CMDINJECTOR_COMMAND_STORAGE_WRDATA_EN_OFFSET |
+            rddata_en << CSR_SDRAM_DFII_B_CMDINJECTOR_COMMAND_STORAGE_RDDATA_EN_OFFSET
+        );
+        sdram_dfii_b_cmdinjector_command_storage_wr_mask_write(wrdata_mask);
+    } else {
+        sdram_dfii_a_cmdinjector_command_storage_write(
+            command << CSR_SDRAM_DFII_B_CMDINJECTOR_COMMAND_STORAGE_CA_OFFSET |
+            cs << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_CS_OFFSET |
+            wrdata_en << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_WRDATA_EN_OFFSET |
+            rddata_en << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_RDDATA_EN_OFFSET
+        );
+        sdram_dfii_a_cmdinjector_command_storage_wr_mask_write(wrdata_mask);
+    }
+#else
+    sdram_dfii_cmdinjector_command_storage_write(
+        command | cs << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_CS_OFFSET |
+        wrdata_en << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_WRDATA_EN_OFFSET |
+        rddata_en << CSR_SDRAM_DFII_CMDINJECTOR_COMMAND_STORAGE_RDDATA_EN_OFFSET
+    );
+    sdram_dfii_cmdinjector_command_storage_wr_mask_write(wrdata_mask);
+#endif
+}
+
+void upload_payload(int channel, int phases) {
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
         sdram_dfii_b_cmdinjector_phase_addr_write(phases);
     } else {
-        sdram_dfii_a_cmdinjector_command_storage_write(payload);
         sdram_dfii_a_cmdinjector_phase_addr_write(phases);
     }
 #else
-    sdram_dfii_cmdinjector_command_storage_write(payload);
     sdram_dfii_cmdinjector_phase_addr_write(phases);
 #endif
 }
@@ -69,9 +77,9 @@ void store_payload(int channel, int single) {
 }
 
 void cmd_injector(int channel, int phases, int cs, int command,
-                  int wrdata_en, uint32_t wrdata_mask, int rddata_en, int single) {
-    int payload = prep_payload(cs, command, wrdata_en, wrdata_mask, rddata_en);
-    upload_payload(channel, phases, payload);
+                  int wrdata_en, uint64_t wrdata_mask, int rddata_en, int single) {
+    prep_payload(channel, cs, command, wrdata_en, wrdata_mask, rddata_en);
+    upload_payload(channel, phases);
     store_payload(channel, single);
 }
 

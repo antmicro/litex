@@ -34,12 +34,12 @@ typedef struct {
 // 0xf addresses all DRAM modules on selected rank
 #define MODULE_BROADCAST (0xf)
 
-int prep_payload (int cs, int command, int wrdata_en,
-                  uint32_t wrdata_mask, int rddata_en);
-void upload_payload(int channel, int phases, int payload);
+void prep_payload(int channel, int cs, int command, int wrdata_en,
+                  uint64_t wrdata_mask, int rddata_en);
+void upload_payload(int channel, int phases);
 void store_payload(int channel, int single);
 void cmd_injector(int channel, int phases, int cs, int command,
-                  int wrdata_en, uint32_t wrdata_mask, int rddata_en, int single);
+                  int wrdata_en, uint64_t wrdata_mask, int rddata_en, int single);
 void setup_rddata_cnt(int channel, int value);
 void store_continuous(int channel);
 void issue_single(int channel);
