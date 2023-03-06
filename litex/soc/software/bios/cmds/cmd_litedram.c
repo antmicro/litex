@@ -595,10 +595,10 @@ static void sdram_rcd_write_handler(int nb_params, char **params)
 	}
 
 	const uint8_t data_array[4] = {
-		EXTRACT_BYTE(data, 3),
-		EXTRACT_BYTE(data, 2),
-		EXTRACT_BYTE(data, 1),
 		EXTRACT_BYTE(data, 0),
+		EXTRACT_BYTE(data, 1),
+		EXTRACT_BYTE(data, 2),
+		EXTRACT_BYTE(data, 3),
 	};
 
 	if (!sdram_rcd_write(rcd, 0, function, page_num, reg_num, data_array, size, byte_write)) {
