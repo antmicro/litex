@@ -480,15 +480,15 @@ static void sdram_rcd_read_handler(int nb_params, char **params)
 		return;
 	}
 
-	reg_num = strtoul(params[1], &c, 0);
+	page_num = strtoul(params[1], &c, 0);
 	if (*c != 0) {
-		printf("Incorrect register number");
+		printf("Incorrect page number");
 		return;
 	}
 
-	page_num = strtoul(params[2], &c, 0);
+	reg_num = strtoul(params[2], &c, 0);
 	if (*c != 0) {
-		printf("Incorrect page number");
+		printf("Incorrect register number");
 		return;
 	}
 
@@ -557,15 +557,15 @@ static void sdram_rcd_write_handler(int nb_params, char **params)
 		return;
 	}
 
-	reg_num = strtoul(params[1], &c, 0);
+	page_num = strtoul(params[1], &c, 0);
 	if (*c != 0) {
-		printf("Incorrect register number");
+		printf("Incorrect page number");
 		return;
 	}
 
-	page_num = strtoul(params[2], &c, 0);
+	reg_num = strtoul(params[2], &c, 0);
 	if (*c != 0) {
-		printf("Incorrect page number");
+		printf("Incorrect register number");
 		return;
 	}
 
