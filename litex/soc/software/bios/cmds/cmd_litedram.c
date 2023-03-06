@@ -521,8 +521,11 @@ static void sdram_rcd_read_handler(int nb_params, char **params)
 	if (status & 0x10)
 		printf("Status byte reported internal target abort\n");
 
-	dump_bytes((unsigned int *) &data[1], 4, (page_num << 8) | reg_num);
-
+	reg_num &= 0xfffffffc; // reads are aligned to 4 bytes
+	printf("Page: 0x%02x\n", page_num);
+	for (int i = 0; i < 4; i++) {
+		printf("RW%02X: 0x%02x\n", reg_num + i, data[i + 1]);
+	}
 }
 define_command(sdram_rcd_read, sdram_rcd_read_handler, "Read from SDRAM RCD", LITEDRAM_CMDS);
 
