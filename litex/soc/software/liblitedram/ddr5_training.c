@@ -1715,6 +1715,10 @@ static uint8_t read_module_width(uint8_t spd) {
 }
 
 static void rcd_init(training_ctx_t *ctx) {
+    // Issue a VR_ENABLE command to the PMIC
+    uint8_t cmd = 0xa0;
+    i2c_write(0x48, 0x32, &cmd, 1, 1); // FIXME: this should be sent to all PMICs
+
     // FIXME: this function should initialize all RCDs
     rcd_set_dca_rate(0, 0, DDR);
     rcd_set_dimm_operating_speed(0, 0, -1);
@@ -1753,6 +1757,7 @@ void sdram_ddr5_flow(void) {
     // rcd_dram_ctx.die_width = die_width; // TODO: uncomment when RCD->DRAM training is implemented
 
     if (is_rdimm) {
+        printf("Detected RDIMM. Initializing RCD and running Host->RCD training\n");
         rcd_init(&host_rcd_ctx);
         // base_ctx = &rcd_dram_ctx; // TODO: uncomment when RCD->DRAM training is implemented
     }
