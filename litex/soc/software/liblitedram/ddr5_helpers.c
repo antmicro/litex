@@ -1716,6 +1716,85 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
         printf("There was a problem with setting DIMM speed in the RCD\n");
 }
 
+/**
+ * rcd_clear_qrst
+ *
+ * Clears DRAMs QRST signal.
+ */
+void rcd_clear_qrst(int channel, int rank) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+
+    // we send Clear CH_[AB]_DRAM Reset commands (CMD6 or CMD8)
+    // to the RW04 register (JESD82-511 8.6.5)
+    uint8_t cmd = 6 + (2 * channel);
+
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 4, &cmd, 1, false);
+
+    if (!ok)
+        printf("There was a problem with clearing DRAM reset for channel %c\n", 'A'+channel);
+}
+
+/**
+ * rcd_forward_all_dram_cmds
+ *
+ * Sets "DRAM Interface Forward All CMDs" field of RCDs RW01 register.
+ *
+ * After Host->RCD training is complete, command blocking in the RCD
+ * shall be disabled. It's a part of RCD initialization sequence.
+ * JESD82-511 3.8 Figure 23
+ */
+void rcd_forward_all_dram_cmds(int channel, int rank, bool forward) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+
+    uint8_t rw_data[4];
+
+    // we need to modify RW01[1]
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+
+    rw_data[1] &= ~(0b1 << 1);          // clear last setting
+    rw_data[1] |= (0b1 & forward << 1); // and set a new one
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, 1, &rw_data[1], 1, false);
+
+    if (!ok)
+        printf("There was a problem with changing CMD blocking in the RCD\n");
+}
+
+/**
+ * rcd_release_qcs
+ *
+ * Releases QCS signals for a selected channel.
+ *
+ * When `sideband` is true, it will send CMD14 or CMD15
+ * to RW04 of the RCD.
+ * When `sideband` is false, it will send a single NOP
+ * on the DCS/DCA interface.
+ *
+ * It's a part of RCD initialization sequence.
+ * JESD82-511 3.8 Figure 23
+ */
+void rcd_release_qcs(int channel, int rank, bool sideband) {
+    if (sideband) {
+        bool ok = true;
+        uint8_t rcd = get_rcd_id(rank);
+
+        // we send CH_[AB]_QCS_HIGH commands (CMD14 or CMD15)
+        // to the RW04 register (JESD82-511 8.6.5)
+        uint8_t cmd = 14 + !!channel;
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, 4, &cmd, 1, false);
+
+        if (!ok)
+            printf("There was a problem with releasing the QCS for channel %c\n", 'A'+channel);
+    } else {
+        cmd_injector(channel, 0x01, 1<<rank, 0x1f, 0, 0, 0, 1);
+        issue_single(channel);
+        cdelay(10);
+    }
+}
+
 /*-----------------------------------------------------------------------*/
 /* Host->RCD CS Training (DCSTM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
@@ -1965,6 +2044,50 @@ void exit_dcatm(int channel, int rank) {
 }
 
 /**
+ * dca_sample_prep
+ *
+ * Alternative implementation for ca_sample_prep to use
+ * in Host->RCD DCA training.
+ *
+ * CA is being sent in 7-bit halves and ca_sample_prep
+ * only sets values for selected address, so a sample DCA
+ * state could look like the one below:
+ *
+ *  CA[x]   | 1 1 0 1  1 1 0 1  |
+ *  CA[x+7] |  0 0 0 0  0 0 0 0 |
+ * DCA[x]   | 10100010 10100010 |
+ *
+ * This completely prevents transition detection.
+ * That's why this function sets the default state for CA
+ * from the other half as well.
+ * This way, DCA can look like this:
+ *
+ *  CA[x]   | 1 1 0 1  1 1 0 1  |
+ *  CA[x+7] |  1 1 1 1  1 1 1 1 |
+ * DCA[x]   | 11110111 11110111 |
+ */
+static void dca_sample_prep(int channel, int rank, int address, int l2h, int phase_shift) {
+    int address_other_half = (address + 7) % 14;
+
+    // state where all CA bits have the same value
+    int default_state = (!l2h) << address | (!l2h) << address_other_half;
+
+    // state where only the selected `address` bit is negated
+    int negated_state =   l2h  << address | (!l2h) << address_other_half;
+
+    cmd_injector(    channel, 0xf,              0,       default_state, 0, 0, 1, 0);
+
+    if (phase_shift == 0) {
+        cmd_injector(channel, 0x1,              1<<rank, negated_state, 0, 0, 1, 0);
+    } else {
+        cmd_injector(channel, 0x1,              0,       negated_state, 0, 0, 1, 0);
+        cmd_injector(channel, 0x1<<phase_shift, 1<<rank, default_state, 0, 0, 1, 0);
+    }
+    store_continuous(channel);
+    cdelay(50);
+}
+
+/**
  * dca_check_if_works
  *
  * Checks if during DCATM, DCA and DCS signals are aligned.
@@ -1995,12 +2118,12 @@ int dca_check_if_works(int channel, int rank, int address, int phase_shift) {
 
     // Test change from low to high
     ddrphy_CSRModule_alert_reduce_write(1); // write 1 to reduce with AND
-    ca_sample_prep(channel, rank, address, 1, phase_shift);
+    dca_sample_prep(channel, rank, address, 1, phase_shift);
     ok = ddrphy_CSRModule_alert_read();
 
     // Test change from high to low
     ddrphy_CSRModule_alert_reduce_write(0); // write 0 to reduce with OR
-    ca_sample_prep(channel, rank, address, 0, phase_shift);
+    dca_sample_prep(channel, rank, address, 0, phase_shift);
     ok &= !ddrphy_CSRModule_alert_read();
 
     return ok;

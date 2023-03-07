@@ -298,14 +298,22 @@ static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) 
 
 static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
     int left_side, right_side;
-    int32_t rank, address;
+    int32_t rank, address, start_address, end_address;
 
     for (rank = 0; rank < ctx->ranks; rank++) {
         printf("Rank:%2"PRId32"\n", rank);
         // Enter CA training
         ctx->ca.enter_training_mode(channel, rank);
 
-        for (address = 0; address < ctx->ca.line_count; address++) {
+        if (ctx->training_type == HOST_RCD) {
+            start_address = channel * 7;     // Select between DCAy_A and DCAy_B
+            end_address = (channel + 1) * 7; // RDIMM always have 14 DCA lines
+        } else {
+            start_address = 0;
+            end_address = ctx->ca.line_count;
+        }
+
+        for (address = start_address; address < end_address; address++) {
 #if defined(CONFIG_HAS_I2C)
             if (ctx->training_type == HOST_RCD) {
                 if (address < ctx->ca.line_count / 2) {
@@ -1069,29 +1077,32 @@ static int wltm_align_external_cycle(int channel, int rank, int module, int widt
  * Scans output delays of the DQS signals to find the eye's edge.
  * It is used in both, External and Internal Write Leveling procedures.
  *
+ * Pulls transition cycle back as we could
  * Sets write DQS cycle delay to the value of transition cycle and scans
  * output delays until it finds the first one that works.
  */
 static int wltm_align_to_eye_edge(int channel, int rank, int module, int width, int *transition_cycle) {
-    int wr_dqs_cycle_dly;
     eye_t eye = DEFAULT_EYE;
 
+    // Passed transition_cycle could have been working with output delay 0.
+    // We found the cycle using output delay of 0, so we need to go one
+    // cycle back first.
+    *transition_cycle -= 1;
+
     wr_dqs_rst(channel, module, width);
-    for (wr_dqs_cycle_dly = 0; wr_dqs_cycle_dly < *transition_cycle; wr_dqs_cycle_dly++)
+    for (int wr_dqs_cycle_dly = 0; wr_dqs_cycle_dly < *transition_cycle; wr_dqs_cycle_dly++)
         wr_dqs_inc(channel, module, width);
 
     printf("DQS edge scan:\n");
 
-    // Break out when 0 to 1 transition was found
-    for (; *transition_cycle < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE; (*transition_cycle)++) {
+    do {
         printf("%2d|", *transition_cycle);
         wleveling_scan(channel, rank, module, width, &eye);
         printf("|\n");
 
         wr_dqs_inc(channel, module, width);
-    }
-    // One loop add too much
-    (*transition_cycle) -= 1;
+        (*transition_cycle)++;
+    } while (*transition_cycle < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE);
 
     return eye.start;
 }
@@ -1186,9 +1197,6 @@ static void write_leveling(int channel, int rank, int module, int width) {
         transition_cycle, transition_cycle + SDRAM_PHY_MIN_WR_LATENCY);
 
     // After finding the transition cycle, we search for the eye's edge.
-    // We found the cycle using output delay of 0, so we need to go one
-    // cycle back first.
-    transition_cycle -= 1;
     int transition_delay = wltm_align_to_eye_edge(channel, rank, module, width, &transition_cycle);
 
 #ifdef INFO_DDR5
@@ -1232,7 +1240,6 @@ static void write_leveling(int channel, int rank, int module, int width) {
     // After finding a correct WICA setting, we need to once again find the eye's edge.
     // This is the upper part of the third column of the Internal Write Leveling
     // flowchart (JESD79-5A Figure 92).
-    transition_cycle -= 1;
     transition_delay = wltm_align_to_eye_edge(channel, rank, module, width, &transition_cycle);
 
     // Just like at the beginning of the Internal Write Leveling,
@@ -1686,10 +1693,45 @@ static enum module_type read_module_type(uint8_t spd) {
     return module_type & 0x0f;
 }
 
-static void rcd_init(void) {
+static uint8_t read_module_width(uint8_t spd) {
+    uint8_t buf;
+
+    // Module width is stored in SPD[6][7:5]
+    //     000: x4
+    //     001: x8
+    //     010: x16
+    //     011: x32
+
+    if (!sdram_read_spd(spd, 6, &buf, 1, false)) {
+        printf("Couldn't read module width from the SPD, defaulting to x%d.\n", SDRAM_PHY_DQ_DQS_RATIO);
+        return SDRAM_PHY_DQ_DQS_RATIO;
+    }
+
+    // minimal supported is x4
+    uint8_t shift = (buf & 0xe0) >> 5;
+    uint8_t module_width = 4 << shift;
+
+    return module_width;
+}
+
+static void rcd_init(training_ctx_t *ctx) {
+    // Issue a VR_ENABLE command to the PMIC
+    uint8_t cmd = 0xa0;
+    i2c_write(0x48, 0x32, &cmd, 1, 1); // FIXME: this should be sent to all PMICs
+
     // FIXME: this function should initialize all RCDs
     rcd_set_dca_rate(0, 0, DDR);
     rcd_set_dimm_operating_speed(0, 0, -1);
+
+    for (int channel = 0; channel < CHANNELS; channel++)
+        rcd_clear_qrst(channel, 0); // FIXME: this should clear QRST for all RCDs
+
+    sdram_ddr5_cs_ca_training(ctx);
+
+    rcd_forward_all_dram_cmds(0, 0, true); // FIXME: this should forward for all RCDs
+
+    for (int channel = 0; channel < CHANNELS; channel++)
+        rcd_release_qcs(channel, 0, true); // FIXME: this should release QCS for all RCDs
 }
 #endif // defined(CONFIG_HAS_I2C)
 
@@ -1709,16 +1751,19 @@ void sdram_ddr5_flow(void) {
 #if defined(CONFIG_HAS_I2C)
     // TODO: read SPD die width
     bool is_rdimm = read_module_type(0) == RDIMM;
+    int die_width = read_module_width(0); // FIXME: handle multiple sticks and SPDs
+    host_dram_ctx.die_width = die_width;
+    host_rcd_ctx.die_width = die_width;
+    // rcd_dram_ctx.die_width = die_width; // TODO: uncomment when RCD->DRAM training is implemented
 
     if (is_rdimm) {
-        rcd_init();
-        base_ctx = &host_rcd_ctx;
-        sdram_ddr5_cs_ca_training(base_ctx);
+        printf("Detected RDIMM. Initializing RCD and running Host->RCD training\n");
+        rcd_init(&host_rcd_ctx);
         // base_ctx = &rcd_dram_ctx; // TODO: uncomment when RCD->DRAM training is implemented
     }
 #endif // defined(CONFIG_HAS_I2C)
 
-    //setup_dram_mrs_sequence();
+    setup_dram_mrs_sequence();
 
     sdram_ddr5_module_enumerate(base_ctx);
 

@@ -68,8 +68,9 @@ static bool sdram_rcd_block_read(uint8_t rcd, const uint8_t *rap_buf, uint8_t le
 	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd, buf, (1 + 1 + 4), false, 1);  // byte count + status + data
 
 	// copy status + data, ignore length
-	for (int i = 0; i < 5; i++)
-		data[i] = buf[1 + i];
+	data[0] = buf[1]; // status
+	for (int i = 0; i < 4; i++)
+		data[4 - i] = buf[2 + i];
 
 	return ok;
 }

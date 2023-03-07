@@ -396,7 +396,7 @@ define_command(sdram_mr_write, sdram_mr_write_handler, "Write SDRAM Mode Registe
  * SPD address is a 3-bit address defined by the pins A0, A1, A2.
  *
  */
-#ifdef CONFIG_HAS_I2C
+#if defined(CSR_SDRAM_BASE) && defined(CONFIG_HAS_I2C)
 static void sdram_spd_handler(int nb_params, char **params)
 {
 	char *c;
@@ -449,7 +449,7 @@ static void sdram_spd_handler(int nb_params, char **params)
 #endif
 }
 define_command(sdram_spd, sdram_spd_handler, "Read SDRAM SPD EEPROM", LITEDRAM_CMDS);
-#endif
+#endif /* defined(CSR_SDRAM_BASE) && defined(CONFIG_HAS_I2C) */
 
 #if defined(CONFIG_HAS_I2C) && (defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_DDR4_RDIMM))
 #define EXTRACT_BYTE(data, i)	(((data) & (0xff << ((i) * 8))) >> ((i) * 8))
@@ -480,15 +480,15 @@ static void sdram_rcd_read_handler(int nb_params, char **params)
 		return;
 	}
 
-	reg_num = strtoul(params[1], &c, 0);
+	page_num = strtoul(params[1], &c, 0);
 	if (*c != 0) {
-		printf("Incorrect register number");
+		printf("Incorrect page number");
 		return;
 	}
 
-	page_num = strtoul(params[2], &c, 0);
+	reg_num = strtoul(params[2], &c, 0);
 	if (*c != 0) {
-		printf("Incorrect page number");
+		printf("Incorrect register number");
 		return;
 	}
 
@@ -521,8 +521,11 @@ static void sdram_rcd_read_handler(int nb_params, char **params)
 	if (status & 0x10)
 		printf("Status byte reported internal target abort\n");
 
-	dump_bytes((unsigned int *) &data[1], 4, (page_num << 8) | reg_num);
-
+	reg_num &= 0xfffffffc; // reads are aligned to 4 bytes
+	printf("Page: 0x%02x\n", page_num);
+	for (int i = 0; i < 4; i++) {
+		printf("RW%02X: 0x%02x\n", reg_num + i, data[i + 1]);
+	}
 }
 define_command(sdram_rcd_read, sdram_rcd_read_handler, "Read from SDRAM RCD", LITEDRAM_CMDS);
 
@@ -554,15 +557,15 @@ static void sdram_rcd_write_handler(int nb_params, char **params)
 		return;
 	}
 
-	reg_num = strtoul(params[1], &c, 0);
+	page_num = strtoul(params[1], &c, 0);
 	if (*c != 0) {
-		printf("Incorrect register number");
+		printf("Incorrect page number");
 		return;
 	}
 
-	page_num = strtoul(params[2], &c, 0);
+	reg_num = strtoul(params[2], &c, 0);
 	if (*c != 0) {
-		printf("Incorrect page number");
+		printf("Incorrect register number");
 		return;
 	}
 
@@ -595,10 +598,10 @@ static void sdram_rcd_write_handler(int nb_params, char **params)
 	}
 
 	const uint8_t data_array[4] = {
-		EXTRACT_BYTE(data, 3),
-		EXTRACT_BYTE(data, 2),
-		EXTRACT_BYTE(data, 1),
 		EXTRACT_BYTE(data, 0),
+		EXTRACT_BYTE(data, 1),
+		EXTRACT_BYTE(data, 2),
+		EXTRACT_BYTE(data, 3),
 	};
 
 	if (!sdram_rcd_write(rcd, 0, function, page_num, reg_num, data_array, size, byte_write)) {
