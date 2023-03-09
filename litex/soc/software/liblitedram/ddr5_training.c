@@ -1095,14 +1095,17 @@ static int wltm_align_to_eye_edge(int channel, int rank, int module, int width, 
 
     printf("DQS edge scan:\n");
 
-    do {
+    printf("%2d|", *transition_cycle);
+    wleveling_scan(channel, rank, module, width, &eye);
+    printf("|\n");
+    while (*transition_cycle < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE) {
+        wr_dqs_inc(channel, module, width);
+        (*transition_cycle)++;
+
         printf("%2d|", *transition_cycle);
         wleveling_scan(channel, rank, module, width, &eye);
         printf("|\n");
-
-        wr_dqs_inc(channel, module, width);
-        (*transition_cycle)++;
-    } while (*transition_cycle < MAX_WRITE_CYCLE_DELAY && eye.state != INSIDE);
+    }
 
     return eye.start;
 }
