@@ -127,10 +127,16 @@ bool sdram_rcd_read(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_num
 		reg_num                   // register number
 	};
 
-	if (byte_read)
-		return sdram_rcd_byte_read(rcd, rap_buf, sizeof(rap_buf), data, RCD_READ_CMD);
-	else
-		return sdram_rcd_block_read(rcd, rap_buf, sizeof(rap_buf), data, RCD_READ_CMD);
+	bool ok = true;
+
+	for (int i = 0; i < 2; i++) {
+		if (byte_read)
+			ok &= sdram_rcd_byte_read(rcd, rap_buf, sizeof(rap_buf), data, RCD_READ_CMD);
+		else
+			ok &= sdram_rcd_block_read(rcd, rap_buf, sizeof(rap_buf), data, RCD_READ_CMD);
+	}
+
+	return ok;
 }
 
 /**
