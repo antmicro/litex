@@ -1772,7 +1772,11 @@ void sdram_ddr5_flow(void) {
 
 #if defined(CONFIG_HAS_I2C)
     // TODO: read SPD die width
+#ifdef DDR5_RDIMM_SIM
     bool is_rdimm = read_module_type(0) == RDIMM;
+#else
+    bool is_rdimm = true;
+#endif // DDR5_RDIMM_SIM
     int die_width = read_module_width(0); // FIXME: handle multiple sticks and SPDs
     host_dram_ctx.die_width = die_width;
     host_rcd_ctx.die_width = die_width;
