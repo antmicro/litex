@@ -1615,13 +1615,13 @@ void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate) {
     uint8_t rw_data[5];
 
     // we need to modify RW00[1:0]
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     rw_data[0] &= ~(0b11 << 0);       // clear last setting
     rw_data[0] |= (0b11 & rate << 0); // and set a new one
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, &rw_data[0], 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, &rw_data[0], 1, false);
 
     if (!ok)
         printf("There was a problem with setting DCA rate in the RCD\n");
@@ -1650,7 +1650,7 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
     if (target_speed == -1) {
         coarse = 0x0f;
 
-        ok &= sdram_rcd_write(rcd, 0, channel, 0, 5, &coarse, 1, false);
+        ok &= sdram_rcd_write(rcd, 0, 0, 0, 5, &coarse, 1, false);
 
         if (!ok)
             printf("There was a problem with enabling PLL bypass mode in the RCD\n");
@@ -1702,8 +1702,8 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
         fine = 0;
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 5, &coarse, 1, false);
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 6, &fine, 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 5, &coarse, 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 6, &fine, 1, false);
 
     if (!ok)
         printf("There was a problem with setting DIMM speed in the RCD\n");
@@ -1722,7 +1722,7 @@ void rcd_clear_qrst(int channel, int rank) {
     // to the RW04 register (JESD82-511 8.6.5)
     uint8_t cmd = 6 + (2 * channel);
 
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 4, &cmd, 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, &cmd, 1, false);
 
     if (!ok)
         printf("There was a problem with clearing DRAM reset for channel %c\n", 'A'+channel);
@@ -1744,13 +1744,13 @@ void rcd_forward_all_dram_cmds(int channel, int rank, bool forward) {
     uint8_t rw_data[5];
 
     // we need to modify RW01[1]
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     rw_data[1] &= ~(0b1 << 1);          // clear last setting
     rw_data[1] |= (0b1 & forward << 1); // and set a new one
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 1, &rw_data[1], 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 1, &rw_data[1], 1, false);
 
     if (!ok)
         printf("There was a problem with changing CMD blocking in the RCD\n");
@@ -1777,7 +1777,7 @@ void rcd_release_qcs(int channel, int rank, bool sideband) {
         // we send CH_[AB]_QCS_HIGH commands (CMD14 or CMD15)
         // to the RW04 register (JESD82-511 8.6.5)
         uint8_t cmd = 14 + !!channel;
-        ok &= sdram_rcd_write(rcd, 0, channel, 0, 4, &cmd, 1, false);
+        ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, &cmd, 1, false);
 
         if (!ok)
             printf("There was a problem with releasing the QCS for channel %c\n", 'A'+channel);
@@ -1805,7 +1805,7 @@ void enter_dcstm(int channel, int rank) {
     uint8_t rw_data[5];
 
     // we need to modify RW01 and RW02
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     // in RW01 we unset bit 5 to make sure we get channel feedback on alert_n
     rw_data[1] &= ~(1 << 5);
@@ -1818,7 +1818,7 @@ void enter_dcstm(int channel, int rank) {
     rw_data[2] |= (0b10 | (rank & 1)) << (2 * channel); // set new bits
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, rw_data, 4, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
 
     if (!ok)
         printf("There was a problem with entering Host->RCD CS training (DCSTM)\n");
@@ -1837,7 +1837,7 @@ void exit_dcstm(int channel, int rank) {
     uint8_t rw_data[5];
 
     // we need to modify RW02
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     // in RW02 we clear training mode setting
     // channel A settings: RW02[1:0]
@@ -1845,7 +1845,7 @@ void exit_dcstm(int channel, int rank) {
     rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 2, &rw_data[2], 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 2, &rw_data[2], 1, false);
 
     if (!ok)
         printf("There was a problem with exiting Host->RCD CS training (DCSTM)\n");
@@ -1991,7 +1991,7 @@ void enter_dcatm(int channel, int rank) {
     uint8_t rw_data[5];
 
     // we need to modify RW01 and RW02
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     // in RW01 we unset bit 5 to make sure we get channel feedback on alert_n
     rw_data[1] &= ~(1 << 5);
@@ -2004,7 +2004,7 @@ void enter_dcatm(int channel, int rank) {
     rw_data[2] |=   0b01 << (2 * channel);  // set new bits
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, rw_data, 4, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
 
     if (!ok)
         printf("There was a problem with entering Host->RCD CA training (DCATM)\n");
@@ -2023,14 +2023,14 @@ void exit_dcatm(int channel, int rank) {
     uint8_t rw_data[5];
 
     // we need to modify RW02
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     // channel A settings: RW02[1:0]
     // channel B settings: RW02[3:2]
     rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 2, &rw_data[2], 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 2, &rw_data[2], 1, false);
 
     if (!ok)
         printf("There was a problem with exiting Host->RCD CA training (DCATM)\n");
@@ -2191,7 +2191,7 @@ void enter_qcatm(int channel, int rank) {
     uint8_t rw_data[5];
 
     // we need to modify RW00, RW01
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     // we set RW00[2] to enable CA Pass Through mode
     rw_data[0] |= 1 << 2;
@@ -2207,7 +2207,7 @@ void enter_qcatm(int channel, int rank) {
     rw_data[1] |= 0b10;
 
     // write RW00 and RW01 settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, rw_data, 2, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 2, false);
 
     if (!ok)
         printf("There was a problem with entering RCD->DRAM CA training (QCATM)\n");
@@ -2228,7 +2228,7 @@ void exit_qcatm(int channel, int rank) {
     uint8_t rw_data[5];
 
     // we need to modify RW00, RW01
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     // we unset RW00[2] to disable CA Pass Through mode
     rw_data[0] &= ~(1 << 2);
@@ -2240,7 +2240,7 @@ void exit_qcatm(int channel, int rank) {
     // rw_data[1] |= 0b10;
 
     // write RW00 and RW01 settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 0, rw_data, 2, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 2, false);
 
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CA training (QCATM)\n");
