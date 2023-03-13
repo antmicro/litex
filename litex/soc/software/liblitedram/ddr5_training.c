@@ -377,7 +377,7 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
  * can be used to compare training results.
  */
 static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
-    int channel, rank, address;
+    int channel, rank, address, start_address, end_address;
     int shift_0101, cntdly, discard;
     printf("Re-scan CS/CA\n");
     for (channel = 0; channel < CHANNELS; channel++) {
@@ -411,8 +411,27 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
             //                    CA rescan                    //
             ctx->ca.enter_training_mode(channel, rank);
 
-            for (address = 0; address < ctx->ca.line_count; address++) {
+            if (ctx->training_type == HOST_RCD) {
+                start_address = channel * 7;     // Select between DCAy_A and DCAy_B
+                end_address = (channel + 1) * 7; // RDIMM always have 14 DCA lines
+            } else {
+                start_address = 0;
+                end_address = ctx->ca.line_count;
+            }
+
+            for (address = start_address; address < end_address; address++) {
                 printf("Address:%2d\n", address);
+#if defined(CONFIG_HAS_I2C)
+                if (ctx->training_type == HOST_RCD) {
+                    if (address < ctx->ca.line_count / 2) {
+                        // If address line belongs to Channel A select rising edge
+                        dca_training_xor_sampling_edge(channel, rank, 1);
+                    } else {
+                        // If address line belongs to Channel B select falling edge
+                        dca_training_xor_sampling_edge(channel, rank, 2);
+                    }
+                }
+#endif // defined(CONFIG_HAS_I2C)
                 CA_ck_scan(ctx, channel, rank, address, ctx->cs.final_delays[channel][rank]);
                 // Restore CK delay after CA_ck_scan
                 ctx->ck.rst_dly(0, 0, 0);
