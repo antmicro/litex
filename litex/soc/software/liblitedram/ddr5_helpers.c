@@ -1612,7 +1612,7 @@ void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate) {
     bool ok = true;
     uint8_t rcd = get_rcd_id(rank);
 
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW00[1:0]
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
@@ -1741,7 +1741,7 @@ void rcd_forward_all_dram_cmds(int channel, int rank, bool forward) {
     bool ok = true;
     uint8_t rcd = get_rcd_id(rank);
 
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW01[1]
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
@@ -1802,7 +1802,7 @@ void enter_dcstm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW01 and RW02
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
@@ -1834,7 +1834,7 @@ void exit_dcstm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW02
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
@@ -1929,7 +1929,7 @@ void enter_qcstm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW03
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
@@ -1957,7 +1957,7 @@ void exit_qcstm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW03
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
@@ -1988,7 +1988,7 @@ void enter_dcatm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW01 and RW02
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
@@ -2020,7 +2020,7 @@ void exit_dcatm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW02
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
@@ -2188,7 +2188,7 @@ void enter_qcatm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW00, RW01
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
@@ -2225,7 +2225,7 @@ void exit_qcatm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     // we need to modify RW00, RW01
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);

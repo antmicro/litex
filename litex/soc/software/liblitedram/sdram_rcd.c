@@ -17,6 +17,8 @@ bool sdram_rcd_read(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_num
 		data[i] = 0;
 	}
 
+	data[4] = 0x01; // simulate successful reads, set status to 1
+
 	return true;
 }
 
@@ -42,11 +44,11 @@ static bool sdram_rcd_byte_read(uint8_t rcd, const uint8_t *rap_buf, uint8_t len
 	ok &= i2c_write(RCD_RW_ADDR(rcd), sidebus_cmd,        &rap_buf[2], 1, 1);
 	ok &= i2c_write(RCD_RW_ADDR(rcd), sidebus_cmd | 0x40, &rap_buf[3], 1, 1); // end bit set
 
-	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd | 0x80, &data[0], 1, false, 1); // start bit set
-	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd,        &data[1], 1, false, 1);
-	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd,        &data[2], 1, false, 1);
+	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd | 0x80, &data[4], 1, false, 1); // start bit set
 	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd,        &data[3], 1, false, 1);
-	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd | 0x40, &data[4], 1, false, 1); // end bit set
+	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd,        &data[2], 1, false, 1);
+	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd,        &data[1], 1, false, 1);
+	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd | 0x40, &data[0], 1, false, 1); // end bit set
 
 	return ok;
 }
@@ -68,9 +70,9 @@ static bool sdram_rcd_block_read(uint8_t rcd, const uint8_t *rap_buf, uint8_t le
 	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd, buf, (1 + 1 + 4), false, 1);  // byte count + status + data
 
 	// copy status + data, ignore length
-	data[0] = buf[1]; // status
-	for (int i = 0; i < 4; i++)
-		data[4 - i] = buf[2 + i];
+	data[4] = buf[1]; // status
+	for (int i = 0; i < 4; i++) // DWORD
+		data[3 - i] = buf[2 + i];
 
 	return ok;
 }

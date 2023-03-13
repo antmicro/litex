@@ -514,7 +514,7 @@ static void sdram_rcd_read_handler(int nb_params, char **params)
 		return;
 	}
 
-	uint8_t status = data[0];
+	uint8_t status = data[4];
 	if (!(status & 0x01))
 		printf("Status byte reported operation not successful\n");
 
@@ -524,7 +524,7 @@ static void sdram_rcd_read_handler(int nb_params, char **params)
 	reg_num &= 0xfffffffc; // reads are aligned to 4 bytes
 	printf("Page: 0x%02x\n", page_num);
 	for (int i = 0; i < 4; i++) {
-		printf("RW%02X: 0x%02x\n", reg_num + i, data[i + 1]);
+		printf("RW%02X: 0x%02x\n", reg_num + i, data[i]);
 	}
 }
 define_command(sdram_rcd_read, sdram_rcd_read_handler, "Read from SDRAM RCD", LITEDRAM_CMDS);
