@@ -1780,6 +1780,7 @@ void sdram_ddr5_flow(void) {
 
     if (is_rdimm) {
         printf("Detected RDIMM. Initializing RCD and running Host->RCD training\n");
+        ddrphy_CSRModule_rdimm_mode_write(1);
         rcd_init(&host_rcd_ctx);
         // base_ctx = &rcd_dram_ctx; // TODO: uncomment when RCD->DRAM training is implemented
     }
