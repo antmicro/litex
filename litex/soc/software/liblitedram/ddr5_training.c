@@ -390,6 +390,7 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
 
             // Get shift_0101 value
             shift_0101 = CS_should_shift_pattern(ctx, channel, rank);
+            ctx->cs.rst_dly(channel, rank, 0);
 
             CS_ck_scan(ctx, channel, rank, shift_0101);
             // Restore CK delay after CS_ck_scan
@@ -398,6 +399,8 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
                 ctx->ck.inc_dly(0, 0, 0);
 
             printf("|");
+            shift_0101 = CS_should_shift_pattern(ctx, channel, rank);
+            ctx->cs.rst_dly(channel, rank, 0);
             CS_scan(ctx, channel, rank, &discard, &discard, shift_0101);
             printf("\n");
 
