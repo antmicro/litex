@@ -288,8 +288,8 @@ def get_csr_header(regions, constants, csr_base=None, with_csr_base_define=True,
                         r += f"#define CSR_{name.upper()}_{csr.name.upper()}_{field.name.upper()}_OFFSET {offset}\n"
                         r += f"#define CSR_{name.upper()}_{csr.name.upper()}_{field.name.upper()}_SIZE {size}\n"
                         if with_access_functions and csr.size <= 32: # FIXME: Implement extract/read functions for csr.size > 32-bit.
-                            reg_name   = name + "_" + csr.name.lower()
-                            field_name = reg_name + "_" + field.name.lower()
+                            reg_name   = name + "_" + csr.name
+                            field_name = reg_name + "_" + field.name
                             r += "static inline uint32_t " + field_name + "_extract(uint32_t oldword) {\n"
                             r += f"\tuint32_t mask = 0x{(1<<int(size))-1:x};\n"
                             r += "\treturn ( (oldword >> " + offset + ") & mask );\n}\n"
