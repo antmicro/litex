@@ -2229,6 +2229,7 @@ int dca_check_if_works(int channel, int rank, int address, int phase_shift) {
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ok &= !ddrphy_CSRModule_alert_read();
     }
+    dca_training_xor_sampling_edge(channel, rank, 0); // restore default values
 
     return ok;
 }
