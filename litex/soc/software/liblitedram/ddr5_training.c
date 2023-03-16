@@ -117,7 +117,8 @@ static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* lef
     }
     ctx->cs.rst_dly(channel, rank, 0);
 
-    *right = eye.start;
+    if (*right == UNSET_DELAY)
+        *right = eye.start;
     *left = eye.end;
 }
 
@@ -259,7 +260,8 @@ static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t 
     }
     ctx->ca.rst_dly(channel, rank, address);
 
-    *right = eye.start;
+    if (*right == UNSET_DELAY)
+        *right = eye.start;
     *left = eye.end;
 }
 
