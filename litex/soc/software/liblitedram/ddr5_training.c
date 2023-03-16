@@ -1751,6 +1751,7 @@ static void rcd_init(training_ctx_t *ctx) {
     // FIXME: this function should initialize all RCDs
     rcd_set_dca_rate(0, 0, DDR);
     rcd_set_dimm_operating_speed(0, 0, -1);
+    rcd_set_termination_and_vref(0);
 
     for (int channel = 0; channel < CHANNELS; channel++)
         rcd_clear_qrst(channel, 0); // FIXME: this should clear QRST for all RCDs

@@ -1711,6 +1711,54 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
         printf("There was a problem with setting DIMM speed in the RCD\n");
 }
 
+void rcd_set_termination_and_vref(int rank) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[5];
+
+    // we need to modify RW10
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0x10, rw_data, false);
+    rw_data[0] = 0;
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0x10, rw_data, 4, false);
+    if (!ok)
+        printf("There was a problem with setting IBT in the RCD\n");
+
+    for (int i=0; i<2; ++i) {
+        ok = true;
+        // we need to modify from RW40 to RW47
+        ok &= sdram_rcd_read(rcd, 0, 0, i, 0x40, rw_data, false);
+        rw_data[0] = 0x5f;
+        rw_data[1] = 0x5f;
+        rw_data[2] = 0x5f;
+        rw_data[3] = 0x5f;
+        // write the settings back
+        ok &= sdram_rcd_write(rcd, 0, 0, i, 0x40, rw_data, 4, false);
+        if (!ok)
+            printf("There was a problem with setting channel's:%c Vref 40-43 in the RCD\n", 'A'+i);
+
+        ok = true;
+        ok &= sdram_rcd_read(rcd, 0, 0, i, 0x44, rw_data, false);
+        rw_data[0] = 0x5f;
+        rw_data[1] = 0x5f;
+        rw_data[2] = 0x5f;
+        rw_data[3] = 0x5f;
+        // write the settings back
+        ok &= sdram_rcd_write(rcd, 0, 0, i, 0x44, rw_data, 4, false);
+        if (!ok)
+            printf("There was a problem with setting channel's:%c Vref 44-47 in the RCD\n", 'A'+i);
+
+        ok = true;
+        ok &= sdram_rcd_read(rcd, 0, 0, i, 0x48, rw_data, false);
+        rw_data[0] = 0x5f;
+        rw_data[1] = 0x5f;
+        // write the settings back
+        ok &= sdram_rcd_write(rcd, 0, 0, i, 0x48, rw_data, 4, false);
+        if (!ok)
+            printf("There was a problem with setting channel's:%c Vref 48-49 in the RCD\n", 'A'+i);
+    }
+}
+
 /**
  * rcd_clear_qrst
  *
