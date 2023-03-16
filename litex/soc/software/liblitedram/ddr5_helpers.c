@@ -2106,7 +2106,7 @@ void exit_dcatm(int channel, int rank) {
         printf("There was a problem with exiting Host->RCD CA training (DCATM)\n");
 
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
-    printf("CA_dis RW0%hhx RW1%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
+    printf("CA_dis RW0:%hhx RW1:%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
     cdelay(250);
 }
 

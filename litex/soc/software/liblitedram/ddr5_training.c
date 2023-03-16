@@ -128,10 +128,9 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
     int32_t rank;
     int shift_0101 = 0;
     for (rank = 0; rank < ctx->ranks; rank++) {
-        printf("Rank: %2"PRId32"", rank);
-
         // Enter CS training
         ctx->cs.enter_training_mode(channel, rank);
+        printf("Rank: %2"PRId32"", rank);
 
         left_side = UNSET_DELAY;
         right_side = UNSET_DELAY;
