@@ -1746,6 +1746,8 @@ static void rcd_init(training_ctx_t *ctx) {
     uint8_t cmd = 0xa0;
     i2c_write(0x48, 0x32, &cmd, 1, 1); // FIXME: this should be sent to all PMICs
 
+    reset_sequence();
+
     // FIXME: this function should initialize all RCDs
     rcd_set_dca_rate(0, 0, DDR);
     rcd_set_dimm_operating_speed(0, 0, -1);
@@ -1773,7 +1775,6 @@ static void rcd_init(training_ctx_t *ctx) {
 void sdram_ddr5_flow(void) {
     training_ctx_t *base_ctx = &host_dram_ctx;
     enable_phy();
-    reset_sequence();
 
 #if defined(CONFIG_HAS_I2C)
     // TODO: read SPD die width
@@ -1792,6 +1793,8 @@ void sdram_ddr5_flow(void) {
         ddrphy_CSRModule_rdimm_mode_write(1);
         rcd_init(&host_rcd_ctx);
         // base_ctx = &rcd_dram_ctx; // TODO: uncomment when RCD->DRAM training is implemented
+    } else {
+        reset_sequence();
     }
 #endif // defined(CONFIG_HAS_I2C)
 
