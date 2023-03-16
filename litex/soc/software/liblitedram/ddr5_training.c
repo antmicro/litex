@@ -1680,6 +1680,7 @@ static void rcd_init(training_ctx_t *ctx) {
     // Issue a VR_ENABLE command to the PMIC
     uint8_t cmd = 0xa0;
     i2c_write(0x48, 0x32, &cmd, 1, 1); // FIXME: this should be sent to all PMICs
+    cdelay(1000000);
 
     reset_sequence();
 
@@ -1732,6 +1733,8 @@ void sdram_ddr5_flow(void) {
     } else {
         reset_sequence();
     }
+#else
+    reset_sequence();
 #endif // defined(CONFIG_HAS_I2C)
 
     setup_dram_mrs_sequence();
