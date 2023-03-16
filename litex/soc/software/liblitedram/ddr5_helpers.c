@@ -1872,6 +1872,10 @@ void enter_dcstm(int channel, int rank) {
 
     if (!ok)
         printf("There was a problem with entering Host->RCD CS training (DCSTM)\n");
+
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+    printf("CS_en RW0:%hhx RW1:%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
+    cdelay(250);
 }
 
 /**
@@ -1881,6 +1885,8 @@ void enter_dcstm(int channel, int rank) {
  * JESD82-511 5.1.1
  */
 void exit_dcstm(int channel, int rank) {
+    cmd_injector(channel, 0xf, 0, 0x7f, 0, 0, 0, 0);
+    store_continuous(channel);
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
@@ -1895,26 +1901,33 @@ void exit_dcstm(int channel, int rank) {
     rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, 0, 0, 2, &rw_data[2], 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
 
     if (!ok)
         printf("There was a problem with exiting Host->RCD CS training (DCSTM)\n");
+
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+    printf("CS_dis RW0:%hhx RW1:%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
+    cdelay(250);
 }
 
 /**
  * dcs_check_if_works
  *
  * Checks if during DCSTM, DCS and CK signals are aligned.
- * When they are aligned, then RCD will send 0s on all DQ's.
+ * When they are aligned, then RCD will send 0 on alert_n.
  * We sample DQ's over multiple cycles, reduce them with
  * the OR operation and check if all were 0s.
  * JESD82-511 5.1.1
  */
 int dcs_check_if_works(int channel, int rank, int address, int shift_0101) {
+    cs_sample_prep(channel, rank, address, shift_0101);
+    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
+    cdelay(100);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    cs_sample_prep(channel, rank, address, shift_0101);
+    cdelay(1000);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     return !ddrphy_CSRModule_alert_read();
 }
@@ -2061,6 +2074,10 @@ void enter_dcatm(int channel, int rank) {
 
     if (!ok)
         printf("There was a problem with entering Host->RCD CA training (DCATM)\n");
+
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+    printf("CA_en RW0:%hhx RW1:%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
+    cdelay(250);
 }
 
 /**
@@ -2083,10 +2100,14 @@ void exit_dcatm(int channel, int rank) {
     rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, 0, 0, 2, &rw_data[2], 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
 
     if (!ok)
         printf("There was a problem with exiting Host->RCD CA training (DCATM)\n");
+
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+    printf("CA_dis RW0%hhx RW1%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
+    cdelay(250);
 }
 
 /**
@@ -2133,6 +2154,26 @@ static void dca_sample_prep(int channel, int rank, int address, int l2h, int pha
     cdelay(50);
 }
 
+static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) {
+    bool ok = true;
+
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[4];
+
+    // we need to modify RW02[5:4]
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+
+    rw_data[2] &= ~(0b11 << 4);       // clear last setting
+    rw_data[2] |= (0b11 & edge) << 4; // and set a new one
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+
+    if (!ok)
+        printf("There was a problem with changing DCA XOR sampling edge\n");
+    cdelay(250);
+}
+
 /**
  * dca_check_if_works
  *
@@ -2160,23 +2201,34 @@ static void dca_sample_prep(int channel, int rank, int address, int l2h, int pha
  * JESD82-511 5.2.1
  */
 int dca_check_if_works(int channel, int rank, int address, int phase_shift) {
-    int ok;
+    int ok = 1;
 
-    // Test change from low to high
-    ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
-    ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    dca_sample_prep(channel, rank, address, 1, phase_shift);
-    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-    ok = ddrphy_CSRModule_alert_read();
+    for(int edge=0; edge<2; ++edge) {
+        dca_training_xor_sampling_edge(channel, rank, 1<<edge);
+        // Test change from low to high
+        dca_sample_prep(channel, rank, address + edge*7, 1, phase_shift);
 
-    // Test change from high to low
-    ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
-    ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    dca_sample_prep(channel, rank, address, 0, phase_shift);
-    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-    ok &= !ddrphy_CSRModule_alert_read();
+        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+        ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
+        ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
+        cdelay(100);
+        ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
+        cdelay(1000);
+        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+        ok &= ddrphy_CSRModule_alert_read();
+
+        // Test change from high to low
+        dca_sample_prep(channel, rank, address + edge*7, 0, phase_shift);
+
+        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+        ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
+        ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
+        cdelay(100);
+        ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
+        cdelay(1000);
+        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+        ok &= !ddrphy_CSRModule_alert_read();
+    }
 
     return ok;
 }

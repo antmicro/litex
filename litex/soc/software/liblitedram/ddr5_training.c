@@ -200,12 +200,14 @@ static void CA_setup_array(training_ctx_t *ctx) {
  * CA13 may be used or not.
  */
 static void CA_check_lines(training_ctx_t *ctx, int32_t channel) {
-    ctx->ca.enter_training_mode(channel, 0);
-    if (ctx->ca.has_line13(channel))
-        ctx->ca.line_count = 14;
-    else
-        ctx->ca.line_count = 13;
-    ctx->ca.exit_training_mode(channel, 0);
+    if (ctx->training_type != HOST_RCD) {
+        ctx->ca.enter_training_mode(channel, 0);
+        if (ctx->ca.has_line13(channel))
+            ctx->ca.line_count = 14;
+        else
+            ctx->ca.line_count = 13;
+        ctx->ca.exit_training_mode(channel, 0);
+    }
     printf("DDR5 module has %d address lines\n", ctx->ca.line_count);
 }
 
@@ -265,39 +267,6 @@ static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t 
     *left = eye.end;
 }
 
-#if defined(CONFIG_HAS_I2C)
-/**
- * dca_training_xor_sampling_edge
- *
- * Selects a sampling edge for Clock-to-DCAy_* training mode in the RCD.
- * Writes value of the `edge` parameter to RW02[5:4].
- *
- * Allowed values of `edge`:
- *   - 0: rising and falling edge
- *   - 1: only rising edge
- *   - 2: only falling edge
- * Any other value is not allowed.
- */
-static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) {
-    bool ok = true;
-
-    uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
-
-    // we need to modify RW02[5:4]
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
-
-    rw_data[2] &= ~(0b11 << 4);       // clear last setting
-    rw_data[2] |= (0b11 & edge) << 4; // and set a new one
-
-    // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 2, &rw_data[2], 1, false);
-
-    if (!ok)
-        printf("There was a problem with changing DCA XOR sampling edge\n");
-}
-#endif // defined(CONFIG_HAS_I2C)
-
 static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
     int left_side, right_side;
     int32_t rank, address, start_address, end_address;
@@ -307,27 +276,10 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         // Enter CA training
         ctx->ca.enter_training_mode(channel, rank);
 
-        if (ctx->training_type == HOST_RCD) {
-            start_address = channel * 7;     // Select between DCAy_A and DCAy_B
-            end_address = (channel + 1) * 7; // RDIMM always have 14 DCA lines
-        } else {
-            start_address = 0;
-            end_address = ctx->ca.line_count;
-        }
+        start_address = 0;
+        end_address = ctx->ca.line_count;
 
         for (address = start_address; address < end_address; address++) {
-#if defined(CONFIG_HAS_I2C)
-            if (ctx->training_type == HOST_RCD) {
-                if (address < ctx->ca.line_count / 2) {
-                    // If address line belongs to Channel A select rising edge
-                    dca_training_xor_sampling_edge(channel, rank, 1);
-                } else {
-                    // If address line belongs to Channel B select falling edge
-                    dca_training_xor_sampling_edge(channel, rank, 2);
-                }
-            }
-#endif // defined(CONFIG_HAS_I2C)
-
             printf("CA line:%2"PRId32"", address);
 
             left_side = UNSET_DELAY;
@@ -416,27 +368,11 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
             //                    CA rescan                    //
             ctx->ca.enter_training_mode(channel, rank);
 
-            if (ctx->training_type == HOST_RCD) {
-                start_address = channel * 7;     // Select between DCAy_A and DCAy_B
-                end_address = (channel + 1) * 7; // RDIMM always have 14 DCA lines
-            } else {
-                start_address = 0;
-                end_address = ctx->ca.line_count;
-            }
+            start_address = 0;
+            end_address = ctx->ca.line_count;
 
             for (address = start_address; address < end_address; address++) {
                 printf("Address:%2d\n", address);
-#if defined(CONFIG_HAS_I2C)
-                if (ctx->training_type == HOST_RCD) {
-                    if (address < ctx->ca.line_count / 2) {
-                        // If address line belongs to Channel A select rising edge
-                        dca_training_xor_sampling_edge(channel, rank, 1);
-                    } else {
-                        // If address line belongs to Channel B select falling edge
-                        dca_training_xor_sampling_edge(channel, rank, 2);
-                    }
-                }
-#endif // defined(CONFIG_HAS_I2C)
                 CA_ck_scan(ctx, channel, rank, address, ctx->cs.final_delays[channel][rank]);
                 // Restore CK delay after CA_ck_scan
                 ctx->ck.rst_dly(0, 0, 0);
@@ -1671,7 +1607,7 @@ training_ctx_t host_rcd_ctx = {
         .check = dcs_check_if_works,
     },
     .ca = {
-        .line_count = 14,
+        .line_count = 7,
         .enter_training_mode = enter_dcatm,
         .exit_training_mode  = exit_dcatm,
         .inc_dly = ca_inc,
