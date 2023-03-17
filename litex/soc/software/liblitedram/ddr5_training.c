@@ -1684,7 +1684,7 @@ static void rcd_init(training_ctx_t *ctx) {
     // Issue a VR_ENABLE command to the PMIC
     uint8_t cmd = 0xa0;
     i2c_write(0x48, 0x32, &cmd, 1, 1); // FIXME: this should be sent to all PMICs
-    cdelay(1000000);
+    cdelay(10000000);
 
     reset_sequence();
 
