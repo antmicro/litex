@@ -89,12 +89,11 @@ static int CS_should_shift_pattern(training_ctx_t *ctx, int32_t channel, int32_t
     ctx->cs.rst_dly(channel, rank, 0);
     for (csdly = 0; csdly < SDRAM_PHY_DELAYS; csdly++) {
         if (CS_in_eye(ctx, channel, rank, &shift_0101))
-            return shift_0101;
-
+            break;
         ctx->cs.inc_dly(channel, rank, 0);
     }
-
-    return 0;
+    ctx->cs.rst_dly(channel, rank, 0);
+    return shift_0101;
 }
 
 static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* left, int* right, int shift_0101) {
@@ -150,8 +149,6 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         CS_scan(ctx, channel, rank, &left_side, &right_side, shift_0101);
         printf("|\n");
 
-        ctx->cs.rst_dly(channel, rank, 0);
-
         // Set up coarse delay adjustment until we get CA results
         printf("Rank delays: %2d:%2d\n", right_side, left_side);
         coarse = (right_side + left_side) / 2;
@@ -159,6 +156,7 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         printf("Coarse adjustment:%"PRId32"\n", coarse);
         ctx->cs.coarse_delays[channel][rank] = coarse;
 
+        ctx->cs.rst_dly(channel, rank, 0);
         for (csdly = 0; csdly < coarse; ++csdly)
             ctx->cs.inc_dly(channel, rank, 0);
 
@@ -216,7 +214,13 @@ static int CA_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_
     works = 1;
     last_good = 0;
     csdly = csdly_base;
+
     ctx->ca.rst_dly(channel, rank, address);
+
+    ctx->cs.rst_dly(channel, rank, 0);
+    for (csdly = 0; csdly < csdly_base; ++csdly)
+        ctx->cs.inc_dly(channel, rank, 0);
+
     for(ckdly = 0; ckdly < SDRAM_PHY_DELAYS && works; ++ckdly, ++csdly) {
         _result = ctx->ca.check(channel, rank, address, csdly/SDRAM_PHY_DELAYS);
         printf("%d", !!_result);
