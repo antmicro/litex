@@ -1387,6 +1387,22 @@ void send_read(int channel, int rank) {
     setup_rddata_cnt(channel, 0);
 }
 
+void send_nop(int channel, int rank) {
+    cmd_injector(channel, 1<<0, 1<<rank, 0x3FFF, 0, 0, 1, 1);
+    if (N2_mode)
+        cmd_injector(channel, 1<<1, 0, 0x3FFF, 0, 0, 1, 1);
+    else
+        cmd_injector(channel, 1<<1, 0, 0, 0, 0, 1, 1);
+    cmd_injector(channel, 1<<2, 0, 0, 0, 0, 1, 1);
+    cmd_injector(channel, 1<<3, 0, 0, 0, 0, 1, 1);
+    cmd_injector(channel, 1<<4, 0, 0, 0, 0, 1, 1);
+    cmd_injector(channel, 1<<5, 0, 0, 0, 0, 1, 1);
+    cmd_injector(channel, 1<<6, 0, 0, 0, 0, 1, 1);
+    cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
+    issue_single(channel);
+    cdelay(50);
+}
+
 /**
  * enter_cstm
  *
