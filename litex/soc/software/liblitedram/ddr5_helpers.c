@@ -1748,35 +1748,35 @@ void rcd_set_termination_and_vref(int rank) {
     for (int i=0; i<2; ++i) {
         ok = true;
         // we need to modify from RW40 to RW47
-        ok &= sdram_rcd_read(rcd, 0, 0, i, 0x40, rw_data, false);
-        rw_data[0] = 0x5f;
-        rw_data[1] = 0x5f;
-        rw_data[2] = 0x5f;
-        rw_data[3] = 0x5f;
+        ok &= sdram_rcd_read(rcd, 0, i, 0, 0x40, rw_data, false);
+        rw_data[0] = 0x2d;
+        rw_data[1] = 0x2d;
+        rw_data[2] = 0x2d;
+        rw_data[3] = 0x2d;
         // write the settings back
-        ok &= sdram_rcd_write(rcd, 0, 0, i, 0x40, rw_data, 4, false);
+        ok &= sdram_rcd_write(rcd, 0, i, 0, 0x40, rw_data, 4, false);
         cdelay(2000);
         if (!ok)
             printf("There was a problem with setting channel's:%c Vref 40-43 in the RCD\n", 'A'+i);
 
         ok = true;
-        ok &= sdram_rcd_read(rcd, 0, 0, i, 0x44, rw_data, false);
-        rw_data[0] = 0x5f;
-        rw_data[1] = 0x5f;
-        rw_data[2] = 0x5f;
-        rw_data[3] = 0x5f;
+        ok &= sdram_rcd_read(rcd, 0, i, 0, 0x44, rw_data, false);
+        rw_data[0] = 0x2d;
+        rw_data[1] = 0x2d;
+        rw_data[2] = 0x2d;
+        rw_data[3] = 0x2d;
         // write the settings back
-        ok &= sdram_rcd_write(rcd, 0, 0, i, 0x44, rw_data, 4, false);
+        ok &= sdram_rcd_write(rcd, 0, i, 0, 0x44, rw_data, 4, false);
         cdelay(2000);
         if (!ok)
             printf("There was a problem with setting channel's:%c Vref 44-47 in the RCD\n", 'A'+i);
 
         ok = true;
-        ok &= sdram_rcd_read(rcd, 0, 0, i, 0x48, rw_data, false);
-        rw_data[0] = 0x5f;
-        rw_data[1] = 0x5f;
+        ok &= sdram_rcd_read(rcd, 0, i, 0, 0x48, rw_data, false);
+        rw_data[0] = 0x2d;
+        rw_data[1] = 0x2d;
         // write the settings back
-        ok &= sdram_rcd_write(rcd, 0, 0, i, 0x48, rw_data, 4, false);
+        ok &= sdram_rcd_write(rcd, 0, i, 0, 0x48, rw_data, 4, false);
         cdelay(2000);
         if (!ok)
             printf("There was a problem with setting channel's:%c Vref 48-49 in the RCD\n", 'A'+i);
