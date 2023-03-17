@@ -300,7 +300,7 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
             // Check if we found the eye
             if (left_side == UNSET_DELAY || right_side == UNSET_DELAY) {
                 // If not, then exit CA training
-                printf("CA:%2"PRId32" Eye width:0 Failed\n", address);
+                printf("CA line:%2"PRId32" Eye width:0 Failed\n", address);
                 *success = 0;
 
                 // Exit CA training early
@@ -355,7 +355,7 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
             shift_0101 = CS_should_shift_pattern(ctx, channel, rank);
             ctx->cs.rst_dly(channel, rank, 0);
             CS_scan(ctx, channel, rank, &discard, &discard, shift_0101);
-            printf("\n");
+            printf("|\n");
 
             // Restore CS delay
             ctx->cs.rst_dly(channel, rank, 0);
@@ -371,7 +371,7 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
             end_address = ctx->ca.line_count;
 
             for (address = start_address; address < end_address; address++) {
-                printf("Address:%2d\n", address);
+                printf("CA line:%2d", address);
                 CA_ck_scan(ctx, channel, rank, address, ctx->cs.final_delays[channel][rank]);
                 // Restore CK delay after CA_ck_scan
                 ctx->ck.rst_dly(0, 0, 0);
@@ -380,7 +380,7 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
 
                 printf("|");
                 CA_scan(ctx, channel, rank, address, &discard, &discard);
-                printf("\n");
+                printf("|\n");
 
                 // Restore CA delay
                 ctx->ca.rst_dly(channel, rank, address);
@@ -419,7 +419,7 @@ static void CS_CA_calculate_midpoints(training_ctx_t *ctx, int *min, int *max) {
 
         for (address = 0; address < ctx->ca.line_count; address++) {
             temp = (ctx->ca.delays[channel][address][0] + ctx->ca.delays[channel][address][1])/2;
-            printf("CA:%2d: min delay %2d, max delay %2d, center %2d\n",
+            printf("CA line:%2d: min delay %2d, max delay %2d, center %2d\n",
                 address, ctx->ca.delays[channel][address][0], ctx->ca.delays[channel][address][1], temp);
 
             ctx->ca.final_delays[channel][address] = temp;
@@ -1716,9 +1716,9 @@ void sdram_ddr5_flow(void) {
 #if defined(CONFIG_HAS_I2C)
     // TODO: read SPD die width
 #ifdef DDR5_RDIMM_SIM
-    bool is_rdimm = read_module_type(0) == RDIMM;
-#else
     bool is_rdimm = true;
+#else
+    bool is_rdimm = read_module_type(0) == RDIMM;
 #endif // DDR5_RDIMM_SIM
     int die_width = read_module_width(0); // FIXME: handle multiple sticks and SPDs
     host_dram_ctx.die_width = die_width;
