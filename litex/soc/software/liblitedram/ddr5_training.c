@@ -1650,7 +1650,7 @@ enum module_type {
  */
 static enum module_type read_module_type(uint8_t spd) {
     uint8_t module_type;
-    if (!sdram_read_spd(spd, 3, &module_type, 1, true)) {
+    if (!sdram_read_spd(spd, 3, &module_type, 1, false)) {
         printf("Couldn't read the SPD and check the module type. Defaulting to UDIMM.\n");
         return UDIMM;
     }
