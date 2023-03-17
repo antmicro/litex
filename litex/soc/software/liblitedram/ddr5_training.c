@@ -1698,6 +1698,9 @@ static void rcd_init(training_ctx_t *ctx) {
 
     for (int channel = 0; channel < CHANNELS; channel++)
         rcd_release_qcs(channel, 0, true); // FIXME: this should release QCS for all RCDs
+
+    for (int channel = 0; channel < CHANNELS; channel++)
+        send_nop(channel, 0);
 }
 #endif // defined(CONFIG_HAS_I2C)
 
