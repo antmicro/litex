@@ -1640,6 +1640,7 @@ void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, &rw_data[0], 1, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with setting DCA rate in the RCD\n");
@@ -1669,6 +1670,7 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
         coarse = 0x0f;
 
         ok &= sdram_rcd_write(rcd, 0, 0, 0, 5, &coarse, 1, false);
+        cdelay(2000);
 
         if (!ok)
             printf("There was a problem with enabling PLL bypass mode in the RCD\n");
@@ -1721,7 +1723,9 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 5, &coarse, 1, false);
+    cdelay(2000);
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 6, &fine, 1, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with setting DIMM speed in the RCD\n");
@@ -1737,6 +1741,7 @@ void rcd_set_termination_and_vref(int rank) {
     rw_data[0] = 0;
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0x10, rw_data, 4, false);
+    cdelay(2000);
     if (!ok)
         printf("There was a problem with setting IBT in the RCD\n");
 
@@ -1750,6 +1755,7 @@ void rcd_set_termination_and_vref(int rank) {
         rw_data[3] = 0x5f;
         // write the settings back
         ok &= sdram_rcd_write(rcd, 0, 0, i, 0x40, rw_data, 4, false);
+        cdelay(2000);
         if (!ok)
             printf("There was a problem with setting channel's:%c Vref 40-43 in the RCD\n", 'A'+i);
 
@@ -1761,6 +1767,7 @@ void rcd_set_termination_and_vref(int rank) {
         rw_data[3] = 0x5f;
         // write the settings back
         ok &= sdram_rcd_write(rcd, 0, 0, i, 0x44, rw_data, 4, false);
+        cdelay(2000);
         if (!ok)
             printf("There was a problem with setting channel's:%c Vref 44-47 in the RCD\n", 'A'+i);
 
@@ -1770,6 +1777,7 @@ void rcd_set_termination_and_vref(int rank) {
         rw_data[1] = 0x5f;
         // write the settings back
         ok &= sdram_rcd_write(rcd, 0, 0, i, 0x48, rw_data, 4, false);
+        cdelay(2000);
         if (!ok)
             printf("There was a problem with setting channel's:%c Vref 48-49 in the RCD\n", 'A'+i);
     }
@@ -1789,6 +1797,7 @@ void rcd_clear_qrst(int channel, int rank) {
     uint8_t cmd = 6 + (2 * channel);
 
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, &cmd, 1, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with clearing DRAM reset for channel %c\n", 'A'+channel);
@@ -1816,10 +1825,12 @@ void rcd_forward_all_dram_cmds(int channel, int rank, bool forward) {
     rw_data[1] |= (0b1 & forward << 1); // and set a new one
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, 0, 0, 1, &rw_data[1], 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with changing CMD blocking in the RCD\n");
+    cdelay(2000);
 }
 
 /**
@@ -1844,6 +1855,7 @@ void rcd_release_qcs(int channel, int rank, bool sideband) {
         // to the RW04 register (JESD82-511 8.6.5)
         uint8_t cmd = 14 + !!channel;
         ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, &cmd, 1, false);
+        cdelay(2000);
 
         if (!ok)
             printf("There was a problem with releasing the QCS for channel %c\n", 'A'+channel);
@@ -1852,6 +1864,7 @@ void rcd_release_qcs(int channel, int rank, bool sideband) {
         issue_single(channel);
         cdelay(10);
     }
+    cdelay(2000);
 }
 
 /*-----------------------------------------------------------------------*/
@@ -1885,6 +1898,7 @@ void enter_dcstm(int channel, int rank) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with entering Host->RCD CS training (DCSTM)\n");
@@ -1918,6 +1932,7 @@ void exit_dcstm(int channel, int rank) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with exiting Host->RCD CS training (DCSTM)\n");
@@ -1973,6 +1988,7 @@ void qcs_inc(int channel, int rank, int address) {
     uint8_t rw_value = *qcs_dly | (1 << 7); // enable delays
 
     ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with incrementing Q%cCS%c_n output delay\n", 'A' + channel, '0' + (rank & 1));
@@ -1996,6 +2012,7 @@ void qcs_rst(int channel, int rank, int address) {
     uint8_t rw_value = 0; // RW[7] bit is 0, means output delays are disabled
 
     ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with resetting Q%cCS%c_n output delay\n", 'A' + channel, '0' + (rank & 1));
@@ -2024,6 +2041,7 @@ void enter_qcstm(int channel, int rank) {
 
     // write RW03 setting back
     ok &= sdram_rcd_write(rcd, 0, channel, 0, 3, &rw_data[3], 1, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with entering RCD->DRAM CS training (QCSTM)\n");
@@ -2051,6 +2069,7 @@ void exit_qcstm(int channel, int rank) {
 
     // write RW03 setting back
     ok &= sdram_rcd_write(rcd, 0, channel, 0, 3, &rw_data[3], 1, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CS training (QCSTM)\n");
@@ -2087,6 +2106,7 @@ void enter_dcatm(int channel, int rank) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with entering Host->RCD CA training (DCATM)\n");
@@ -2117,6 +2137,7 @@ void exit_dcatm(int channel, int rank) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with exiting Host->RCD CA training (DCATM)\n");
@@ -2184,6 +2205,7 @@ static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) 
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with changing DCA XOR sampling edge\n");
@@ -2276,6 +2298,7 @@ void qca_inc(int channel, int rank, int address) {
     uint8_t rw_value = *qca_dly | (1 << 7); // enable delays
 
     ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with incrementing Q%cCA output delay\n", 'A' + channel);
@@ -2299,6 +2322,7 @@ void qca_rst(int channel, int rank, int address) {
     uint8_t rw_value = 0; // RW[7] bit is 0, means output delays are disabled
 
     ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with resetting Q%cCA output delay\n", 'A' + channel);
@@ -2336,6 +2360,7 @@ void enter_qcatm(int channel, int rank) {
 
     // write RW00 and RW01 settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 2, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with entering RCD->DRAM CA training (QCATM)\n");
@@ -2369,6 +2394,7 @@ void exit_qcatm(int channel, int rank) {
 
     // write RW00 and RW01 settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 2, false);
+    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CA training (QCATM)\n");
