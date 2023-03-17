@@ -8,6 +8,20 @@
 
 #include <generated/sdram_phy.h>
 
+static uint8_t pec_calc(uint8_t pec, uint8_t *buf, uint8_t len) {
+    uint16_t inter = 0;
+    for (int i=0; i<len; ++i) {
+        inter = (pec ^ buf[i]) << 8;
+        for (int j=0; j<8; ++j) {
+            if (inter & 0x8000)
+                inter ^= 0x8380;
+            inter = inter << 1;
+        }
+        pec = inter >> 8;
+    }
+    return pec;
+}
+
 #if defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_DDR4_RDIMM)
 
 #ifdef SDRAM_PHY_DDR5SIMPHY
@@ -58,16 +72,22 @@ static bool sdram_rcd_block_read(uint8_t rcd, const uint8_t *rap_buf, uint8_t le
 		  1 // 1 byte for count
 		+ 4 // 4 bytes for register addressing
 		+ 1 // 1 byte for status from read
-		// + 1 // optional PEC
-	]; // total 6 bytes (7 with if using PEC)
+		+ 1 // optional PEC
+	]; // total 7 bytes using PEC
 
 	buf[0] = len;
 	for (int i = 0; i < len; i++)
 		buf[1 + i] = rap_buf[i];
 
-	uint8_t sidebus_cmd = 0xc2 | ((internal_cmd & 0b11) << 2); // | ((pec_en & 0b1) << 4);
+	uint8_t addr = 0x5f << 1;
+	uint8_t pec = pec_calc(0, &addr, 1);
+	uint8_t sidebus_cmd = 0xd2 | ((internal_cmd & 0b11) << 2);
+
+	pec = pec_calc(pec, &sidebus_cmd, 1);
+	buf[len+1] = pec_calc(pec, buf, len+1);
+
 	bool ok = i2c_write(RCD_RW_ADDR(rcd), sidebus_cmd, buf, sizeof(buf) - 1, 1); // -1 because no status byte
-	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd, buf, (1 + 1 + 4), false, 1);  // byte count + status + data
+	ok &= i2c_read(RCD_RW_ADDR(rcd), sidebus_cmd, buf, (1 + 1 + 4 + 1), false, 1);  // byte count + status + data + PEC
 
 	// copy status + data, ignore length
 	data[4] = buf[1]; // status
@@ -97,15 +117,21 @@ static bool sdram_rcd_block_write(uint8_t rcd, const uint8_t *rap_buf, uint8_t l
 		  1 // 1 byte for count
 		+ 4 // 4 bytes for register addressing
 		+ 4 // at most 4 bytes of data
-		// + 1 // optional PEC
-	]; // total 9 bytes (10 with if using PEC)
+		+ 1 // optional PEC
+	]; // total 10 bytes using PEC
 
 	buf[0] = len;
 	for (int i = 0; i < len; i++)
 		buf[1 + i] = rap_buf[i];
 
-	uint8_t sidebus_cmd = 0xc2 | ((internal_cmd & 0b11) << 2); // | ((pec_en & 0b1) << 4);
-	return i2c_write(RCD_RW_ADDR(rcd), sidebus_cmd, buf, (1 + len), 1);
+	uint8_t addr = 0x5f << 1;
+	uint8_t pec = pec_calc(0, &addr, 1);
+	uint8_t sidebus_cmd = 0xd2 | ((internal_cmd & 0b11) << 2);
+
+	pec = pec_calc(pec, &sidebus_cmd, 1);
+	buf[len+1] = pec_calc(pec, buf, len+1);
+
+	return i2c_write(RCD_RW_ADDR(rcd), sidebus_cmd, buf, (1 + len + 1), 1);
 }
 
 /**
