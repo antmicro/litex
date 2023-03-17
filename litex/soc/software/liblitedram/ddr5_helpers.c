@@ -406,6 +406,7 @@ static void phy_select(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dly_sel_write(mask<<select);
 #endif
+    cdelay(1000);
 }
 
 static void phy_deselect(int channel, int select, int width) {
@@ -418,6 +419,7 @@ static void phy_deselect(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dly_sel_write(0);
 #endif
+    cdelay(1000);
 }
 
 static void phy_dq_select(int channel, int select, int width) {
@@ -432,6 +434,7 @@ static void phy_dq_select(int channel, int select, int width) {
     ddrphy_CSRModule_dq_dly_sel_write(1<<select);
 #endif
 #endif // SDRAM_DELAY_PER_DQ
+    cdelay(1000);
 }
 
 static void phy_dq_deselect(int channel, int select, int width) {
@@ -446,6 +449,7 @@ static void phy_dq_deselect(int channel, int select, int width) {
     ddrphy_CSRModule_dq_dly_sel_write(0);
 #endif
 #endif // SDRAM_DELAY_PER_DQ
+    cdelay(1000);
 }
 
 static void idly_rst_internal(int channel) {
