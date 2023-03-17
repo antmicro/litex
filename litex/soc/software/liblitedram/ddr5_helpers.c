@@ -1881,31 +1881,36 @@ void enter_dcstm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[5];
+    uint8_t w_data[5];
+    uint8_t r_data[5];
 
     // we need to modify RW01 and RW02
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, w_data, false);
 
     // in RW01 we unset bit 5 to make sure we get channel feedback on alert_n
-    rw_data[1] &= ~(1 << 5);
+    w_data[1] &= ~(1 << 5);
 
     // in RW02 we select CS training mode
     // channel A settings: RW02[1:0]
     // channel B settings: RW02[3:2]
     // higher bit selects CS training mode, while lower bit selects rank
-    rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
-    rw_data[2] |= (0b10 | (rank & 1)) << (2 * channel); // set new bits
+    w_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    w_data[2] |= (0b10 | (rank & 1)) << (2 * channel); // set new bits
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
     cdelay(2000);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
+    for (int i=0; i<4; ++i) {
+        ok &= (w_data[i] == r_data[i]);
+    }
 
-    if (!ok)
+    if (!ok) {
         printf("There was a problem with entering Host->RCD CS training (DCSTM)\n");
+        cdelay(1000000);
+    }
 
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
-    printf("CS_en RW0:%hhx RW1:%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
-    cdelay(250);
+    printf("CS_en RW0:%hhx RW1:%hhx RW2:%hhx\n", r_data[0], r_data[1], r_data[2]);
 }
 
 /**
@@ -1920,26 +1925,31 @@ void exit_dcstm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[5];
+    uint8_t w_data[5];
+    uint8_t r_data[5];
 
     // we need to modify RW02
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, w_data, false);
 
     // in RW02 we clear training mode setting
     // channel A settings: RW02[1:0]
     // channel B settings: RW02[3:2]
-    rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    w_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
     cdelay(2000);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
+    for (int i=0; i<4; ++i) {
+        ok &= (w_data[i] == r_data[i]);
+    }
 
-    if (!ok)
+    if (!ok) {
         printf("There was a problem with exiting Host->RCD CS training (DCSTM)\n");
+        cdelay(1000000);
+    }
 
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
-    printf("CS_dis RW0:%hhx RW1:%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
-    cdelay(250);
+    printf("CS_dis RW0:%hhx RW1:%hhx RW2:%hhx\n", r_data[0], r_data[1], r_data[2]);
 }
 
 /**
@@ -2089,31 +2099,36 @@ void enter_dcatm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[5];
+    uint8_t w_data[5];
+    uint8_t r_data[5];
 
     // we need to modify RW01 and RW02
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, w_data, false);
 
     // in RW01 we unset bit 5 to make sure we get channel feedback on alert_n
-    rw_data[1] &= ~(1 << 5);
+    w_data[1] &= ~(1 << 5);
 
     // in RW02 we select CA training mode
     // channel A settings: RW02[1:0]
     // channel B settings: RW02[3:2]
     // write 0b01 to enter CA training
-    rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
-    rw_data[2] |=   0b01 << (2 * channel);  // set new bits
+    w_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    w_data[2] |=   0b01 << (2 * channel);  // set new bits
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
     cdelay(2000);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
+    for (int i=0; i<4; ++i) {
+        ok &= (w_data[i] == r_data[i]);
+    }
 
-    if (!ok)
+    if (!ok) {
         printf("There was a problem with entering Host->RCD CA training (DCATM)\n");
+        cdelay(1000000);
+    }
 
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
-    printf("CA_en RW0:%hhx RW1:%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
-    cdelay(250);
+    printf("CA_en RW0:%hhx RW1:%hhx RW2:%hhx\n", r_data[0], r_data[1], r_data[2]);
 }
 
 /**
@@ -2126,25 +2141,30 @@ void exit_dcatm(int channel, int rank) {
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[5];
+    uint8_t w_data[5];
+    uint8_t r_data[5];
 
     // we need to modify RW02
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, w_data, false);
 
     // channel A settings: RW02[1:0]
     // channel B settings: RW02[3:2]
-    rw_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    w_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
     cdelay(2000);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
+    for (int i=0; i<4; ++i) {
+        ok &= (w_data[i] == r_data[i]);
+    }
 
-    if (!ok)
+    if (!ok) {
         printf("There was a problem with exiting Host->RCD CA training (DCATM)\n");
+        cdelay(1000000);
+    }
 
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
-    printf("CA_dis RW0:%hhx RW1:%hhx RW2:%hhx\n", rw_data[0], rw_data[1], rw_data[2]);
-    cdelay(250);
+    printf("CA_dis RW0:%hhx RW1:%hhx RW2:%hhx\n", r_data[0], r_data[1], r_data[2]);
 }
 
 /**
@@ -2195,21 +2215,27 @@ static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) 
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t w_data[5];
+    uint8_t r_data[5];
 
     // we need to modify RW02[5:4]
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, w_data, false);
 
-    rw_data[2] &= ~(0b11 << 4);       // clear last setting
-    rw_data[2] |= (0b11 & edge) << 4; // and set a new one
+    w_data[2] &= ~(0b11 << 4);       // clear last setting
+    w_data[2] |= (0b11 & edge) << 4; // and set a new one
 
     // write the settings back
-    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
     cdelay(2000);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
+    for (int i=0; i<4; ++i) {
+        ok &= (w_data[i] == r_data[i]);
+    }
 
-    if (!ok)
+    if (!ok) {
         printf("There was a problem with changing DCA XOR sampling edge\n");
-    cdelay(250);
+        cdelay(1000000);
+    }
 }
 
 /**
