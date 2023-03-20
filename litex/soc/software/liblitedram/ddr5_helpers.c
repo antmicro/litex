@@ -406,7 +406,7 @@ static void phy_select(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dly_sel_write(mask<<select);
 #endif
-    cdelay(1000);
+    cdelay(10000);
 }
 
 static void phy_deselect(int channel, int select, int width) {
@@ -419,7 +419,7 @@ static void phy_deselect(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dly_sel_write(0);
 #endif
-    cdelay(1000);
+    cdelay(10000);
 }
 
 static void phy_dq_select(int channel, int select, int width) {
@@ -434,7 +434,7 @@ static void phy_dq_select(int channel, int select, int width) {
     ddrphy_CSRModule_dq_dly_sel_write(1<<select);
 #endif
 #endif // SDRAM_DELAY_PER_DQ
-    cdelay(1000);
+    cdelay(10000);
 }
 
 static void phy_dq_deselect(int channel, int select, int width) {
@@ -449,7 +449,7 @@ static void phy_dq_deselect(int channel, int select, int width) {
     ddrphy_CSRModule_dq_dly_sel_write(0);
 #endif
 #endif // SDRAM_DELAY_PER_DQ
-    cdelay(1000);
+    cdelay(10000);
 }
 
 static void idly_rst_internal(int channel) {
@@ -1537,13 +1537,14 @@ int ca_check_if_works(int channel, int rank, int address, int phase_shift) {
 void enter_write_leveling(int channel) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        return ddrphy_CSRModule_B_wlevel_en_write(1);
+        ddrphy_CSRModule_B_wlevel_en_write(1);
     } else {
-        return ddrphy_CSRModule_A_wlevel_en_write(1);
+        ddrphy_CSRModule_A_wlevel_en_write(1);
     }
 #else
-    return ddrphy_CSRModule_wlevel_en_write(1);
+    ddrphy_CSRModule_wlevel_en_write(1);
 #endif
+    cdelay(10000);
 }
 
 int wr_dqs_check_if_works(int channel, int rank, int module, int width) {
@@ -1596,7 +1597,7 @@ void clear_phy_fifos(int channel) {
 #else
     ddrphy_CSRModule_discard_rd_fifo_write(1);
 #endif
-    cdelay(1000);
+    cdelay(1000000);
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         ddrphy_CSRModule_B_discard_rd_fifo_write(0);
@@ -1830,7 +1831,6 @@ void rcd_forward_all_dram_cmds(int channel, int rank, bool forward) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
-    cdelay(2000);
 
     if (!ok)
         printf("There was a problem with changing CMD blocking in the RCD\n");
