@@ -738,25 +738,25 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
     // in this stage we don't care about eye end
     eye_t eye = DEFAULT_EYE;
 
-#ifdef INFO_DDR5
+//#ifdef INFO_DDR5
     printf("Finding read preamble\n");
-#endif // INFO_DDR5
+//#endif // INFO_DDR5
 
     /* Coarse alignment */
     rd_rst(channel, module, width);
     for (rd_cycle_dly = 0; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye.state != AFTER; rd_cycle_dly ++) {
-#ifdef INFO_DDR5
+//#ifdef INFO_DDR5
         printf("%2d|", rd_cycle_dly);
-#endif // INFO_DDR5
+//#endif // INFO_DDR5
 
         idly_rst(channel, module, width);
         for (idly = 0; idly < SDRAM_PHY_DELAYS; idly++) {
             send_mrr(channel, rank, 31);
             preamble = captured_preamble(channel, module, width);
 
-#ifdef INFO_DDR5
+//#ifdef INFO_DDR5
             printf("%01x", preamble);
-#endif // INFO_DDR5
+//#endif // INFO_DDR5
 
             // Should be 1tCK preamble 0b10 (JESD79-5A 4.18.3),
             // but due to the way basephy.py works we sample 2 cycles,
@@ -770,9 +770,9 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
             idly_inc(channel, module, width);
         }
 
-#ifdef INFO_DDR5
+//#ifdef INFO_DDR5
         printf("\n");
-#endif // INFO_DDR5
+//#endif // INFO_DDR5
 
         rd_inc(channel, module, width);
     }
