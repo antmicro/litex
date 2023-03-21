@@ -1391,8 +1391,8 @@ void send_read(int channel, int rank) {
     setup_rddata_cnt(channel, 0);
 }
 
-void send_nop(int channel, int rank) {
-    cmd_injector(channel, 1<<0, 1<<rank, 0x3FFF, 0, 0, 1, 1);
+void prep_nop(int channel, int rank) {
+    cmd_injector(channel, 1<<0, 3, 0x3FFF, 0, 0, 1, 1);
     if (N2_mode)
         cmd_injector(channel, 1<<1, 0, 0x3FFF, 0, 0, 1, 1);
     else
@@ -1403,7 +1403,22 @@ void send_nop(int channel, int rank) {
     cmd_injector(channel, 1<<5, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
-    issue_single(channel);
+}
+
+void force_issue_single(void) {
+#ifdef SDRAM_PHY_SUBCHANNELS
+    sdram_dfii_b_cmdinjector_single_shot_write(1);
+    sdram_dfii_a_cmdinjector_single_shot_write(1);
+#else
+    sdram_dfii_cmdinjector_single_shot_write(1);
+#endif
+    sdram_dfii_force_issue_write(1);
+#ifdef SDRAM_PHY_SUBCHANNELS
+    sdram_dfii_b_cmdinjector_single_shot_write(0);
+    sdram_dfii_a_cmdinjector_single_shot_write(0);
+#else
+    sdram_dfii_cmdinjector_single_shot_write(0);
+#endif
     cdelay(50);
 }
 

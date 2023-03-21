@@ -133,7 +133,8 @@ void send_precharge(int channel, int rank);
 void send_write(int channel, int rank);
 void send_write_byte(int channel, int rank, int module, int byte);
 void send_read(int channel, int rank);
-void send_nop(int channel, int rank);
+void prep_nop(int channel, int rank);
+void force_issue_single(void);
 
 void enter_cstm(int channel, int rank);
 void exit_cstm(int channel, int rank);
