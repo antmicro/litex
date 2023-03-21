@@ -1187,11 +1187,17 @@ void setup_enumerate(int channel, int rank, int module, int width) {
         set_data_module_phase(channel, module, width, i, 0);
     cmd_injector(channel, 0xf, 0, 0, 1, 0, 0, 0);
     store_continuous(channel);
+    cdelay(50);
     cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
     store_continuous(channel);
+    cdelay(50);
     cmd_injector(channel, 0xf, 1<<rank, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
     store_continuous(channel);
+    cdelay(50);
     cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
+    store_continuous(channel);
+    cdelay(50);
+    cmd_injector(channel, 0xf, 0, 0, 0, 0, 0, 0);
     store_continuous(channel);
     cdelay(50);
 }
@@ -1199,9 +1205,14 @@ void setup_enumerate(int channel, int rank, int module, int width) {
 void send_mpc(int channel, int rank, int cmd) {
     cmd_injector(channel, 0xf, 0, 0xf | (cmd<<5), 0, 0, 0, 0);
     store_continuous(channel);
+    cdelay(50);
     cmd_injector(channel, 0xf, 1<<rank, 0xf | (cmd<<5), 0, 0, 0, 0);
     store_continuous(channel);
+    cdelay(50);
     cmd_injector(channel, 0xf, 0, 0xf | (cmd<<5), 0, 0, 0, 0);
+    store_continuous(channel);
+    cdelay(50);
+    cmd_injector(channel, 0xf, 0, 0, 0, 0, 0, 0);
     store_continuous(channel);
     cdelay(50);
 }
@@ -1842,7 +1853,7 @@ void rcd_forward_all_dram_cmds(int channel, int rank, bool forward) {
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     rw_data[1] &= ~(0b1 << 1);          // clear last setting
-    rw_data[1] |= (0b1 & forward << 1); // and set a new one
+    rw_data[1] |= ((0b1 & forward) << 1); // and set a new one
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);

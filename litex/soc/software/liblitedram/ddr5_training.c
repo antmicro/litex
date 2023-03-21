@@ -1414,12 +1414,14 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                 // Setting read delay to eye center
                 wr_dq_rst(channel, module, ctx->die_width);
                 odly_dq_rst(channel, module, ctx->die_width);
-                for (it = 0; it < middle_cycle; ++it) {
-                    wr_dq_inc(channel, module, ctx->die_width);
-                }
-                for (it = 0; it < middle_delay; ++it) {
-                    odly_dq_inc(channel, module, ctx->die_width);
-                }
+                if (start_cycle >= 0)
+                    for (it = 0; it < middle_cycle; ++it) {
+                        wr_dq_inc(channel, module, ctx->die_width);
+                    }
+                if (start_delay >= 0)
+                    for (it = 0; it < middle_delay; ++it) {
+                        odly_dq_inc(channel, module, ctx->die_width);
+                    }
 
                 // DM training
                 printf("%x\n", mr5);
