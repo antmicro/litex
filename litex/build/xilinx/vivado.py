@@ -192,7 +192,7 @@ class XilinxVivadoToolchain(GenericToolchain):
         # The asynchronous input to a MultiReg is a false path
         self.platform.add_platform_command(
             "set_false_path -quiet "
-            "-through [get_nets -hierarchical -filter {{mr_ff == TRUE}}]"
+            "-to [get_cells -hierarchical -filter {{ mr_ff == TRUE }}]"
         )
         # The asychronous reset input to the AsyncResetSynchronizer is a false path
         self.platform.add_platform_command(
