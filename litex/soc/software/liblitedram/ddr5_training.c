@@ -274,7 +274,11 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
     int left_side, right_side;
     int32_t rank, address, start_address, end_address;
 
-    for (rank = 0; rank < ctx->ranks; rank++) {
+    int ranks = ctx->ranks;
+    if (ctx->training_type == HOST_RCD)
+        ranks = 1;
+
+    for (rank = 0; rank < ranks; rank++) {
         printf("Rank:%2"PRId32"\n", rank);
         // Enter CA training
         ctx->ca.enter_training_mode(channel, rank);
@@ -368,6 +372,8 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly) {
 
             ctx->cs.exit_training_mode(channel, rank);
 
+            if (ctx->training_type == HOST_RCD && rank == 1)
+                continue;
             //                    CA rescan                    //
             ctx->ca.enter_training_mode(channel, rank);
 
@@ -1613,7 +1619,7 @@ training_ctx_t host_rcd_ctx = {
     // use only first rank, leave all other as inactive.
     // Use SDRAM_PHY_RANKS if we ever support multiple ranks
     // and independent timing for them.
-    .ranks = 1,
+    .ranks = 2,
     // must be populated from SPD
     .die_width = -1,
 };
