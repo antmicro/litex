@@ -78,6 +78,7 @@ typedef struct {
     enum dca_rate rate;
     int ranks;
     int die_width;
+    bool CS_CA_successful;
 } training_ctx_t;
 
 void sdram_ddr5_module_enumerate(training_ctx_t *ctx);

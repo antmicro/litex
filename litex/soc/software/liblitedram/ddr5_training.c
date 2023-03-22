@@ -560,15 +560,11 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
         CA_check_lines(ctx, channel);
         CA_training(ctx, channel, &CA_success);
     }
+    ctx->CS_CA_successful &= (CS_success & CA_success);
     if (!(CS_success & CA_success)) {
         enable_dfi_2n_mode();
     } else {
         CK_CS_CA_finalize_timings(ctx);
-        for (channel = 0; channel < CHANNELS; channel++) {
-            for (rank = 0; rank < ctx->ranks; rank++) {
-                disable_dram_2n_mode(channel, rank);
-            }
-        }
     }
 }
 #endif // SKIP_NO_DELAYS
@@ -1589,6 +1585,7 @@ training_ctx_t host_dram_ctx = {
     // defualts to dq_dqs_ratio from sdram_phy.h
     .die_width = SDRAM_PHY_DQ_DQS_RATIO,
     .rate = SDR1,
+    .CS_CA_successful = true,
 };
 
 #if defined(CONFIG_HAS_I2C)
@@ -1627,6 +1624,7 @@ training_ctx_t host_rcd_ctx = {
     // must be populated from SPD
     .die_width = -1,
     .rate = SDR1,
+    .CS_CA_successful = true,
 };
 
 enum module_type {
@@ -1736,6 +1734,7 @@ void sdram_ddr5_flow(void) {
         rcd_init(&host_rcd_ctx);
         // base_ctx = &rcd_dram_ctx; // TODO: uncomment when RCD->DRAM training is implemented
         base_ctx->rate = host_rcd_ctx.rate;
+        base_ctx->CS_CA_successful &= host_rcd_ctx.CS_CA_successful;
     } else {
         reset_sequence();
     }
@@ -1753,6 +1752,14 @@ void sdram_ddr5_flow(void) {
 #if !defined(CONFIG_HAS_I2C)
     sdram_ddr5_cs_ca_training(base_ctx);
 #endif // !defined(CONFIG_HAS_I2C)
+
+    if (base_ctx->CS_CA_successful && base_ctx->rate == DDR) {
+        for (int channel = 0; channel < CHANNELS; channel++) {
+            for (int rank = 0; rank < base_ctx->ranks; rank++) {
+                disable_dram_2n_mode(channel, rank);
+            }
+        }
+    }
 
     if (in_2n_mode()) {
         printf("2N mode setup\n");
