@@ -75,6 +75,7 @@ typedef struct {
         RCD_DRAM,
         TRAINING_TYPE_COUNT,
     } training_type;
+    enum dca_rate rate;
     int ranks;
     int die_width;
 } training_ctx_t;

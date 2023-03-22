@@ -184,6 +184,13 @@ void qca_inc(int channel, int rank, int address);
 void qca_rst(int channel, int rank, int address);
 void enter_qcatm(int channel, int rank);
 void exit_qcatm(int channel, int rank);
+#else
+
+enum dca_rate {
+    SDR1 = 0b00,
+    DDR  = 0b01,
+};
+
 #endif // defined(CONFIG_HAS_I2C)
 
 #endif // SDRAM_PHY_DDR5

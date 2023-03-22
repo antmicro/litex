@@ -547,7 +547,8 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx) {
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     int32_t channel, rank;
     uint8_t CS_success, CA_success;
-    disable_dfi_2n_mode();
+    if (ctx->rate == DDR)
+        disable_dfi_2n_mode();
 
     CS_success = 1;
     CA_success = 1;
@@ -1587,6 +1588,7 @@ training_ctx_t host_dram_ctx = {
     // should be populated from SPD
     // defualts to dq_dqs_ratio from sdram_phy.h
     .die_width = SDRAM_PHY_DQ_DQS_RATIO,
+    .rate = SDR1,
 };
 
 #if defined(CONFIG_HAS_I2C)
@@ -1608,7 +1610,7 @@ training_ctx_t host_rcd_ctx = {
         .exit_training_mode  = exit_dcatm,
         .inc_dly = ca_inc,
         .rst_dly = ca_rst,
-        .check = dca_check_if_works,
+        .check = dca_check_if_works_ddr,
         .has_line13 = NULL, // RCD has always 7 DCA lines
     },
     .par = {
@@ -1624,6 +1626,7 @@ training_ctx_t host_rcd_ctx = {
     .ranks = 2,
     // must be populated from SPD
     .die_width = -1,
+    .rate = SDR1,
 };
 
 enum module_type {
@@ -1682,9 +1685,12 @@ static void rcd_init(training_ctx_t *ctx) {
     reset_sequence();
 
     // FIXME: this function should initialize all RCDs
-    rcd_set_dca_rate(0, 0, DDR);
+    rcd_set_dca_rate(0, 0, ctx->rate);
+    if (ctx->rate != DDR)
+        ctx->ca.check = dca_check_if_works_sdr;
     rcd_set_dimm_operating_speed(0, 0, -1);
     rcd_set_termination_and_vref(0);
+    reset_sequence();
 
     for (int channel = 0; channel < CHANNELS; channel++)
         rcd_clear_qrst(channel, 0); // FIXME: this should clear QRST for all RCDs
@@ -1729,6 +1735,7 @@ void sdram_ddr5_flow(void) {
         ddrphy_CSRModule_rdimm_mode_write(1);
         rcd_init(&host_rcd_ctx);
         // base_ctx = &rcd_dram_ctx; // TODO: uncomment when RCD->DRAM training is implemented
+        base_ctx->rate = host_rcd_ctx.rate;
     } else {
         reset_sequence();
     }
