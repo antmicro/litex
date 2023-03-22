@@ -1666,8 +1666,8 @@ void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate) {
     // we need to modify RW00[1:0]
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
-    rw_data[0] &= ~(0b11 << 0);       // clear last setting
-    rw_data[0] |= (0b11 & rate << 0); // and set a new one
+    rw_data[0] &= ~(0b11 << 0);         // clear last setting
+    rw_data[0] |= ((0b11 & rate) << 0); // and set a new one
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, &rw_data[0], 1, false);
