@@ -2294,7 +2294,7 @@ static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) 
  * just as good when going low->high and high->low.
  * JESD82-511 5.2.1
  */
-int dca_check_if_works(int channel, int rank, int address, int phase_shift) {
+int dca_check_if_works_ddr(int channel, int rank, int address, int phase_shift) {
     int ok = 1;
 
     for(int edge=0; edge<2; ++edge) {
@@ -2323,6 +2323,38 @@ int dca_check_if_works(int channel, int rank, int address, int phase_shift) {
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ok &= !ddrphy_CSRModule_alert_read();
     }
+    dca_training_xor_sampling_edge(channel, rank, 0); // restore default values
+
+    return ok;
+}
+
+int dca_check_if_works_sdr(int channel, int rank, int address, int phase_shift) {
+    int ok = 1;
+
+    dca_training_xor_sampling_edge(channel, rank, 1);
+    // Test change from low to high
+    dca_sample_prep(channel, rank, address, 1, phase_shift);
+
+    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+    ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
+    ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
+    cdelay(100);
+    ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
+    cdelay(1000);
+    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+    ok &= ddrphy_CSRModule_alert_read();
+
+    // Test change from high to low
+    dca_sample_prep(channel, rank, address, 0, phase_shift);
+
+    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+    ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
+    ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
+    cdelay(100);
+    ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
+    cdelay(1000);
+    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+    ok &= !ddrphy_CSRModule_alert_read();
     dca_training_xor_sampling_edge(channel, rank, 0); // restore default values
 
     return ok;

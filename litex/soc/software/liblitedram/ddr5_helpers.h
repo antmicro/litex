@@ -177,7 +177,8 @@ void exit_qcstm(int channel, int rank);
 
 void enter_dcatm(int channel, int rank);
 void exit_dcatm(int channel, int rank);
-int dca_check_if_works(int channel, int rank, int address, int cs_dly);
+int dca_check_if_works_ddr(int channel, int rank, int address, int cs_dly);
+int dca_check_if_works_sdr(int channel, int rank, int address, int cs_dly);
 
 void qca_inc(int channel, int rank, int address);
 void qca_rst(int channel, int rank, int address);
