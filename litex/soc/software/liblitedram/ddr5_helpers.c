@@ -2224,10 +2224,10 @@ static void dca_sample_prep(int channel, int rank, int address, int l2h, int pha
     int address_other_half = (address + 7) % 14;
 
     // state where all CA bits have the same value
-    int default_state = (!l2h) << address | (!l2h) << address_other_half;
+    int default_state = ((!l2h) << address) | ((!l2h) << address_other_half);
 
     // state where only the selected `address` bit is negated
-    int negated_state =   l2h  << address | (!l2h) << address_other_half;
+    int negated_state =   (l2h  << address) | ((!l2h) << address_other_half);
 
     cmd_injector(    channel, 0xf,              0,       default_state, 0, 0, 1, 0);
 
@@ -2298,10 +2298,20 @@ int dca_check_if_works_ddr(int channel, int rank, int address, int phase_shift) 
     int ok = 1;
 
     for(int edge=0; edge<2; ++edge) {
-        dca_training_xor_sampling_edge(channel, rank, 1<<edge);
         // Test change from low to high
         dca_sample_prep(channel, rank, address + edge*7, 1, phase_shift);
 
+        dca_training_xor_sampling_edge(channel, rank, 0);
+        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+        ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
+        ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
+        cdelay(100);
+        ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
+        cdelay(1000);
+        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+        ok &= ddrphy_CSRModule_alert_read();
+
+        dca_training_xor_sampling_edge(channel, rank, 1<<edge);
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
         ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
@@ -2314,6 +2324,17 @@ int dca_check_if_works_ddr(int channel, int rank, int address, int phase_shift) 
         // Test change from high to low
         dca_sample_prep(channel, rank, address + edge*7, 0, phase_shift);
 
+        dca_training_xor_sampling_edge(channel, rank, 0);
+        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+        ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
+        ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
+        cdelay(100);
+        ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
+        cdelay(1000);
+        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+        ok &= ddrphy_CSRModule_alert_read();
+
+        dca_training_xor_sampling_edge(channel, rank, 1<<edge);
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
         ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
