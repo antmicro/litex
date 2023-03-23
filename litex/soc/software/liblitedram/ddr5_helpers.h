@@ -161,6 +161,7 @@ enum dca_rate {
 
 void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate);
 void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed);
+void rcd_set_dimm_operating_speed_band(int channel, int rank, int target_speed);
 void rcd_set_termination_and_vref(int rank);
 void rcd_clear_qrst(int channel, int rank);
 void rcd_forward_all_dram_cmds(int channel, int rank, bool forward);

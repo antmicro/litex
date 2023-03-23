@@ -1689,6 +1689,8 @@ static void rcd_init(training_ctx_t *ctx) {
     rcd_set_dimm_operating_speed(0, 0, -1);
     rcd_set_termination_and_vref(0);
     reset_sequence();
+    rcd_set_dimm_operating_speed_band(0, 0, -1);
+    busy_wait_us(50);
 
     for (int channel = 0; channel < CHANNELS; channel++)
         rcd_clear_qrst(channel, 0); // FIXME: this should clear QRST for all RCDs

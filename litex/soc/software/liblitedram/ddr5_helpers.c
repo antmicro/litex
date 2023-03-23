@@ -1698,7 +1698,7 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
 
     // Special case, -1 means: enable PLL bypass mode
     if (target_speed == -1) {
-        coarse = 0x0f;
+        coarse = 0x0e;
 
         ok &= sdram_rcd_write(rcd, 0, 0, 0, 5, &coarse, 1, false);
         cdelay(2000);
@@ -1760,6 +1760,22 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
 
     if (!ok)
         printf("There was a problem with setting DIMM speed in the RCD\n");
+}
+
+void rcd_set_dimm_operating_speed_band(int channel, int rank, int target_speed) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[4];
+
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 4, rw_data, false);
+    if (target_speed <= 1400)
+        rw_data[1] |= 1<<7;
+
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, rw_data, 4, false);
+    cdelay(2000);
+
+    if (!ok)
+        printf("There was a problem with setting DIMM band in the RCD\n");
 }
 
 void rcd_set_termination_and_vref(int rank) {
