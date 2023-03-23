@@ -155,7 +155,7 @@ bool sdram_rcd_read(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_num
 
 	bool ok = true;
 
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 1; i++) {
 		if (byte_read)
 			ok &= sdram_rcd_byte_read(rcd, rap_buf, sizeof(rap_buf), data, RCD_READ_CMD);
 		else
@@ -190,7 +190,7 @@ bool sdram_rcd_write(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_nu
 
 	bool ok = true;
 
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 1; i++) {
 		if (byte_write)
 			ok &= sdram_rcd_byte_write(rcd, rap_buf, (4 + size), RCD_WRITE_CMD(size));
 		else
