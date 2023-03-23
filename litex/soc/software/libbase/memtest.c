@@ -7,9 +7,9 @@
 #include <generated/soc.h>
 #include <generated/csr.h>
 
-#define MEMTEST_BUS_DEBUG
-#define MEMTEST_DATA_DEBUG
-#define MEMTEST_ADDR_DEBUG
+//#define MEMTEST_BUS_DEBUG
+//#define MEMTEST_DATA_DEBUG
+//#define MEMTEST_ADDR_DEBUG
 
 // Limits the number of errors printed, so that we can still access bios console
 #ifndef MEMTEST_DEBUG_MAX_ERRORS
