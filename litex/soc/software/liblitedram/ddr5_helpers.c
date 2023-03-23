@@ -2354,7 +2354,7 @@ int dca_check_if_works_sdr(int channel, int rank, int address, int phase_shift) 
 
     dca_training_xor_sampling_edge(channel, rank, 1);
     // Test change from low to high
-    dca_sample_prep(channel, rank, address, 1, phase_shift);
+    ca_sample_prep(channel, rank, address, 1, phase_shift);
 
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
@@ -2366,7 +2366,7 @@ int dca_check_if_works_sdr(int channel, int rank, int address, int phase_shift) 
     ok &= ddrphy_CSRModule_alert_read();
 
     // Test change from high to low
-    dca_sample_prep(channel, rank, address, 0, phase_shift);
+    ca_sample_prep(channel, rank, address, 0, phase_shift);
 
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
