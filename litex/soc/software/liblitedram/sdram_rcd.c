@@ -1,6 +1,7 @@
 // This file is Copyright (c) 2023 Antmicro <www.antmicro.com>
 // License: BSD
 
+#define I2C_FREQ_HZ 200000
 #include <libbase/i2c.h>
 #include <liblitedram/sdram_rcd.h>
 
