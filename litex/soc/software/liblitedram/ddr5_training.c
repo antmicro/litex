@@ -1584,7 +1584,7 @@ training_ctx_t host_dram_ctx = {
     // should be populated from SPD
     // defualts to dq_dqs_ratio from sdram_phy.h
     .die_width = SDRAM_PHY_DQ_DQS_RATIO,
-    .rate = SDR1,
+    .rate = DDR,
     .CS_CA_successful = true,
 };
 
@@ -1623,7 +1623,7 @@ training_ctx_t host_rcd_ctx = {
     .ranks = 2,
     // must be populated from SPD
     .die_width = -1,
-    .rate = SDR1,
+    .rate = DDR,
     .CS_CA_successful = true,
 };
 
