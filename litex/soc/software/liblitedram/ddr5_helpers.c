@@ -332,27 +332,27 @@ uint32_t capture_and_reduce_module(int channel, int module, int width, int opera
 
 int or_sample(int channel) {
     setup_capture(channel, 0);
-    cdelay(100);
-    start_capture(channel);
     cdelay(1000);
+    start_capture(channel);
+    cdelay(10000);
     stop_capture(channel);
     return !!capture_and_reduce_result(channel, 0);
 }
 
 int and_sample(int channel) {
     setup_capture(channel, 3);
-    cdelay(100);
-    start_capture(channel);
     cdelay(1000);
+    start_capture(channel);
+    cdelay(10000);
     stop_capture(channel);
     return !!capture_and_reduce_result(channel, 1);
 }
 
 int wleveling_sample(int channel, int module, int width) {
     setup_capture(channel, 3);
-    cdelay(100);
-    start_capture(channel);
     cdelay(1000);
+    start_capture(channel);
+    cdelay(10000);
     stop_capture(channel);
     return !!capture_and_reduce_module(channel, module, width, 1);
 }
@@ -1698,7 +1698,7 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
 
     // Special case, -1 means: enable PLL bypass mode
     if (target_speed == -1) {
-        coarse = 0x0e;
+        coarse = 0x0f;
 
         ok &= sdram_rcd_write(rcd, 0, 0, 0, 5, &coarse, 1, false);
         cdelay(2000);
