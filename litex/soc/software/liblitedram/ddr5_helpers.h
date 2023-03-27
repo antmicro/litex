@@ -167,6 +167,10 @@ void rcd_clear_qrst(int channel, int rank);
 void rcd_forward_all_dram_cmds(int channel, int rank, bool forward);
 void rcd_release_qcs(int channel, int rank, bool sideband);
 
+void enter_ca_pass(int rank);
+void exit_ca_pass(int rank);
+void select_ca_pass(int rank);
+
 void enter_dcstm(int channel, int rank);
 void exit_dcstm(int channel, int rank);
 int dcs_check_if_works(int channel, int rank, int address, int shift_0101);
@@ -186,6 +190,10 @@ void qca_rst(int channel, int rank, int address);
 void enter_qcatm(int channel, int rank);
 void exit_qcatm(int channel, int rank);
 #else
+
+void enter_ca_pass(int rank);
+void exit_ca_pass(int rank);
+void select_ca_pass(int rank);
 
 enum dca_rate {
     SDR1 = 0b00,

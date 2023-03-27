@@ -1729,12 +1729,12 @@ void sdram_ddr5_flow(void) {
     training_ctx_t *base_ctx = &host_dram_ctx;
     enable_phy();
 
+    bool is_rdimm = false;
 #if defined(CONFIG_HAS_I2C)
-    // TODO: read SPD die width
 #ifdef DDR5_RDIMM_SIM
-    bool is_rdimm = true;
+    is_rdimm = true;
 #else
-    bool is_rdimm = read_module_type(0) == RDIMM;
+    is_rdimm = read_module_type(0) == RDIMM;
 #endif // DDR5_RDIMM_SIM
     int die_width = read_module_width(0); // FIXME: handle multiple sticks and SPDs
     host_dram_ctx.die_width = die_width;
@@ -1757,9 +1757,18 @@ void sdram_ddr5_flow(void) {
 
     dram_start_sequence();
 
+    if (is_rdimm) {
+        enter_ca_pass(0);
+    }
     for (int rank = 0; rank < base_ctx->ranks; ++rank) {
+        if (is_rdimm)
+            select_ca_pass(rank);
         dram_setup_and_enumerate(base_ctx, rank);
     }
+    if (is_rdimm) {
+        exit_ca_pass(0);
+    }
+
 
      // TODO: guard below can be removed when RCD->DRAM training is implemented
      // and base_ctx is changed to rcd_dram_ctx after performing CS/CA training

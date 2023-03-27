@@ -1913,6 +1913,61 @@ void rcd_release_qcs(int channel, int rank, bool sideband) {
     cdelay(2000);
 }
 
+void enter_ca_pass(int rank) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+
+    uint8_t rw_data[5];
+
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+
+    rw_data[0] |= (0b1 << 2);
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+
+    if (!ok)
+        printf("There was a problem with entering CA pass Through in the RCD\n");
+    cdelay(2000);
+}
+
+void exit_ca_pass(int rank) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+
+    uint8_t rw_data[5];
+
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+
+    rw_data[0] &= ~(0b1 << 2);
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+
+    if (!ok)
+        printf("There was a problem with exiting CA pass Through in the RCD\n");
+    cdelay(2000);
+}
+
+void select_ca_pass(int rank) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+
+    uint8_t rw_data[5];
+
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+
+    rw_data[0] &= ~(0b1 << 3);
+    rw_data[0] |= ((rank & 0b1) << 3);
+
+    // write the settings back
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 4, false);
+
+    if (!ok)
+        printf("There was a problem with selecting rank for CA pass Through in the RCD\n");
+    cdelay(2000);
+}
+
 /*-----------------------------------------------------------------------*/
 /* Host->RCD CS Training (DCSTM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
@@ -2401,7 +2456,6 @@ int dca_check_if_works_sdr(int channel, int rank, int address, int phase_shift) 
 /* RCD->DRAM CA Training (QCATM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
 
-#ifdef SDRAM_PHY_RCD_DRAM_TRAINING_CAPABLE
 static uint8_t qca_delays[2][14] = {}; // init with 0s
 
 /**
@@ -2524,7 +2578,12 @@ void exit_qcatm(int channel, int rank) {
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CA training (QCATM)\n");
 }
-#endif // SDRAM_PHY_RCD_DRAM_TRAINING_CAPABLE
+
+#else // defined(CONFIG_HAS_I2C)
+
+void enter_ca_pass(int rank) {};
+void exit_ca_pass(int rank) {};
+void select_ca_pass(int rank) {};
 
 #endif // defined(CONFIG_HAS_I2C)
 
