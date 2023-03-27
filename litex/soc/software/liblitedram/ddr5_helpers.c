@@ -1175,11 +1175,7 @@ uint8_t recover_mrr_value(int channel, int module, int width) {
 
 void setup_enumerate(int channel, int rank, int module, int width) {
     int module_, i;
-#ifdef SDRAM_PHY_SUBCHANNELS
-    for (module_ = 0; module_ < SDRAM_PHY_MODULES/2; module_++) {
-#else
-    for (module_ = 0; module_ < SDRAM_PHY_MODULES; module_++) {
-#endif // SDRAM_PHY_SUBCHANNELS
+    for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
         for (i = 0; i < 4; ++i)
             set_data_module_phase(channel, module_, width, i, 0xffff);
     }
@@ -2010,8 +2006,6 @@ void enter_dcstm(int channel, int rank) {
         printf("There was a problem with entering Host->RCD CS training (DCSTM)\n");
         cdelay(1000000);
     }
-
-    printf("CS_en RW0:%hhx RW1:%hhx RW2:%hhx\n", r_data[0], r_data[1], r_data[2]);
 }
 
 /**
@@ -2049,8 +2043,6 @@ void exit_dcstm(int channel, int rank) {
         printf("There was a problem with exiting Host->RCD CS training (DCSTM)\n");
         cdelay(1000000);
     }
-
-    printf("CS_dis RW0:%hhx RW1:%hhx RW2:%hhx\n", r_data[0], r_data[1], r_data[2]);
 }
 
 /**
@@ -2228,8 +2220,6 @@ void enter_dcatm(int channel, int rank) {
         printf("There was a problem with entering Host->RCD CA training (DCATM)\n");
         cdelay(1000000);
     }
-
-    printf("CA_en RW0:%hhx RW1:%hhx RW2:%hhx\n", r_data[0], r_data[1], r_data[2]);
 }
 
 /**
@@ -2264,8 +2254,6 @@ void exit_dcatm(int channel, int rank) {
         printf("There was a problem with exiting Host->RCD CA training (DCATM)\n");
         cdelay(1000000);
     }
-
-    printf("CA_dis RW0:%hhx RW1:%hhx RW2:%hhx\n", r_data[0], r_data[1], r_data[2]);
 }
 
 /**
