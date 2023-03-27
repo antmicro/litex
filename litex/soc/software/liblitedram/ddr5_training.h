@@ -77,12 +77,14 @@ typedef struct {
     } training_type;
     enum dca_rate rate;
     int ranks;
+    int channels;
     int die_width;
+    int max_delay_taps;
     bool CS_CA_successful;
 } training_ctx_t;
 
-void sdram_ddr5_module_enumerate(training_ctx_t *ctx);
 void sdram_ddr5_cs_ca_training(training_ctx_t *ctx);
+void sdram_ddr5_module_enumerate(int rank, int width, int channels);
 void sdram_ddr5_read_training(training_ctx_t *ctx);
 void sdram_ddr5_write_training(training_ctx_t *ctx);
 

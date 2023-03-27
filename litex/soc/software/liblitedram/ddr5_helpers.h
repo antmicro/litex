@@ -148,7 +148,7 @@ void enter_write_leveling(int channel);
 void exit_write_leveling(int channel);
 void clear_phy_fifos(int channel);
 int wr_dqs_check_if_works(int channel, int rank, int module, int width);
-void wleveling_scan(int channel, int rank, int module, int width, eye_t *eye_state);
+void wleveling_scan(int channel, int rank, int module, int width, int max_delay, eye_t *eye_state);
 
 #if defined(CONFIG_HAS_I2C)
 uint8_t get_rcd_id(int rank);

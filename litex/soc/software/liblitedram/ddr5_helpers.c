@@ -1578,11 +1578,11 @@ int wr_dqs_check_if_works(int channel, int rank, int module, int width) {
     return wleveling_sample(channel, module, width);
 }
 
-void wleveling_scan(int channel, int rank, int module, int width, eye_t *eye) {
+void wleveling_scan(int channel, int rank, int module, int width, int max_delay, eye_t *eye) {
     int works, delay;
 
     odly_dqs_rst(channel, module, width);
-    for(delay = 0; delay < SDRAM_PHY_DELAYS; ++delay) {
+    for(delay = 0; delay < max_delay; ++delay) {
         works = 1;
 
         // Check multiple times, as we can be on the edge of transition
