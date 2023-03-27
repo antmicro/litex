@@ -788,7 +788,7 @@ uint8_t lfsr_next(uint8_t input) {
 int compare_serial(int channel, int module, int width, uint16_t data, int inv, int select) {
     uint16_t module_data[8];
     int phase;
-    int bit, it, _bit;
+    int _dq, it, _bit;
     for (phase = 0; phase < 8; ++phase) {
         module_data[phase] = get_data_module_phase(channel, module, width, phase);
 #ifdef DEBUG_DDR5
@@ -798,14 +798,14 @@ int compare_serial(int channel, int module, int width, uint16_t data, int inv, i
 #ifdef DEBUG_DDR5
     printf("\n");
 #endif
-    for (bit = 0; bit < SDRAM_PHY_DQ_DQS_RATIO; ++bit) {
+    for (_dq = 0; _dq < width; ++_dq) {
         for (it = 0; it < 16; ++it) {
-            _bit = (module_data[it>>1] >> (bit+((it&1)*width))) & 1;
-            if (inv & (1<<bit))
+            _bit = (module_data[it>>1] >> (_dq+((it&1)*width))) & 1;
+            if (inv & (1<<_dq))
                 _bit = !_bit;
             if (_bit != ((data>>it)&1)) {
 #ifdef DEBUG_DDR5
-                printf("Failed for line:%d bit:%d, expected %d got %d\n", bit, it, (data>>it)&1, _bit);
+                printf("Failed for line:%d bit:%d, expected %d got %d\n", _dq, it, (data>>it)&1, _bit);
 #endif
                 return 0;
             }
@@ -818,7 +818,7 @@ int compare(int channel, int module, int width, int data0, int data1, int inv, i
     uint16_t module_data[8];
     uint8_t lfsr;
     int phase;
-    int bit, it, _bit;
+    int _dq, it, _bit;
     for (phase = 0; phase < 8; ++phase) {
         module_data[phase] = get_data_module_phase(channel, module, width, phase);
 #ifdef DEBUG_DDR5
@@ -828,15 +828,15 @@ int compare(int channel, int module, int width, int data0, int data1, int inv, i
 #ifdef DEBUG_DDR5
     printf("\n");
 #endif
-    for (bit = 0; bit < width; ++bit) {
-        lfsr = (select & 1<<bit) ? data1 : data0;
+    for (_dq = 0; _dq < width; ++_dq) {
+        lfsr = (select & 1<<_dq) ? data1 : data0;
         for (it = 0; it < 16; ++it) {
-            _bit = (module_data[it>>1] >> (bit+((it&1)*width))) & 1;
-            if (inv & (1<<bit))
+            _bit = (module_data[it>>1] >> (_dq+((it&1)*width))) & 1;
+            if (inv & (1<<_dq))
                 _bit = !_bit;
             if (_bit != (lfsr&1)) {
 #ifdef DEBUG_DDR5
-                printf("Failed for line:%d bit:%d, expected %d got %d\n", bit, it, (lfsr&1), _bit);
+                printf("Failed for line:%d bit:%d, expected %d got %d\n", _dq, it, (lfsr&1), _bit);
 #endif
                 return 0;
             }
