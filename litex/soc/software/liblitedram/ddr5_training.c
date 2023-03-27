@@ -1619,10 +1619,6 @@ training_ctx_t host_dram_ctx = {
         .check = ca_check_if_works,
         .has_line13 = ca_check_if_has_line13,
     },
-    .par = {
-        .rst_dly = par_rst,
-        .inc_dly = par_inc,
-    },
     .training_type = HOST_DRAM,
 
     // So far, all PHYs have support for single delay far all ranks,
