@@ -175,10 +175,14 @@ void enter_dcstm(int channel, int rank);
 void exit_dcstm(int channel, int rank);
 int dcs_check_if_works(int channel, int rank, int address, int shift_0101);
 
+void qck_inc(int channel, int rank, int address);
+void qck_rst(int channel, int rank, int address);
+
 void qcs_inc(int channel, int rank, int address);
 void qcs_rst(int channel, int rank, int address);
 void enter_qcstm(int channel, int rank);
 void exit_qcstm(int channel, int rank);
+int qcs_check_if_works(int channel, int rank, int address, int shift_0101);
 
 void enter_dcatm(int channel, int rank);
 void exit_dcatm(int channel, int rank);

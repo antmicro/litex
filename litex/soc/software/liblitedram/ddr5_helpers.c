@@ -2067,10 +2067,55 @@ int dcs_check_if_works(int channel, int rank, int address, int shift_0101) {
 }
 
 /*-----------------------------------------------------------------------*/
+/* RCD->DRAM CK Helpers                                                  */
+/*-----------------------------------------------------------------------*/
+
+static uint8_t qck_delays[2] = {}; // init with 0s
+
+void qck_inc(int channel, int rank, int address) {
+    bool ok = true;
+
+    uint8_t rcd = get_rcd_id(rank);
+
+    uint8_t *qck_dly = &qck_delays[channel];
+     *qck_dly = (*qck_dly + 1) & 0x3f; // delay is a is 6-bit value
+
+    uint8_t rw_number = 0x12;
+    uint8_t rw_value = *qck_dly | (1 << 7); // enable delays
+
+    for (int i = 0; i< 4; ++i) {
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+        cdelay(2000);
+        if (!ok)
+            printf("There was a problem with incrementing Q%cCK output delay\n", 'A' + i);
+        rw_number++;
+    }
+}
+
+void qck_rst(int channel, int rank, int address) {
+    bool ok = true;
+
+    uint8_t rcd = get_rcd_id(rank);
+
+    qck_delays[channel] = 0;
+
+    uint8_t rw_number = 0x12;
+    uint8_t rw_value = (1 << 7); // keep enabled
+
+    for (int i = 0; i< 4; ++i) {
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+        cdelay(2000);
+        if (!ok)
+            printf("There was a problem with incrementing Q%cCK output delay\n", 'A' + i);
+        rw_number++;
+    }
+}
+
+/*-----------------------------------------------------------------------*/
 /* RCD->DRAM CS Training (QCSTM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
 
-static uint8_t qcs_delays[2][SDRAM_PHY_RANKS] = {}; // init with 0s
+static uint8_t qcs_delays[2][2] = {}; // init with 0s
 
 /**
  * qcs_inc
@@ -2084,17 +2129,18 @@ void qcs_inc(int channel, int rank, int address) {
     uint8_t rcd = get_rcd_id(rank);
 
     uint8_t *qcs_dly = &qcs_delays[channel][rank];
-     *qcs_dly = (*qcs_dly + 1) & 0x7f; // delay is a is 6-bit value + 1 bit for full cycle delay
+     *qcs_dly = (*qcs_dly + 1) & 0x3f; // delay is a is 6-bit value + 1 bit for full cycle delay
 
-    // 0x17: QACS0_n, 0x18: QACS1_n, 0x19: QBCS0_n, 0x1a: QBCS1_n
-    uint8_t rw_number = 0x17 + (rank & 1) + (2 * channel);
+    uint8_t rw_number = 0x17 + (rank & 1);
     uint8_t rw_value = *qcs_dly | (1 << 7); // enable delays
 
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-    cdelay(2000);
-
-    if (!ok)
-        printf("There was a problem with incrementing Q%cCS%c_n output delay\n", 'A' + channel, '0' + (rank & 1));
+    for (int i = 0; i < 2; ++i) {
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+        cdelay(2000);
+        if (!ok)
+            printf("There was a problem with incrementing Q%cCS%c_n output delay\n", 'A' + i, '0' + (rank & 1));
+        rw_number += 2;
+    }
 }
 
 /**
@@ -2111,14 +2157,16 @@ void qcs_rst(int channel, int rank, int address) {
     qcs_delays[channel][rank] = 0;
 
     // 0x17: QACS0_n, 0x18: QACS1_n, 0x19: QBCS0_n, 0x1a: QBCS1_n
-    uint8_t rw_number = 0x17 + (rank & 1) + (2 * channel);
-    uint8_t rw_value = 0; // RW[7] bit is 0, means output delays are disabled
+    uint8_t rw_number = 0x17 + (rank & 1);
+    uint8_t rw_value = (1 << 7); // Reset value, keep enabled
 
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-    cdelay(2000);
-
-    if (!ok)
-        printf("There was a problem with resetting Q%cCS%c_n output delay\n", 'A' + channel, '0' + (rank & 1));
+    for (int i = 0; i < 2; ++i) {
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+        cdelay(2000);
+        if (!ok)
+            printf("There was a problem with resetting Q%cCS%c_n output delay\n", 'A' + i, '0' + (rank & 1));
+        rw_number += 2;
+    }
 }
 
 /**
@@ -2133,19 +2181,24 @@ void enter_qcstm(int channel, int rank) {
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
 
+    enter_ca_pass(rank);
+    select_ca_pass(rank);
+    enter_cstm(channel, rank);
+    exit_ca_pass(rank);
+
     // we need to modify RW03
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     // in RW03 we select CS training mode
     // QCSTM enable: RW03[0]
     // QCSTM rank selection: RW03[1]
     rw_data[3] &= ~(0b11); // clear setting bits
-    rw_data[3] |= 0b10 | (rank & 1); // set new bits
+    rw_data[3] |= 0b1 | ((rank & 1) << 1); // set new bits
 
     // write RW03 setting back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 3, &rw_data[3], 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 3, &rw_data[3], 1, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
     cdelay(2000);
-
     if (!ok)
         printf("There was a problem with entering RCD->DRAM CS training (QCSTM)\n");
 }
@@ -2163,19 +2216,54 @@ void exit_qcstm(int channel, int rank) {
     uint8_t rw_data[5];
 
     // we need to modify RW03
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0, rw_data, false);
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
     // in RW03 we disable CS training mode
     // QCSTM enable: RW03[0]
     // QCSTM rank selection: RW03[1]
-    rw_data[3] &= ~1; // clear lowest bit
+    rw_data[3] &= ~3; // clear lowest 2 bits
 
     // write RW03 setting back
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, 3, &rw_data[3], 1, false);
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 3, &rw_data[3], 1, false);
     cdelay(2000);
-
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CS training (QCSTM)\n");
+
+    enter_ca_pass(rank);
+    select_ca_pass(rank);
+    exit_cstm(channel, rank);
+    exit_ca_pass(rank);
+}
+
+static void qcs_sample_prep(int channel) {
+    cmd_injector(channel, 0xf, 0, 0, 0, 0, 1, 0);
+    store_continuous(channel);
+    cdelay(50);
+}
+
+int qcs_check_if_works(int channel, int rank, int address, int shift_0101) {
+    bool ok = true;
+
+    uint8_t rcd = get_rcd_id(rank);
+
+    uint8_t *qcs_dly = &qcs_delays[channel][rank];
+     *qcs_dly |= shift_0101 << 6;
+
+    uint8_t rw_number = 0x17 + (rank & 1);
+    uint8_t rw_value = *qcs_dly | (1 << 7); // enable delays
+
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+    cdelay(2000);
+    if (!ok)
+        printf("There was a problem with shifting CS Q%cCS%c_n output delay\n", 'A', '0' + (rank & 1));
+    rw_number += 2;
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+    cdelay(2000);
+    if (!ok)
+        printf("There was a problem with shifting CS Q%cCS%c_n output delay\n", 'B', '0' + (rank & 1));
+
+    qcs_sample_prep(channel);
+    return !or_sample(channel);
 }
 
 /*-----------------------------------------------------------------------*/
@@ -2460,15 +2548,16 @@ void qca_inc(int channel, int rank, int address) {
     uint8_t *qca_dly = &qca_delays[channel][address];
      *qca_dly = (*qca_dly + 1) & 0x7f; // delay is a is 6-bit value + 1 bit for full cycle delay
 
-    // 0x1b: QACA, 0x1c: QBCA
-    uint16_t rw_number = 0x1b + channel;
+    uint16_t rw_number = 0x1b;
     uint8_t rw_value = *qca_dly | (1 << 7); // enable delays
 
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-    cdelay(2000);
-
-    if (!ok)
-        printf("There was a problem with incrementing Q%cCA output delay\n", 'A' + channel);
+    for (int i = 0; i < 2; ++i) {
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+        cdelay(2000);
+        if (!ok)
+            printf("There was a problem with incrementing Q%cCA output delay\n", 'A' + i);
+        rw_number += 1;
+    }
 }
 
 /**
@@ -2484,15 +2573,16 @@ void qca_rst(int channel, int rank, int address) {
 
     qca_delays[channel][address] = 0;
 
-    // 0x1b: QACA, 0x1c: QBCA
-    uint16_t rw_number = 0x1b + channel;
-    uint8_t rw_value = 0; // RW[7] bit is 0, means output delays are disabled
+    uint16_t rw_number = 0x1b;
+    uint8_t rw_value = (1 << 7); // keep delay enabled
 
-    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-    cdelay(2000);
-
-    if (!ok)
-        printf("There was a problem with resetting Q%cCA output delay\n", 'A' + channel);
+    for (int i = 0; i < 2; ++i) {
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+        cdelay(2000);
+        if (!ok)
+            printf("There was a problem with resetting Q%cCA output delay\n", 'A' + channel);
+        rw_number += 1;
+    }
 }
 
 /**
@@ -2509,6 +2599,11 @@ void enter_qcatm(int channel, int rank) {
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
 
+    enter_ca_pass(rank);
+    select_ca_pass(rank);
+    enter_catm(channel, rank);
+    exit_ca_pass(rank);
+
     // we need to modify RW00, RW01
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
 
@@ -2524,6 +2619,8 @@ void enter_qcatm(int channel, int rank) {
     rw_data[1] &= ~1;
     // RCD must be set to forward DRAM commands (RW01[1])
     rw_data[1] |= 0b10;
+    // RCD must be set to blcok BCOM commands (RW01[3])
+    rw_data[1] &= ~(0b1000);
 
     // write RW00 and RW01 settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 2, false);
@@ -2556,8 +2653,6 @@ void exit_qcatm(int channel, int rank) {
     // TODO: do we reenable them?
     // // CA Parity Checking (RW01[0]) needs to be disabled
     // rw_data[1] &= ~1;
-    // // RCD must be set to forward DRAM commands (RW01[1])
-    // rw_data[1] |= 0b10;
 
     // write RW00 and RW01 settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 2, false);
@@ -2565,6 +2660,11 @@ void exit_qcatm(int channel, int rank) {
 
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CA training (QCATM)\n");
+
+    enter_ca_pass(rank);
+    select_ca_pass(rank);
+    exit_catm(channel, rank);
+    exit_ca_pass(rank);
 }
 
 #else // defined(CONFIG_HAS_I2C)
