@@ -1697,10 +1697,10 @@ static void rcd_init(training_ctx_t *ctx) {
     rcd_set_dca_rate(0, 0, ctx->rate);
     if (ctx->rate != DDR)
         ctx->ca.check = dca_check_if_works_sdr;
-    rcd_set_dimm_operating_speed(0, 0, -1);
+    rcd_set_dimm_operating_speed(0, 0, 2000);
     rcd_set_termination_and_vref(0);
     reset_sequence();
-    rcd_set_dimm_operating_speed_band(0, 0, -1);
+    rcd_set_dimm_operating_speed_band(0, 0, 2000);
     busy_wait_us(50);
 
     for (int channel = 0; channel < ctx->channels; channel++)
