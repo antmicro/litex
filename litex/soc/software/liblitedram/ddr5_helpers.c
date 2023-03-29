@@ -995,22 +995,30 @@ void rd_inc(int channel, int module, int width) {
 void idly_rst(int channel, int module, int width) {
     phy_select(channel, module, width);
     idly_rst_internal(channel);
+#ifdef SDRAM_DELAY_PER_DQ
     for(int i=0; i < width; ++i) {
         phy_dq_select(channel, i, width);
         idly_dq_rst_internal(channel);
         phy_dq_deselect(channel, i, width);
     }
+#else
+    idly_dq_rst_internal(channel);
+#endif // SDRAM_DELAY_PER_DQ
     phy_deselect(channel, module, width);
 }
 
 void idly_inc(int channel, int module, int width) {
     phy_select(channel, module, width);
     idly_inc_internal(channel);
+#ifdef SDRAM_DELAY_PER_DQ
     for(int i=0; i < width; ++i) {
         phy_dq_select(channel, i, width);
         idly_dq_inc_internal(channel);
         phy_dq_deselect(channel, i, width);
     }
+#else
+    idly_dq_inc_internal(channel);
+#endif // SDRAM_DELAY_PER_DQ
     phy_deselect(channel, module, width);
 }
 
@@ -1110,21 +1118,29 @@ void odly_dm_inc(int channel, int module, int width) {
 
 void odly_dq_rst(int channel, int module, int width) {
     phy_select(channel, module, width);
+#ifdef SDRAM_DELAY_PER_DQ
     for(int i=0; i < width; ++i) {
         phy_dq_select(channel, i, width);
         odly_dq_rst_internal(channel);
         phy_dq_deselect(channel, i, width);
     }
+#else
+    odly_dq_rst_internal(channel);
+#endif
     phy_deselect(channel, module, width);
 }
 
 void odly_dq_inc(int channel, int module, int width) {
     phy_select(channel, module, width);
+#ifdef SDRAM_DELAY_PER_DQ
     for(int i=0; i < width; ++i) {
         phy_dq_select(channel, i, width);
         odly_dq_inc_internal(channel);
         phy_dq_deselect(channel, i, width);
     }
+#else
+    odly_dq_inc_internal(channel);
+#endif
     phy_deselect(channel, module, width);
 }
 
