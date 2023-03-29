@@ -441,12 +441,12 @@ static void phy_dq_select(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dq_dly_sel_write(1<<select);
 #endif
-#endif // SDRAM_DELAY_PER_DQ
 #ifdef DDR5_TRAINING_SIM
     cdelay(1000);
 #else
     cdelay(10000);
 #endif
+#endif // SDRAM_DELAY_PER_DQ
 }
 
 static void phy_dq_deselect(int channel, int select, int width) {
@@ -460,12 +460,12 @@ static void phy_dq_deselect(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dq_dly_sel_write(0);
 #endif
-#endif // SDRAM_DELAY_PER_DQ
 #ifdef DDR5_TRAINING_SIM
     cdelay(1000);
 #else
     cdelay(10000);
 #endif
+#endif // SDRAM_DELAY_PER_DQ
 }
 
 static void idly_rst_internal(int channel) {
