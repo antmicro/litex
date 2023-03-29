@@ -801,7 +801,7 @@ uint8_t lfsr_next(uint8_t input) {
     return temp;
 }
 
-int compare_serial(int channel, int module, int width, uint16_t data, int inv, int select) {
+int compare_serial(int channel, int module, int width, uint16_t data, int inv) {
     uint16_t module_data[8];
     int phase;
     int _dq, it, _bit;

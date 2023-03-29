@@ -751,7 +751,7 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module, i
         send_mrw(channel, rank, module, 26, serial[seed]&0xff);
         send_mrw(channel, rank, module, 27, serial[seed]>>8);
         send_mrr(channel, rank, 31);
-        works &= compare_serial(channel, module, width, serial[seed], 0xA5, 0x33);
+        works &= compare_serial(channel, module, width, serial[seed], 0xA5);
     }
 #endif // DDR5_TRAINING_SIM
     if (!works)
