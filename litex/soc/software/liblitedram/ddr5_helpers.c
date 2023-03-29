@@ -2615,7 +2615,8 @@ int dca_check_if_works_sdr(int channel, int rank, int address, int phase_shift) 
 /* RCD->DRAM CA Training (QCATM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
 
-static uint8_t qca_delays[2][14] = {}; // init with 0s
+static uint8_t qca_delays[2] = {}; // init with 0s
+static uint8_t qca_address_lines = 0;
 
 /**
  * qca_inc
@@ -2628,7 +2629,7 @@ void qca_inc(int channel, int rank, int address) {
 
     uint8_t rcd = get_rcd_id(rank);
 
-    uint8_t *qca_dly = &qca_delays[channel][address];
+    uint8_t *qca_dly = &qca_delays[channel];
      *qca_dly = (*qca_dly + 1) & 0x7f; // delay is a is 6-bit value + 1 bit for full cycle delay
 
     uint16_t rw_number = 0x1b;
@@ -2654,7 +2655,7 @@ void qca_rst(int channel, int rank, int address) {
 
     uint8_t rcd = get_rcd_id(rank);
 
-    qca_delays[channel][address] = 0;
+    qca_delays[channel] = 0;
 
     uint16_t rw_number = 0x1b;
     uint8_t rw_value = (1 << 7); // keep delay enabled
@@ -2748,6 +2749,23 @@ void exit_qcatm(int channel, int rank) {
     select_ca_pass(rank);
     exit_catm(channel, rank);
     exit_ca_pass(rank);
+}
+
+int qca_check_if_works(int channel, int rank, int _address, int phase_shift) {
+    int ok = 1;
+    if (qca_address_lines == 0) {
+        qca_address_lines = 13;
+        cmd_injector(channel, 0xf, 0, 1<<13, 0, 0, 1, 0);
+        cmd_injector(channel, 0x1, 1, 1<<13, 0, 0, 1, 0);
+        store_continuous(channel);
+        if (and_sample(channel))
+            qca_address_lines = 14;
+    }
+
+    for (int address = 0; address < qca_address_lines; ++address) {
+        ok &= ca_check_if_works(channel, rank, address, phase_shift);
+    }
+    return ok;
 }
 
 #else // defined(CONFIG_HAS_I2C)

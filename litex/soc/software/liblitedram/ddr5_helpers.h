@@ -194,6 +194,7 @@ void qca_inc(int channel, int rank, int address);
 void qca_rst(int channel, int rank, int address);
 void enter_qcatm(int channel, int rank);
 void exit_qcatm(int channel, int rank);
+int qca_check_if_works(int channel, int rank, int _address, int phase_shift);
 #else
 
 void enter_ca_pass(int rank);

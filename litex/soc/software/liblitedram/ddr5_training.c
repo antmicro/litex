@@ -208,7 +208,7 @@ static void CA_setup_array(training_ctx_t *ctx) {
  * CA13 may be used or not.
  */
 static void CA_check_lines(training_ctx_t *ctx, int32_t channel) {
-    if (ctx->training_type != HOST_RCD) {
+    if (ctx->training_type == HOST_DRAM) {
         ctx->ca.enter_training_mode(channel, 0);
         if (ctx->ca.has_line13(channel))
             ctx->ca.line_count = 14;
@@ -1717,13 +1717,13 @@ training_ctx_t rcd_dram_ctx = {
         .check = qcs_check_if_works,
     },
     .ca = {
-        .line_count = 13,
+        .line_count = 1,
         .enter_training_mode = enter_qcatm,
         .exit_training_mode  = exit_qcatm,
         .inc_dly = qca_inc,
         .rst_dly = qca_rst,
-        .check = ca_check_if_works,
-        .has_line13 = ca_check_if_has_line13,
+        .check = qca_check_if_works,
+        .has_line13 = NULL,
     },
     .training_type = RCD_DRAM,
 
