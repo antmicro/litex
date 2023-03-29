@@ -1373,11 +1373,11 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                         for (cnt_seed = 0; cnt_seed < serial_count && works; ++cnt_seed) {
                             for (it =0; it <8; ++it) {
                                 wrdata = 0;
-                                for (temp = 0; temp < SDRAM_PHY_DQ_DQS_RATIO; ++temp) {
+                                for (temp = 0; temp < ctx->die_width; ++temp) {
                                     wrdata |= ((serial[cnt_seed]>>(2*it))&1) << temp;
                                 }
-                                for (temp = 0; temp < SDRAM_PHY_DQ_DQS_RATIO; ++temp) {
-                                    wrdata |= ((serial[cnt_seed]>>(2*it+1))&1) << (temp + SDRAM_PHY_DQ_DQS_RATIO);
+                                for (temp = 0; temp < ctx->die_width; ++temp) {
+                                    wrdata |= ((serial[cnt_seed]>>(2*it+1))&1) << (temp + ctx->die_width);
                                 }
 #ifdef WRITE_DEBUG_DDR5
                                 printf("wrdata:%04"PRIx16"|", wrdata);
@@ -1395,11 +1395,11 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
 #ifdef WRITE_DEBUG_DDR5
                                 printf("rddata:%04"PRIx16"|", rddata);
 #endif // WRITE_DEBUG_DDR5
-                                for (temp = 0; temp < SDRAM_PHY_DQ_DQS_RATIO; ++temp) {
+                                for (temp = 0; temp < ctx->die_width; ++temp) {
                                     works &= !!(((rddata>>temp)&1) == ((serial[cnt_seed]>>(2*it))&1));
                                 }
-                                for (temp = 0; temp < SDRAM_PHY_DQ_DQS_RATIO; ++temp) {
-                                    works &= !!(((rddata>>(temp + SDRAM_PHY_DQ_DQS_RATIO))&1) == ((serial[cnt_seed]>>(2*it+1))&1));
+                                for (temp = 0; temp < ctx->die_width; ++temp) {
+                                    works &= !!(((rddata>>(temp + ctx->die_width))&1) == ((serial[cnt_seed]>>(2*it+1))&1));
                                 }
                             }
                             for (it =0; it <8; ++it) {
