@@ -8,7 +8,7 @@
 
 #include <liblitedram/sdram_rcd.h>
 
-#define DEBUG_DDR5
+//#define DEBUG_DDR5
 
 static int N2_mode = 1;
 extern int enumerated;
