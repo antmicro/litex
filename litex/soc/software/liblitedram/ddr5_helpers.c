@@ -386,8 +386,7 @@ int in_2n_mode(void) {
 }
 
 void disable_dram_2n_mode(int channel, int rank) {
-    cmd_injector(channel, 1, 1<<rank, 0xf | 0b1001<<5, 0, 0, 0, 1);
-    issue_single(channel);
+    send_mpc(channel, rank, 0b1001);
     printf("Switching DRAM on channel:%c rank:%d to 1N mode\n", 'A'+channel, rank);
 }
 
@@ -1985,6 +1984,7 @@ void rcd_release_qcs(int channel, int rank, bool sideband) {
         if (!ok)
             printf("There was a problem with releasing the QCS for channel %c\n", 'A'+channel);
     } else {
+        cmd_injector(channel, 0xff,       0,    0, 0, 0, 0, 1);
         cmd_injector(channel, 0x01, 1<<rank, 0x1f, 0, 0, 0, 1);
         issue_single(channel);
         cdelay(10);
