@@ -1498,13 +1498,13 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                     }
 
                 // DM training
-                printf("%x\n", mr5);
-                if (mr5 & 0x20) { // DM was enabled
+                printf("MR5:%x die_width:%d\n", mr5, ctx->die_width);
+                if ((mr5 & 0x20) && ctx->die_width > 4) { // DM was enabled
                     printf("DM scan\nm:%2d DM|", module);
                     odly_dm_rst(channel, module, ctx->die_width);
                     got = 0;
                     start_delay = 1; end_delay = -1;
-                    for(delay = 0; delay < ctx->max_delay_taps; ++delay){
+                    for(delay = 0; delay < ctx->max_delay_taps; ++delay) {
 #ifdef WRITE_DEBUG_DDR5
                         printf("DM dly:%"PRIu16"\n", get_wr_dm_dly(channel, module, ctx->die_width));
 #endif // WRITE_DEBUG_DDR5
@@ -1594,18 +1594,18 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                         odly_dm_inc(channel, module, ctx->die_width);
                     }
                     printf("|\n");
-                }
-                printf("m%2d|DM start delay:%2d; delay:%2d|",
-                    module, start_delay, end_delay);
-                eye_width = end_delay - start_delay;
-                middle_delay = (start_delay + eye_width/2)%ctx->max_delay_taps;
-                printf("eye_width:%2"PRIu32"; eye center: delay:%2d\n",
-                    eye_width, middle_delay);
+                    printf("m%2d|DM start delay:%2d; delay:%2d|",
+                        module, start_delay, end_delay);
+                    eye_width = end_delay - start_delay;
+                    middle_delay = (start_delay + eye_width/2)%ctx->max_delay_taps;
+                    printf("eye_width:%2"PRIu32"; eye center: delay:%2d\n",
+                        eye_width, middle_delay);
 
-                // Setting read delay to eye center
-                odly_dm_rst(channel, module, ctx->die_width);
-                for (it = 0; it < middle_delay; ++it) {
-                    odly_dm_inc(channel, module, ctx->die_width);
+                    // Setting read delay to eye center
+                    odly_dm_rst(channel, module, ctx->die_width);
+                    for (it = 0; it < middle_delay; ++it) {
+                        odly_dm_inc(channel, module, ctx->die_width);
+                    }
                 }
             }
         }
