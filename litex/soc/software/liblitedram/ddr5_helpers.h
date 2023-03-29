@@ -100,6 +100,8 @@ void idly_dq_inc(int channel, int module, int dq_line, int width);
 
 uint16_t get_rd_dq_dly(int channel, int module, int width);
 uint16_t get_rd_dqs_dly(int channel, int module, int width);
+uint16_t get_rd_dq_ck_dly(int channel, int module, int width);
+uint16_t get_rd_preamble_ck_dly(int channel, int module, int width);
 
 void wr_dqs_rst(int channel, int module, int width);
 void wr_dqs_inc(int channel, int module, int width);

@@ -807,6 +807,9 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
 #ifdef INFO_DDR5
         printf("%2d|", rd_cycle_dly);
 #endif // INFO_DDR5
+#ifdef READ_DEBUG_DDR5
+        printf("Preamble CK dly:%"PRIu16"\n", get_rd_preamble_ck_dly(channel, module, width));
+#endif // READ_DEBUG_DDR5
 
         idly_rst(channel, module, width);
         for (idly = 0; idly < max_delay_taps; idly++) {
@@ -868,6 +871,9 @@ static void read_training_data_scan(int channel, int rank, int module, int width
 
     for (rd_cycle_dly = preamble_cycle; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye.state != AFTER; rd_cycle_dly++) {
         printf("%2d|", rd_cycle_dly);
+#ifdef READ_DEBUG_DDR5
+        printf("DQ CK dly:%"PRIu16"\n", get_rd_dq_ck_dly(channel, module, width));
+#endif // READ_DEBUG_DDR5
 
 #ifdef READ_DEBUG_DDR5
         printf("\n");
@@ -915,11 +921,17 @@ static void read_training_data_scan(int channel, int rank, int module, int width
     for (rd_cycle_dly = 0; rd_cycle_dly < eye_center_cycle; rd_cycle_dly++) {
         rd_inc(channel, module, width);
     }
+#ifdef READ_DEBUG_DDR5
+    printf("Final DQ CK dly:%"PRIu16"\n", get_rd_dq_ck_dly(channel, module, width));
+#endif // READ_DEBUG_DDR5
 
     idly_rst(channel, module, width);
     for (idly = 0; idly < eye_center_delay; idly++) {
         idly_inc(channel, module, width);
     }
+#ifdef READ_DEBUG_DDR5
+    printf("Final DQ dly:%"PRIu16"\n", get_rd_dq_dly(channel, module, width));
+#endif // READ_DEBUG_DDR5
 }
 
 #ifdef INFO_DDR5

@@ -680,6 +680,30 @@ static uint16_t get_rd_dqs_dly_internal(int channel) {
 #endif // SDRAM_INPUT_DELAY_CAPABLE
 }
 
+static uint16_t get_rd_dq_ck_dly_internal(int channel) {
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        return ddrphy_CSRModule_B_ck_rddly_read();
+    } else {
+        return ddrphy_CSRModule_A_ck_rddly_read();
+    }
+#else
+    return ddrphy_CSRModule_ck_rddly_read();
+#endif
+}
+
+static uint16_t get_rd_preamble_ck_dly_internal(int channel) {
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        return ddrphy_CSRModule_B_ck_rddly_preamble_read();
+    } else {
+        return ddrphy_CSRModule_A_ck_rddly_preamble_read();
+    }
+#else
+    return ddrphy_CSRModule_ck_rddly_preamble_read();
+#endif
+}
+
 static uint16_t get_wr_dm_dly_internal(int channel) {
 #ifdef SDRAM_OUTPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
@@ -1053,6 +1077,25 @@ uint16_t get_rd_dqs_dly(int channel, int module, int width) {
     }
     phy_select(channel, module, 4);
     temp = get_rd_dqs_dly_internal(channel);
+    phy_deselect(channel, module, width);
+    return temp;
+}
+
+uint16_t get_rd_dq_ck_dly(int channel, int module, int width) {
+    uint16_t temp;
+    phy_select(channel, module, width);
+    temp = get_rd_dq_ck_dly_internal(channel);
+    phy_deselect(channel, module, width);
+    return temp;
+}
+
+uint16_t get_rd_preamble_ck_dly(int channel, int module, int width) {
+    uint16_t temp;
+    if (width == 8) {
+        module *= 2;
+    }
+    phy_select(channel, module, 4);
+    temp = get_rd_preamble_ck_dly_internal(channel);
     phy_deselect(channel, module, width);
     return temp;
 }
