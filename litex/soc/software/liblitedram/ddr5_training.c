@@ -1006,9 +1006,11 @@ void sdram_ddr5_read_training(training_ctx_t *ctx) {
                 );
 
 #ifdef INFO_DDR5
-                if (!simple_read_check(channel, rank, module, ctx->die_width)) {
-                    printf("Simple read check failure!\n");
-                    continue;
+                if (ctx->training_type == HOST_DRAM) {
+                    if (!simple_read_check(channel, rank, module, ctx->die_width)) {
+                        printf("Simple read check failure!\n");
+                        continue;
+                    }
                 }
 
                 printf("Channel:%c rank:%d module:%d\n", (char)('A'+channel), rank, module);
