@@ -215,8 +215,10 @@ void set_data_module_phase(int channel, int module, int width, int phase, uint16
 }
 
 void enable_phy(void) {
+    ddrphy_CSRModule_rst_write(1);
+    cdelay(5000);
     ddrphy_CSRModule_rst_write(0);
-    cdelay(50);
+    cdelay(5000);
     ddrphy_CSRModule_enable_fifos_write(1);
 }
 
