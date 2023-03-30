@@ -666,7 +666,6 @@ static const uint8_t seeds1[] = {
 
 static const int seeds_count = sizeof(seeds0) / sizeof(seeds0[0]);
 
-#ifndef DDR5_TRAINING_SIM
 static const uint16_t serial[] = {
     0x0000, 0xffff,
     0xfffe, 0xfffd, 0xfffb, 0xfff7, 0xffef, 0xffdf, 0xffbf, 0xff7f,
@@ -674,7 +673,6 @@ static const uint16_t serial[] = {
     0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080,
     0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000};
 static const int serial_count = sizeof(serial) / sizeof(serial[0]);
-#endif
 
 // MR2:OP[7] value to use, whenever MR2 is being modified
 static int use_internal_write_timing = 0;
@@ -1218,7 +1216,7 @@ static void wltm_align_internal_cycle(int channel, int rank, int module, int wid
  *
  * JESD79-5A 4.21
  */
-static void write_leveling(training_ctx_t *ctx, int channel, int rank, int module) {
+static int write_leveling(training_ctx_t *ctx, int channel, int rank, int module) {
     enter_wltm(channel, rank);
 
     printf("WL m:%2d\n", module);
@@ -1234,7 +1232,7 @@ static void write_leveling(training_ctx_t *ctx, int channel, int rank, int modul
 
     if (transition_cycle == -1) {
         printf("Failed to find a transition cycle for module %2d\n", module);
-        return;
+        return transition_cycle;
     }
 
     printf("DQS write leveling response transition starts in cycle:%2d (adjusted %2d)\n",
@@ -1313,18 +1311,258 @@ static void write_leveling(training_ctx_t *ctx, int channel, int rank, int modul
     for (int i = 0; i < transition_delay; i++) {
         odly_dqs_inc(channel, module, ctx->die_width);
     }
+    return transition_cycle;
+}
+
+static void setup_serial_write_data(training_ctx_t *ctx, int cnt_seed, int channel, int module) {
+    int it;
+    uint8_t temp;
+    uint16_t wrdata;
+    for (it =0; it <8; ++it) {
+        wrdata = 0;
+        for (temp = 0; temp < ctx->die_width; ++temp) {
+            wrdata |= ((serial[cnt_seed]>>(2*it))&1) << temp;
+        }
+        for (temp = 0; temp < ctx->die_width; ++temp) {
+            wrdata |= ((serial[cnt_seed]>>(2*it+1))&1) << (temp + ctx->die_width);
+        }
+#ifdef WRITE_DEBUG_DDR5
+        printf("wrdata:%04"PRIx16"|", wrdata);
+#endif // WRITE_DEBUG_DDR5
+        set_data_module_phase(channel, module, ctx->die_width, it, wrdata);
+    }
+#ifdef WRITE_DEBUG_DDR5
+    printf("\n");
+#endif // WRITE_DEBUG_DDR5
+}
+
+static int compare_serial_write_data(training_ctx_t *ctx, int cnt_seed, int channel, int module) {
+    int it;
+    uint8_t temp;
+    uint16_t rddata;
+    int works = 1;
+    for (it =0; it <8; ++it) {
+        rddata = get_data_module_phase(channel, module, ctx->die_width, it);
+#ifdef WRITE_DEBUG_DDR5
+        printf("rddata:%04"PRIx16"|", rddata);
+#endif // WRITE_DEBUG_DDR5
+        for (temp = 0; temp < ctx->die_width; ++temp)
+            works &= !!(((rddata>>temp)&1) == ((serial[cnt_seed]>>(2*it))&1));
+        for (temp = 0; temp < ctx->die_width; ++temp)
+            works &= !!(((rddata>>(temp + ctx->die_width))&1) == ((serial[cnt_seed]>>(2*it+1))&1));
+    }
+#ifdef WRITE_DEBUG_DDR5
+    printf("\n");
+#endif // WRITE_DEBUG_DDR5
+    return works;
+}
+
+static int write_serial_check(training_ctx_t *ctx, int channel, int rank, int module) {
+    int cnt_seed, it;
+    int works = 1;
+    for (cnt_seed = 0; cnt_seed < serial_count; ++cnt_seed) {
+        setup_serial_write_data(ctx, cnt_seed, channel, module);
+        send_write(channel, rank);
+        send_read(channel, rank);
+        works &= compare_serial_write_data(ctx, cnt_seed, channel, module);
+        // Set all 0's
+        for (it =0; it <8; ++it) {
+            set_data_module_phase(channel, module, ctx->die_width, it, 0);
+        }
+        send_write(channel, rank);
+        if (!works)
+            return works;
+    }
+    return works;
+}
+
+static void setup_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module) {
+    int it;
+    uint8_t lfsr;
+    uint16_t wrdata;
+
+    lfsr = seed;
+    for (it =0; it <8; ++it) {
+        wrdata = (lfsr^0x55);
+        lfsr = lfsr_next(lfsr);
+        if (ctx->die_width > 4) {
+            wrdata |= ((lfsr << 8)^0x55);
+            lfsr = lfsr_next(lfsr);
+        }
+#ifdef WRITE_DEBUG_DDR5
+        printf("wrdata:%04"PRIx16"|", wrdata);
+#endif // WRITE_DEBUG_DDR5
+        set_data_module_phase(channel, module, ctx->die_width, it, wrdata);
+    }
+#ifdef WRITE_DEBUG_DDR5
+    printf("\n");
+#endif // WRITE_DEBUG_DDR5
+}
+
+static int compare_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module) {
+    int it;
+    int works = 1;
+    uint8_t lfsr;
+    uint16_t rddata;
+    lfsr = seed;
+    for (it =0; it <8; ++it) {
+        rddata = get_data_module_phase(channel, module, ctx->die_width, it);
+#ifdef WRITE_DEBUG_DDR5
+        printf("rddata:%04"PRIx16"|", rddata);
+#endif // WRITE_DEBUG_DDR5
+        works &= ((rddata&0xff) == (lfsr^0x55));
+        lfsr = lfsr_next(lfsr);
+        if (ctx->die_width > 4) {
+            rddata >>= 8;
+            works &= (rddata == (lfsr^0x55));
+            lfsr = lfsr_next(lfsr);
+        }
+    }
+#ifdef WRITE_DEBUG_DDR5
+    printf("\n");
+#endif // WRITE_DEBUG_DDR5
+    return works;
+}
+
+static int write_lfsr_check(training_ctx_t *ctx, int channel, int rank, int module) {
+    int cnt_seed, it;
+    int works = 1;
+    int seed;
+    for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
+        if(cnt_seed < seeds_count)
+            seed = seeds0[cnt_seed];
+        else
+            seed = seeds1[cnt_seed - seeds_count];
+
+        setup_lfsr_write_data(ctx, seed, channel, module);
+        send_write(channel, rank);
+        send_read(channel, rank);
+        works &= compare_lfsr_write_data(ctx, seed, channel, module);
+        for (it =0; it <8; ++it) {
+            set_data_module_phase(channel, module, ctx->die_width, it, 0);
+        }
+        send_write(channel, rank);
+        if (!works)
+            return works;
+    }
+    return works;
+}
+
+static int compare_dm_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module, int byte) {
+    int it;
+    int works = 1;
+    uint8_t lfsr;
+    uint16_t rddata;
+    lfsr = seed;
+    for (it = 0; it < 16; ++it) {
+        rddata = get_data_module_phase(channel, module, ctx->die_width, it/2);
+#ifdef WRITE_DEBUG_DDR5
+        printf("rddata:%04"PRIx16"|", rddata);
+#endif // WRITE_DEBUG_DDR5
+        if (it & 1)
+            rddata >>= 8;
+        if (byte == it)
+            works &= ((rddata&0xff) == lfsr);
+        lfsr = lfsr_next(lfsr);
+    }
+#ifdef WRITE_DEBUG_DDR5
+    printf("\n");
+#endif // WRITE_DEBUG_DDR5
+    return works;
+}
+
+static int write_dm_lfsr_check(training_ctx_t *ctx, int channel, int rank, int module, int byte, int mr5) {
+    int cnt_seed, it;
+    int works = 1;
+    int seed;
+#ifndef DDR5_TRAINING_SIM
+    for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
+#else
+    {cnt_seed = 0;
+#endif // DDR5_TRAINING_SIM
+        if(cnt_seed < seeds_count)
+            seed = seeds0[cnt_seed];
+        else
+            seed = seeds1[cnt_seed - seeds_count];
+
+        send_mrw(channel, rank, module, 5, mr5 & 0xDF); // Disable DM
+        for (it =0; it <8; ++it) {
+            set_data_module_phase(channel, module, ctx->die_width, it, 0);
+        }
+        send_write(channel, rank);
+        send_mrw(channel, rank, module, 5, mr5); // Enable DM
+
+        setup_lfsr_write_data(ctx, seed, channel, module);
+        send_write_byte(channel, rank, module, byte);
+        send_read(channel, rank);
+
+        works &= compare_dm_lfsr_write_data(ctx, seed, channel, module, byte);
+        for (it =0; it <8; ++it) {
+            set_data_module_phase(channel, module, ctx->die_width, it, 0);
+        }
+        send_write(channel, rank);
+        if (!works)
+            return works;
+    }
+    return works;
+}
+
+static eye_t write_data_scan(training_ctx_t *ctx, int channel, int rank, int module, int write_strobe_cycle, int print) {
+    eye_t eye = DEFAULT_EYE;
+    int works = 1;
+
+    wr_dq_rst(channel, module, ctx->die_width);
+    for (int cycle = 0; cycle < write_strobe_cycle - 3; ++cycle) {
+        wr_dq_inc(channel, module, ctx->die_width);
+    }
+    if (print)
+        printf("Data scan:\n");
+    for (int cycle = write_strobe_cycle - 3; eye.state != AFTER && cycle < 65 && cycle < write_strobe_cycle + 8; ++cycle) {
+        if (print)
+            printf("%2d|", cycle);
+#ifdef WRITE_DEBUG_DDR5
+        printf("\n");
+#endif // WRITE_DEBUG_DDR5
+        odly_dq_rst(channel, module, ctx->die_width);
+        for(int delay = 0; delay < ctx->max_delay_taps; ++delay){
+#ifdef WRITE_DEBUG_DDR5
+            printf("DQ dly:%"PRIu16"\n", get_wr_dq_dly(channel, module, ctx->die_width));
+#endif // WRITE_DEBUG_DDR5
+            works = 1;
+#ifndef DDR5_TRAINING_SIM
+            works &= write_serial_check(ctx, channel, rank, module);
+#endif // DDR5_TRAINING_SIM
+            works &= write_lfsr_check(ctx, channel, rank, module);
+            if (print)
+                printf("%d", works);
+#ifdef WRITE_DEBUG_DDR5
+            printf("\n");
+#endif // WRITE_DEBUG_DDR5
+            if (works && eye.state == BEFORE) {
+                eye.start = cycle * ctx->max_delay_taps + delay;
+                eye.state  = INSIDE;
+            } else if (!works && eye.state == INSIDE) {
+                eye.end = cycle * ctx->max_delay_taps + delay;
+                eye.state  = AFTER;
+            }
+            odly_dq_inc(channel, module, ctx->die_width);
+        }
+        if (print)
+            printf("|\n");
+        wr_dq_inc(channel, module, ctx->die_width);
+    }
+    return eye;
 }
 
 void sdram_ddr5_write_training(training_ctx_t *ctx) {
-    int channel, rank, module, seed, cnt_seed, byte;
-    int cycle, delay, got, it, works;
-    int start_cycle, start_delay,   // First working cycle delay pair
-        middle_cycle, middle_delay, // Middle between first and last working
-        end_cycle, end_delay;       // First cycle delay pair that does not work after working
-    uint8_t lfsr, temp;
+    int channel, rank, module, byte;
+    int write_strobe_cycle[SDRAM_PHY_MODULES/CHANNELS];
+    int delay, it, works;
+    int middle_cycle, middle_delay; // Middle between first and last working
     uint8_t mr5;
-    uint16_t wrdata, rddata;
-    uint32_t eye_width;             // In taps
+    int best_eye_width, last_best_eye_width; // In taps
+    int best_vref_min, best_vref_max;
+    int best_vref;
 
     for (channel = 0; channel < ctx->channels; channel++) {
         printf("Subchannel:%c Write leveling\n", (char)('A'+channel));
@@ -1333,7 +1571,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
             // Perform Write Leveling (both External and Internal)
             enter_wltm(channel, rank);
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
-                write_leveling(ctx, channel, rank, module);
+                write_strobe_cycle[module] = write_leveling(ctx, channel, rank, module);
             }
             exit_wltm(channel, rank);
 
@@ -1348,258 +1586,120 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 send_mrr(channel, rank, 5);
                 mr5 = recover_mrr_value(channel, module, ctx->die_width);
-                printf("mr5:%02"PRIx8"\n", mr5);
+                printf("m%2d|\n", module);
+                printf("MR5:%02"PRIx8"\n", mr5);
                 send_mrw(channel, rank, module, 5, mr5 & 0xDF); // Disable DM
 
                 wr_dq_rst(channel, module, ctx->die_width);
-                printf("m%2d|\n", module);
-                cycle = 0;
-                got = 0;
-                start_cycle = -1; start_delay = -1;
-                end_cycle = -1; end_delay = -1;
-                printf("Data scan:\n");
-                while (got != 2 && cycle < 65) {
-                    printf("%2d|", cycle);
-#ifdef WRITE_DEBUG_DDR5
-                    printf("\n");
-#endif // WRITE_DEBUG_DDR5
-                    odly_dq_rst(channel, module, ctx->die_width);
-                    for(delay = 0; delay < ctx->max_delay_taps; ++delay){
-#ifdef WRITE_DEBUG_DDR5
-                        printf("DQ dly:%"PRIu16"\n", get_wr_dq_dly(channel, module, ctx->die_width));
-#endif // WRITE_DEBUG_DDR5
-                        works = 1;
-#ifndef DDR5_TRAINING_SIM
-                        for (cnt_seed = 0; cnt_seed < serial_count && works; ++cnt_seed) {
-                            for (it =0; it <8; ++it) {
-                                wrdata = 0;
-                                for (temp = 0; temp < ctx->die_width; ++temp) {
-                                    wrdata |= ((serial[cnt_seed]>>(2*it))&1) << temp;
-                                }
-                                for (temp = 0; temp < ctx->die_width; ++temp) {
-                                    wrdata |= ((serial[cnt_seed]>>(2*it+1))&1) << (temp + ctx->die_width);
-                                }
-#ifdef WRITE_DEBUG_DDR5
-                                printf("wrdata:%04"PRIx16"|", wrdata);
-#endif // WRITE_DEBUG_DDR5
-                                set_data_module_phase(channel, module, ctx->die_width, it, wrdata);
-                            }
-#ifdef WRITE_DEBUG_DDR5
-                            printf("\n");
-#endif // WRITE_DEBUG_DDR5
-                            send_write(channel, rank);
-                            send_read(channel, rank);
+                odly_dq_rst(channel, module, ctx->die_width);
+                best_vref = -1;
+                best_eye_width = -1;
 
-                            for (it =0; it <8; ++it) {
-                                rddata = get_data_module_phase(channel, module, ctx->die_width, it);
-#ifdef WRITE_DEBUG_DDR5
-                                printf("rddata:%04"PRIx16"|", rddata);
-#endif // WRITE_DEBUG_DDR5
-                                for (temp = 0; temp < ctx->die_width; ++temp) {
-                                    works &= !!(((rddata>>temp)&1) == ((serial[cnt_seed]>>(2*it))&1));
-                                }
-                                for (temp = 0; temp < ctx->die_width; ++temp) {
-                                    works &= !!(((rddata>>(temp + ctx->die_width))&1) == ((serial[cnt_seed]>>(2*it+1))&1));
-                                }
-                            }
-                            for (it =0; it <8; ++it) {
-                                set_data_module_phase(channel, module, ctx->die_width, it, 0);
-                            }
-                            send_write(channel, rank);
-#ifdef WRITE_DEBUG_DDR5
-                            printf("\n");
-#endif // WRITE_DEBUG_DDR5
-                        }
-#endif // DDR5_TRAINING_SIM
-                        for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
-                            if(cnt_seed < seeds_count)
-                                seed = seeds0[cnt_seed];
-                            else
-                                seed = seeds1[cnt_seed - seeds_count];
-
-                            lfsr = seed;
-                            for (it =0; it <8; ++it) {
-                                wrdata = lfsr;
-                                lfsr = lfsr_next(lfsr);
-                                if (ctx->die_width > 4) {
-                                    wrdata |= lfsr << 8;
-                                    lfsr = lfsr_next(lfsr);
-                                }
-#ifdef WRITE_DEBUG_DDR5
-                                printf("wrdata:%04"PRIx16"|", wrdata);
-#endif // WRITE_DEBUG_DDR5
-                                set_data_module_phase(channel, module, ctx->die_width, it, wrdata);
-                            }
-#ifdef WRITE_DEBUG_DDR5
-                            printf("\n");
-#endif // WRITE_DEBUG_DDR5
-                            send_write(channel, rank);
-                            send_read(channel, rank);
-
-                            lfsr = seed;
-                            for (it =0; it <8; ++it) {
-                                rddata = get_data_module_phase(channel, module, ctx->die_width, it);
-#ifdef WRITE_DEBUG_DDR5
-                                printf("rddata:%04"PRIx16"|", rddata);
-#endif // WRITE_DEBUG_DDR5
-                                works &= ((rddata&0xff) == lfsr);
-                                lfsr = lfsr_next(lfsr);
-                                if (ctx->die_width > 4) {
-                                    rddata >>= 8;
-                                    works &= (rddata == lfsr);
-                                    lfsr = lfsr_next(lfsr);
-                                }
-                            }
-                            for (it =0; it <8; ++it) {
-                                set_data_module_phase(channel, module, ctx->die_width, it, 0);
-                            }
-                            send_write(channel, rank);
-#ifdef WRITE_DEBUG_DDR5
-                            printf("\n");
-#endif // WRITE_DEBUG_DDR5
-                        }
-                        printf("%d", works);
-#ifdef WRITE_DEBUG_DDR5
-                        printf("\n");
-#endif // WRITE_DEBUG_DDR5
-                        if (works && got == 0) {
-                            start_cycle = cycle;
-                            start_delay = delay;
-                            got = 1;
-                        } else if (!works && got == 1) {
-                            end_cycle = cycle;
-                            end_delay = delay;
-                            got = 2;
-                        }
-                        odly_dq_inc(channel, module, ctx->die_width);
+                for(int vref = 0; vref < 0x7e; ++vref) {
+                    printf("Vref:%x\n", vref);
+                    send_mrw(channel, rank, module, 10, vref);
+                    busy_wait(1);
+//#ifdef WRITE_DEBUG_DDR5
+                    eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 1);
+                    printf("m%2d|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
+                        module,
+                        eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
+                        eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
+//#else
+//                    eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 0);
+//#endif // WRITE_DEBUG_DDR5
+                    eye.center = eye.end - eye.start;
+                    middle_cycle = ((eye.start + eye.end)/2)/ctx->max_delay_taps;
+                    middle_delay = ((eye.start + eye.end)/2)%ctx->max_delay_taps;
+//#ifdef WRITE_DEBUG_DDR5
+                    printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
+                        eye.center, middle_cycle, middle_delay);
+//#endif // WRITE_DEBUG_DDR5
+                    if (eye.center + 2 < best_eye_width)
+                        break;
+                    if (eye.center == best_eye_width && eye.center != last_best_eye_width) {
+                        last_best_eye_width = eye.center;
+                        best_vref_min = best_vref;
                     }
-                    printf("|\n");
-                    ++cycle;
-                    wr_dq_inc(channel, module, ctx->die_width);
+                    if (eye.center != last_best_eye_width)
+                        best_vref_max = vref + 1;
+                    if (eye.center > best_eye_width) {
+                        best_eye_width = eye.center;
+                        best_vref = vref;
+                    }
                 }
-                printf("m%2d|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
-                    module, start_cycle, start_delay, end_cycle, end_delay);
-                eye_width = (end_cycle-start_cycle)*ctx->max_delay_taps + end_delay - start_delay;
-                middle_cycle = start_cycle + (start_delay + eye_width/2)/ctx->max_delay_taps;
-                middle_delay = (start_delay + eye_width/2)%ctx->max_delay_taps;
-                printf("eye_width:%2"PRIu32"; eye center: cycle:%2d,delay:%2d\n",
-                    eye_width, middle_cycle, middle_delay);
 
                 // Setting read delay to eye center
                 wr_dq_rst(channel, module, ctx->die_width);
                 odly_dq_rst(channel, module, ctx->die_width);
-                if (start_cycle >= 0)
+                best_vref = (best_vref_min + best_vref_max)/2;
+                printf("m%2d|Best Vref:%2x\n", module, best_vref);
+                if (best_vref > -1) {
+                    send_mrw(channel, rank, module, 10, best_vref);
+                    busy_wait(1);
+                }
+                send_mrr(channel, rank, 10);
+                printf("MR10:%02"PRIx8"\n", recover_mrr_value(channel, module, ctx->die_width));
+
+                eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 1);
+                middle_cycle = ((eye.start + eye.end)/2)/ctx->max_delay_taps;
+                middle_delay = ((eye.start + eye.end)/2)%ctx->max_delay_taps;
+                eye.center = eye.end - eye.start;
+                printf("m%2d|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
+                    module,
+                    eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
+                    eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
+                printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
+                    eye.center, middle_cycle, middle_delay);
+
+                wr_dq_rst(channel, module, ctx->die_width);
+                odly_dq_rst(channel, module, ctx->die_width);
+                if (eye.state == AFTER)
                     for (it = 0; it < middle_cycle; ++it) {
                         wr_dq_inc(channel, module, ctx->die_width);
                     }
-                if (start_delay >= 0)
+                if (eye.state == AFTER)
                     for (it = 0; it < middle_delay; ++it) {
                         odly_dq_inc(channel, module, ctx->die_width);
                     }
 
                 // DM training
-                printf("MR5:%x die_width:%d\n", mr5, ctx->die_width);
                 if ((mr5 & 0x20) && ctx->die_width > 4) { // DM was enabled
                     printf("DM scan\nm:%2d DM|", module);
                     odly_dm_rst(channel, module, ctx->die_width);
-                    got = 0;
-                    start_delay = 1; end_delay = -1;
+                    eye_t eye_dm = DEFAULT_EYE;
                     for(delay = 0; delay < ctx->max_delay_taps; ++delay) {
 #ifdef WRITE_DEBUG_DDR5
                         printf("DM dly:%"PRIu16"\n", get_wr_dm_dly(channel, module, ctx->die_width));
 #endif // WRITE_DEBUG_DDR5
                         works = 1;
                         for (byte = 0; byte < 16 && works; ++byte) {
-#ifndef DDR5_TRAINING_SIM
-                            for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
-#else
-                            {cnt_seed = 0;
-#endif // DDR5_TRAINING_SIM
-                                send_mrw(channel, rank, module, 5, mr5 & 0xDF); // Disable DM
-                                if(cnt_seed < seeds_count)
-                                    seed = seeds0[cnt_seed];
-                                else
-                                    seed = seeds1[cnt_seed - seeds_count];
-
-                                for (it =0; it <8; ++it) {
-                                    set_data_module_phase(channel, module, ctx->die_width, it, 0);
-                                }
-                                send_write(channel, rank);
-
-                                send_mrw(channel, rank, module, 5, mr5); // Enable DM
-                                lfsr = seed;
-                                for (it =0; it <8; ++it) {
-                                    wrdata = lfsr;
-                                    lfsr = lfsr_next(lfsr);
-                                    if (ctx->die_width > 4) {
-                                        wrdata |= lfsr << 8;
-                                        lfsr = lfsr_next(lfsr);
-                                    }
-#ifdef DEBUG_DDR5
-                                    printf("wrdata:%04"PRIx16"|", wrdata);
-#endif // DEBUG_DDR5
-                                    set_data_module_phase(channel, module, ctx->die_width, it, wrdata);
-                                }
-#ifdef WRITE_DEBUG_DDR5
-                                printf("\n");
-#endif // WRITE_DEBUG_DDR5
-                                send_write_byte(channel, rank, module, byte);
-                                send_read(channel, rank);
-
-                                lfsr = seed;
-                                for (it =0; it <8; ++it) {
-                                    rddata = get_data_module_phase(channel, module, ctx->die_width, it);
-#ifdef WRITE_DEBUG_DDR5
-                                    printf("rddata:%04"PRIx16"|", rddata);
-#endif // WRITE_DEBUG_DDR5
-                                    if ((byte >> 1) == it) {
-                                        if(!(byte & 1)) {
-                                            works &= ((rddata&0xff) == lfsr);
-                                        }
-                                        lfsr = lfsr_next(lfsr);
-                                        rddata >>= 8;
-                                        if(byte & 1) {
-                                            works &= ((rddata&0xff) == lfsr);
-                                        }
-                                        lfsr = lfsr_next(lfsr);
-                                    } else {
-                                        lfsr = lfsr_next(lfsr);
-                                        lfsr = lfsr_next(lfsr);
-                                    }
-                                }
-                                for (it =0; it <8; ++it) {
-                                    set_data_module_phase(channel, module, ctx->die_width, it, 0);
-                                }
-                                send_write(channel, rank);
-#ifdef WRITE_DEBUG_DDR5
-                                printf("\n");
-#endif // WRITE_DEBUG_DDR5
-                            }
+                            write_dm_lfsr_check(ctx, channel, rank, module, byte, mr5);
                         }
                         printf("%d", works);
 #ifdef WRITE_DEBUG_DDR5
                         printf("\n");
 #endif // WRITE_DEBUG_DDR5
-                        if (works && got == 0) {
-                            start_delay = delay;
-                            got = 1;
+                        if (works && eye_dm.state == BEFORE) {
+                            eye_dm.start = delay;
+                            eye_dm.state  = INSIDE;
                         }
-                        if (!works && got == 1) {
-                            end_delay = delay;
-                            got = 2;
-                        } else if (delay == ctx->max_delay_taps-1 && got == 1) {
-                            end_delay = delay + 1;
-                            got = 2;
+                        if (!works && eye_dm.state == INSIDE) {
+                            eye_dm.end = delay;
+                            eye_dm.state  = AFTER;
+                        } else if (delay == ctx->max_delay_taps-1 && eye_dm.state == INSIDE) {
+                            eye_dm.end = delay + 1;
+                            eye_dm.state  = AFTER;
                         }
                         odly_dm_inc(channel, module, ctx->die_width);
                     }
                     printf("|\n");
                     printf("m%2d|DM start delay:%2d; delay:%2d|",
-                        module, start_delay, end_delay);
-                    eye_width = end_delay - start_delay;
-                    middle_delay = (start_delay + eye_width/2)%ctx->max_delay_taps;
-                    printf("eye_width:%2"PRIu32"; eye center: delay:%2d\n",
-                        eye_width, middle_delay);
+                        module, eye_dm.start, eye_dm.start);
+                    eye_dm.center = eye_dm.end - eye_dm.start;
+                    middle_delay = (eye_dm.start + eye_dm.end)/2;
+                    printf("eye_width:%2d; eye center: delay:%2d\n",
+                        eye_dm.center, middle_delay);
 
                     // Setting read delay to eye center
                     odly_dm_rst(channel, module, ctx->die_width);
