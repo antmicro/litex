@@ -449,7 +449,7 @@ static void CS_CA_calculate_midpoints(training_ctx_t *ctx, int *min, int *max, i
 
     int temp;
     for (; _channel < _max_channel; ++_channel) {
-        printf("Subchannel:%c Timings\n", 'A'+channel);
+        printf("Subchannel:%c Timings\n", 'A'+_channel);
 
         for (int _rank = 0; _rank < ctx->ranks; ++_rank) {
             temp = (ctx->cs.delays[_channel][_rank][0] + ctx->cs.delays[_channel][_rank][1])/2;
