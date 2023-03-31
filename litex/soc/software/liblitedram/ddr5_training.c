@@ -884,7 +884,9 @@ static void read_training_data_scan(int channel, int rank, int module, int width
             printf("DQ dly:%"PRIu16"\n", get_rd_dq_dly(channel, module, width));
 #endif // READ_DEBUG_DDR5
 
-            works = rd_cycle_dly_idly_check_if_works(channel, rank, module, width);
+            works = 1;
+            for (int i = 0 ; i < 16; ++i)
+                works &= rd_cycle_dly_idly_check_if_works(channel, rank, module, width);
             printf("%d", works);
 
             if (works && eye.state == BEFORE) {

@@ -1329,7 +1329,7 @@ void send_mrr(int channel, int rank, int reg) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
     issue_single(channel);
-    cdelay(50);
+    cdelay(100);
     setup_rddata_cnt(channel, 0);
 }
 
@@ -1475,7 +1475,7 @@ void send_read(int channel, int rank) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
     issue_single(channel);
-    cdelay(50);
+    cdelay(100);
     setup_rddata_cnt(channel, 0);
 }
 
@@ -1507,7 +1507,7 @@ void force_issue_single(void) {
 #else
     sdram_dfii_cmdinjector_single_shot_write(0);
 #endif
-    cdelay(50);
+    cdelay(100);
 }
 
 /**
@@ -1594,7 +1594,7 @@ static void ca_sample_prep(int channel, int rank, int address, int l2h, int phas
         cmd_injector(channel, 0x1<<phase_shift, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
     }
     store_continuous(channel);
-    cdelay(50);
+    cdelay(100);
 }
 
 /**
