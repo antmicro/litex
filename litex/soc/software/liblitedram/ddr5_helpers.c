@@ -459,9 +459,9 @@ static void phy_dq_deselect(int channel, int select, int width) {
 #ifdef SDRAM_DELAY_PER_DQ
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        ddrphy_CSRModule_dq_B_dly_sel_write(0);
+        ddrphy_CSRModule_B_dq_dly_sel_write(0);
     } else {
-        ddrphy_CSRModule_dq_A_dly_sel_write(0);
+        ddrphy_CSRModule_A_dq_dly_sel_write(0);
     }
 #else
     ddrphy_CSRModule_dq_dly_sel_write(0);
