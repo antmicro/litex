@@ -210,15 +210,17 @@ class XilinxVivadoToolchain(GenericToolchain):
         )
         # The output from slow_ff is a false path
         self.platform.add_platform_command(
-            "set_false_path -quiet "
+            "set_max_delay -quiet "
             "-through [get_pins -filter {{REF_PIN_NAME == Q}} "
-                "-of_objects [get_cells -hierarchical -filter {{slow_ff == TRUE}}]]"
+                "-of_objects [get_cells -hierarchical -filter {{slow_ff == TRUE}}]] "
+            "250"
         )
         # The input to ff from slow source is a false path
         self.platform.add_platform_command(
-            "set_false_path -quiet "
+            "set_max_delay -quiet "
             "-to [get_pins -filter {{REF_PIN_NAME == D}} "
-                "-of_objects [get_cells -hierarchical -filter {{slow_in == TRUE}}]]"
+                "-of_objects [get_cells -hierarchical -filter {{slow_in == TRUE}}]] "
+            "250"
         )
 
     def build_timing_constraints(self, vns):
