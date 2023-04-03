@@ -1562,8 +1562,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
     int delay, it, works;
     int middle_cycle, middle_delay; // Middle between first and last working
     uint8_t mr5;
-    int best_eye_width, last_best_eye_width; // In taps
-    int best_vref_min, best_vref_max;
+    int eye_width_range [2][SDRAM_PHY_DELAYS];
     int best_vref;
 
     for (channel = 0; channel < ctx->channels; channel++) {
@@ -1594,47 +1593,44 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
 
                 wr_dq_rst(channel, module, ctx->die_width);
                 odly_dq_rst(channel, module, ctx->die_width);
-                best_vref = -1;
-                best_eye_width = -1;
+                for(int _width = 0; _width < SDRAM_PHY_DELAYS; ++_width) {
+                    eye_width_range[0][_width] = -1;
+                    eye_width_range[1][_width] = -1;
+                }
 
                 for(int vref = 0; vref < 0x7e; ++vref) {
-                    printf("Vref:%x\n", vref);
+                    printf("Vref:%x", vref);
                     send_mrw(channel, rank, module, 10, vref);
                     busy_wait(1);
 //#ifdef WRITE_DEBUG_DDR5
                     eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 1);
-                    printf("m%2d|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
-                        module,
-                        eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
-                        eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
 //#else
 //                    eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 0);
 //#endif // WRITE_DEBUG_DDR5
+                    printf("|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
+                        module,
+                        eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
+                        eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
                     eye.center = eye.end - eye.start;
                     middle_cycle = ((eye.start + eye.end)/2)/ctx->max_delay_taps;
                     middle_delay = ((eye.start + eye.end)/2)%ctx->max_delay_taps;
-//#ifdef WRITE_DEBUG_DDR5
                     printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
                         eye.center, middle_cycle, middle_delay);
-//#endif // WRITE_DEBUG_DDR5
-                    if (eye.center + 2 < best_eye_width)
-                        break;
-                    if (eye.center == best_eye_width && eye.center != last_best_eye_width) {
-                        last_best_eye_width = eye.center;
-                        best_vref_min = best_vref;
-                    }
-                    if (eye.center != last_best_eye_width)
-                        best_vref_max = vref + 1;
-                    if (eye.center > best_eye_width) {
-                        best_eye_width = eye.center;
-                        best_vref = vref;
+                    for(int _width = 0; _width < eye.center; ++_width) {
+                        if (eye_width_range[0][_width] == -1)
+                            eye_width_range[0][_width] = vref;
+                        else
+                            eye_width_range[1][_width] = vref + 1;
                     }
                 }
 
                 // Setting read delay to eye center
                 wr_dq_rst(channel, module, ctx->die_width);
                 odly_dq_rst(channel, module, ctx->die_width);
-                best_vref = (best_vref_min + best_vref_max)/2;
+                for (int _width = 0; _width < SDRAM_PHY_DELAYS; ++_width) {
+                    if (eye_width_range[0][_width] != -1)
+                        best_vref = (eye_width_range[0][_width] + eye_width_range[1][_width]) / 2;
+                }
                 printf("m%2d|Best Vref:%2x\n", module, best_vref);
                 if (best_vref > -1) {
                     send_mrw(channel, rank, module, 10, best_vref);
