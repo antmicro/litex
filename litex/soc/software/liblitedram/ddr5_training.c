@@ -770,11 +770,11 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module, i
 
     // Check if LFSR readout works
     for (seed = 0; seed < seeds_count && works; ++seed) {
-        /* Setup MRs */
-        send_mrw(channel, rank, module, 25, 1); // select LFSR mode
-        send_mrw(channel, rank, module, 26, seeds0[seed]);
-        send_mrw(channel, rank, module, 27, seeds1[seed]);
         for (int i = 0 ; i < 16 && works; ++i) {
+            /* Setup MRs */
+            send_mrw(channel, rank, module, 25, 1); // select LFSR mode
+            send_mrw(channel, rank, module, 26, seeds0[seed]);
+            send_mrw(channel, rank, module, 27, seeds1[seed]);
             send_mrr(channel, rank, 31);
             works &= compare(channel, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33);
         }
