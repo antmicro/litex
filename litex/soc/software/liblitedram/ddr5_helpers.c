@@ -412,11 +412,7 @@ static void phy_select(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dly_sel_write(mask<<select);
 #endif
-#ifdef DDR5_TRAINING_SIM
-    cdelay(1000);
-#else
-    cdelay(10000);
-#endif
+    cdelay(100);
 }
 
 static void phy_deselect(int channel, int select, int width) {
@@ -429,11 +425,7 @@ static void phy_deselect(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dly_sel_write(0);
 #endif
-#ifdef DDR5_TRAINING_SIM
-    cdelay(1000);
-#else
-    cdelay(10000);
-#endif
+    cdelay(100);
 }
 
 static void phy_dq_select(int channel, int select, int width) {
@@ -447,11 +439,7 @@ static void phy_dq_select(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dq_dly_sel_write(1<<select);
 #endif
-#ifdef DDR5_TRAINING_SIM
-    cdelay(1000);
-#else
-    cdelay(10000);
-#endif
+    cdelay(100);
 #endif // SDRAM_DELAY_PER_DQ
 }
 
@@ -466,11 +454,7 @@ static void phy_dq_deselect(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dq_dly_sel_write(0);
 #endif
-#ifdef DDR5_TRAINING_SIM
-    cdelay(1000);
-#else
-    cdelay(10000);
-#endif
+    cdelay(100);
 #endif // SDRAM_DELAY_PER_DQ
 }
 
@@ -1647,11 +1631,7 @@ void enter_write_leveling(int channel) {
 #else
     ddrphy_CSRModule_wlevel_en_write(1);
 #endif
-#ifdef DDR5_TRAINING_SIM
-    cdelay(1000);
-#else
-    cdelay(10000);
-#endif
+    cdelay(100);
 }
 
 int wr_dqs_check_if_works(int channel, int rank, int module, int width) {
@@ -1704,11 +1684,7 @@ void clear_phy_fifos(int channel) {
 #else
     ddrphy_CSRModule_discard_rd_fifo_write(1);
 #endif
-#ifdef DDR5_TRAINING_SIM
     cdelay(1000);
-#else
-    cdelay(1000000);
-#endif
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         ddrphy_CSRModule_B_discard_rd_fifo_write(0);
