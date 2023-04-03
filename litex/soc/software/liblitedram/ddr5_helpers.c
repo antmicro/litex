@@ -2057,7 +2057,7 @@ void enter_dcstm(int channel, int rank) {
     // channel A settings: RW02[1:0]
     // channel B settings: RW02[3:2]
     // higher bit selects CS training mode, while lower bit selects rank
-    w_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    w_data[2] &= ~(0xf); // clear bits for all channels
     w_data[2] |= (0b10 | (rank & 1)) << (2 * channel); // set new bits
 
     // write the settings back
@@ -2095,7 +2095,7 @@ void exit_dcstm(int channel, int rank) {
     // in RW02 we clear training mode setting
     // channel A settings: RW02[1:0]
     // channel B settings: RW02[3:2]
-    w_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    w_data[2] &= ~(0xf); // clear bits for all channels
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
@@ -2125,9 +2125,9 @@ int dcs_check_if_works(int channel, int rank, int address, int shift_0101) {
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    cdelay(100);
+    cdelay(500);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    cdelay(1000);
+    cdelay(5000);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     return !ddrphy_CSRModule_alert_read();
 }
@@ -2359,7 +2359,7 @@ void enter_dcatm(int channel, int rank) {
     // channel A settings: RW02[1:0]
     // channel B settings: RW02[3:2]
     // write 0b01 to enter CA training
-    w_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    w_data[2] &= ~(0xf); // clear bits for all channels
     w_data[2] |=   0b01 << (2 * channel);  // set new bits
 
     // write the settings back
@@ -2394,7 +2394,7 @@ void exit_dcatm(int channel, int rank) {
 
     // channel A settings: RW02[1:0]
     // channel B settings: RW02[3:2]
-    w_data[2] &= ~(0b11 << (2 * channel)); // clear bits for selected channel
+    w_data[2] &= ~(0xf); // clear bits for all channels
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
