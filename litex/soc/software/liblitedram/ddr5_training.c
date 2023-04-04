@@ -1628,8 +1628,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                     for(int _width = 0; _width < eye.center; ++_width) {
                         if (eye_width_range[0][_width] == -1)
                             eye_width_range[0][_width] = vref;
-                        else
-                            eye_width_range[1][_width] = vref + 1;
+                        eye_width_range[1][_width] = vref + 1;
                     }
                 }
 
