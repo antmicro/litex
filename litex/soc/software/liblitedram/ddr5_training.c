@@ -1617,7 +1617,6 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
 //                    eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 0);
 //#endif // WRITE_DEBUG_DDR5
                     printf("|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
-                        module,
                         eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
                         eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
                     eye.center = eye.end - eye.start;
