@@ -1318,7 +1318,7 @@ static int write_leveling(training_ctx_t *ctx, int channel, int rank, int module
     return transition_cycle;
 }
 
-static void setup_serial_write_data(training_ctx_t *ctx, int cnt_seed, int channel, int module) {
+static void setup_serial_write_data(training_ctx_t *ctx, int cnt_seed, int channel, int module, int print) {
     int it;
     uint8_t temp;
     uint16_t wrdata;
@@ -1330,26 +1330,23 @@ static void setup_serial_write_data(training_ctx_t *ctx, int cnt_seed, int chann
         for (temp = 0; temp < ctx->die_width; ++temp) {
             wrdata |= ((serial[cnt_seed]>>(2*it+1))&1) << (temp + ctx->die_width);
         }
-#ifdef WRITE_DEBUG_DDR5
-        printf("wrdata:%04"PRIx16"|", wrdata);
-#endif // WRITE_DEBUG_DDR5
+        if(print)
+            printf("wrdata:%04"PRIx16"|", wrdata);
         set_data_module_phase(channel, module, ctx->die_width, it, wrdata);
     }
-#ifdef WRITE_DEBUG_DDR5
-    printf("\n");
-#endif // WRITE_DEBUG_DDR5
+    if(print)
+        printf("\n");
 }
 
-static int compare_serial_write_data(training_ctx_t *ctx, int cnt_seed, int channel, int module) {
+static int compare_serial_write_data(training_ctx_t *ctx, int cnt_seed, int channel, int module, int print) {
     int it;
     uint8_t temp;
     uint16_t rddata;
     int works = 1;
     for (it =0; it <8 && works; ++it) {
         rddata = get_data_module_phase(channel, module, ctx->die_width, it);
-#ifdef WRITE_DEBUG_DDR5
-        printf("rddata:%04"PRIx16"|", rddata);
-#endif // WRITE_DEBUG_DDR5
+        if(print)
+            printf("rddata:%04"PRIx16"|", rddata);
         for (temp = 0; temp < ctx->die_width; ++temp)
             works &= !!(((rddata>>temp)&1) == ((serial[cnt_seed]>>(2*it))&1));
         if (!works)
@@ -1357,9 +1354,8 @@ static int compare_serial_write_data(training_ctx_t *ctx, int cnt_seed, int chan
         for (temp = 0; temp < ctx->die_width; ++temp)
             works &= !!(((rddata>>(temp + ctx->die_width))&1) == ((serial[cnt_seed]>>(2*it+1))&1));
     }
-#ifdef WRITE_DEBUG_DDR5
-    printf("\n");
-#endif // WRITE_DEBUG_DDR5
+    if(print)
+        printf("\n");
     return works;
 }
 
@@ -1368,10 +1364,16 @@ static int write_serial_check(training_ctx_t *ctx, int channel, int rank, int mo
     int works = 1;
     for (cnt_seed = 0; cnt_seed < serial_count; ++cnt_seed) {
         for (int i=0; i < 16; ++i) {
-            setup_serial_write_data(ctx, cnt_seed, channel, module);
+            setup_serial_write_data(ctx, cnt_seed, channel, module, 0);
             send_write(channel, rank);
             send_read(channel, rank);
-            works &= compare_serial_write_data(ctx, cnt_seed, channel, module);
+            works &= compare_serial_write_data(ctx, cnt_seed, channel, module, 0);
+#ifdef WRITE_DEBUG_DDR5
+            if (!works) {
+                setup_serial_write_data(ctx, cnt_seed, channel, module, 1);
+                compare_serial_write_data(ctx, cnt_seed, channel, module, 1);
+            }
+#endif
             // Set all 0's
             for (it =0; it <8; ++it) {
                 set_data_module_phase(channel, module, ctx->die_width, it, 0);
@@ -1384,7 +1386,7 @@ static int write_serial_check(training_ctx_t *ctx, int channel, int rank, int mo
     return works;
 }
 
-static void setup_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module) {
+static void setup_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module, int print) {
     int it;
     uint8_t lfsr;
     uint16_t wrdata;
@@ -1397,17 +1399,15 @@ static void setup_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, in
             wrdata |= ((lfsr << 8)^0x55);
             lfsr = lfsr_next(lfsr);
         }
-#ifdef WRITE_DEBUG_DDR5
-        printf("wrdata:%04"PRIx16"|", wrdata);
-#endif // WRITE_DEBUG_DDR5
+        if(print)
+            printf("wrdata:%04"PRIx16"|", wrdata);
         set_data_module_phase(channel, module, ctx->die_width, it, wrdata);
     }
-#ifdef WRITE_DEBUG_DDR5
-    printf("\n");
-#endif // WRITE_DEBUG_DDR5
+    if(print)
+        printf("\n");
 }
 
-static int compare_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module) {
+static int compare_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module, int print) {
     int it;
     int works = 1;
     uint8_t lfsr;
@@ -1415,9 +1415,8 @@ static int compare_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, i
     lfsr = seed;
     for (it =0; it < 8 && works; ++it) {
         rddata = get_data_module_phase(channel, module, ctx->die_width, it);
-#ifdef WRITE_DEBUG_DDR5
-        printf("rddata:%04"PRIx16"|", rddata);
-#endif // WRITE_DEBUG_DDR5
+        if(print)
+            printf("rddata:%04"PRIx16"|", rddata);
         works &= ((rddata&0xff) == (lfsr^0x55));
         lfsr = lfsr_next(lfsr);
         if (ctx->die_width > 4) {
@@ -1426,9 +1425,8 @@ static int compare_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, i
             lfsr = lfsr_next(lfsr);
         }
     }
-#ifdef WRITE_DEBUG_DDR5
-    printf("\n");
-#endif // WRITE_DEBUG_DDR5
+    if(print)
+        printf("\n");
     return works;
 }
 
@@ -1437,16 +1435,22 @@ static int write_lfsr_check(training_ctx_t *ctx, int channel, int rank, int modu
     int works = 1;
     int seed;
     for (cnt_seed = 0; cnt_seed < seeds_count * 2 && works; ++cnt_seed) {
-        for (int i = 0; i < 16; ++i) {
-            if(cnt_seed < seeds_count)
-                seed = seeds0[cnt_seed];
-            else
-                seed = seeds1[cnt_seed - seeds_count];
+        if(cnt_seed < seeds_count)
+            seed = seeds0[cnt_seed];
+        else
+            seed = seeds1[cnt_seed - seeds_count];
 
-            setup_lfsr_write_data(ctx, seed, channel, module);
+        for (int i = 0; i < 16; ++i) {
+            setup_lfsr_write_data(ctx, seed, channel, module, 0);
             send_write(channel, rank);
             send_read(channel, rank);
-            works &= compare_lfsr_write_data(ctx, seed, channel, module);
+            works &= compare_lfsr_write_data(ctx, seed, channel, module, 0);
+#ifdef WRITE_DEBUG_DDR5
+            if (!works) {
+                setup_lfsr_write_data(ctx, seed, channel, module, 1);
+                compare_lfsr_write_data(ctx, seed, channel, module, 1);
+            }
+#endif
             for (it =0; it <8; ++it) {
                 set_data_module_phase(channel, module, ctx->die_width, it, 0);
             }
@@ -1502,7 +1506,7 @@ static int write_dm_lfsr_check(training_ctx_t *ctx, int channel, int rank, int m
         send_write(channel, rank);
         send_mrw(channel, rank, module, 5, mr5); // Enable DM
 
-        setup_lfsr_write_data(ctx, seed, channel, module);
+        setup_lfsr_write_data(ctx, seed, channel, module, 0);
         send_write_byte(channel, rank, module, byte);
         send_read(channel, rank);
 
@@ -1608,14 +1612,15 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                 }
 
                 for(int vref = 0; vref < 0x7e; ++vref) {
-                    printf("Vref:%x", vref);
+                    printf("Vref:%2X", vref);
                     send_mrw(channel, rank, module, 10, vref);
                     busy_wait(1);
-//#ifdef WRITE_DEBUG_DDR5
+#ifdef WRITE_DEBUG_DDR5
+                    printf("\n");
                     eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 1);
-//#else
-//                    eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 0);
-//#endif // WRITE_DEBUG_DDR5
+#else
+                    eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 0);
+#endif // WRITE_DEBUG_DDR5
                     printf("|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
                         eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
                         eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
