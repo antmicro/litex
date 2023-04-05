@@ -152,12 +152,12 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
             // We are already in the eye and can look for the eye start by changing CK delay
             right_side = CS_ck_scan(ctx, channel, _rank, shift_0101);
 
-            // After delaying clock, pattern could have changes, as we missed one clock cycle
-            shift_0101 = CS_should_shift_pattern(ctx, channel, _rank);
         }
+        shift_0101 = CS_should_shift_pattern(ctx, channel, _rank);
 
         printf("|");
         CS_scan(ctx, channel, _rank, &left_side, &right_side, shift_0101);
+
         printf("|\n");
 
         // Set up coarse delay adjustment until we get CA results
