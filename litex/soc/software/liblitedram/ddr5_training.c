@@ -224,13 +224,12 @@ static int CA_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_
     printf("|");
     works = 1;
     last_good = 0;
-    csdly = csdly_base;
 
     ctx->ca.rst_dly(channel, rank, address);
-
     ctx->cs.rst_dly(channel, rank, 0);
     for (csdly = 0; csdly < csdly_base; ++csdly)
         ctx->cs.inc_dly(channel, rank, 0);
+    csdly = csdly_base;
 
     for(ckdly = 0; ckdly < ctx->max_delay_taps && works; ++ckdly, ++csdly) {
         _result = ctx->ca.check(channel, rank, address, csdly/ctx->max_delay_taps);
@@ -244,8 +243,8 @@ static int CA_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_
         ctx->ck.inc_dly(channel, rank, 0);
         ctx->cs.inc_dly(channel, rank, 0);
     }
-    ctx->ck.rst_dly(channel, rank, 0);
 
+    ctx->ck.rst_dly(channel, rank, 0);
     ctx->cs.rst_dly(channel, rank, 0);
     for (csdly = 0; csdly < csdly_base; ++csdly)
         ctx->cs.inc_dly(channel, rank, 0);
