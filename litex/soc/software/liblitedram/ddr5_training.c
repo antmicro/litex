@@ -1947,7 +1947,7 @@ static void rcd_init(training_ctx_t *ctx) {
     i2c_write(0x48, 0x32, &cmd, 1, 1); // FIXME: this should be sent to all PMICs
     cdelay(10000000);
 
-    reset_sequence();
+    reset_sequence(ctx->ranks);
 
     // FIXME: this function should initialize all RCDs
     rcd_set_dca_rate(0, 0, ctx->rate);
@@ -1955,7 +1955,7 @@ static void rcd_init(training_ctx_t *ctx) {
         ctx->ca.check = dca_check_if_works_sdr;
     rcd_set_dimm_operating_speed(0, 0, 2000);
     rcd_set_termination_and_vref(0);
-    reset_sequence();
+    reset_sequence(ctx->ranks);
     rcd_set_dimm_operating_speed_band(0, 0, 2000);
     busy_wait_us(50);
 
@@ -2007,13 +2007,13 @@ void sdram_ddr5_flow(void) {
         base_ctx->rate = host_rcd_ctx.rate;
         base_ctx->CS_CA_successful &= host_rcd_ctx.CS_CA_successful;
     } else {
-        reset_sequence();
+        reset_sequence(base_ctx->ranks);
     }
 #else
-    reset_sequence();
+    reset_sequence(base_ctx->ranks);
 #endif // defined(CONFIG_HAS_I2C)
 
-    dram_start_sequence();
+    dram_start_sequence(base_ctx->ranks);
 
     if (is_rdimm) {
         enter_ca_pass(0);
@@ -2045,10 +2045,10 @@ void sdram_ddr5_flow(void) {
 
     if (in_2n_mode()) {
         printf("2N mode setup\n");
-        init_sequence_2n();
+        init_sequence_2n(base_ctx->ranks);
     } else {
         printf("1N mode setup\n");
-        init_sequence_1n();
+        init_sequence_1n(base_ctx->ranks);
     }
 
 #if defined(CONFIG_HAS_I2C)
