@@ -76,6 +76,7 @@ void ck_inc(int channel, int rank, int address);
 
 void cs_rst(int channel, int rank, int address);
 void cs_inc(int channel, int rank, int address);
+uint16_t get_cs_dly(int channel, int rank, int address);
 
 void ca_rst(int channel, int rank, int address);
 void ca_inc(int channel, int rank, int address);

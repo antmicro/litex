@@ -622,6 +622,22 @@ static void odly_dq_inc_internal(int channel) {
 #endif // SDRAM_OUTPUT_DELAY_CAPABLE
 }
 
+static uint16_t get_cs_dly_internal(int channel) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        return ddrphy_CSRModule_B_csdly_read();
+    } else {
+        return ddrphy_CSRModule_A_csdly_read();
+    }
+#else
+    return ddrphy_CSRModule_csdly_read();
+#endif
+#else
+    return 0;
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+}
+
 static uint16_t get_ca_dly_internal(int channel) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
@@ -906,6 +922,14 @@ void cs_inc(int channel, int rank, int address) {
 #endif //SDRAM_PHY_SUBCHANNELS
     phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+}
+
+uint16_t get_cs_dly(int channel, int rank, int address) {
+    uint16_t temp;
+    phy_select(channel,rank, 0);
+    temp = get_cs_dly_internal(channel);
+    phy_deselect(channel, rank, 0);
+    return temp;
 }
 
 void ca_rst(int channel, int rank, int address) {
