@@ -1389,7 +1389,7 @@ static void setup_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, in
         wrdata = (lfsr^0x55);
         lfsr = lfsr_next(lfsr);
         if (ctx->die_width > 4) {
-            wrdata |= ((lfsr << 8)^0x55);
+            wrdata |= (lfsr^0x55) << 8;
             lfsr = lfsr_next(lfsr);
         }
         if(print)
