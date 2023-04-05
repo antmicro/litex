@@ -14,6 +14,7 @@
 //#define DEBUG_DDR5
 //#define CA_DEBUG_DDR5
 //#define READ_DEBUG_DDR5
+//#define WRITE_INFO_DDR5
 //#define WRITE_DEBUG_DDR5
 #if defined(DEBUG_DDR5) && !defined(CA_DEBUG_DDR5)
     #define CA_DEBUG_DDR5
@@ -1522,7 +1523,7 @@ static int write_dm_lfsr_check(training_ctx_t *ctx, int channel, int rank, int m
 
 static eye_t write_data_scan(training_ctx_t *ctx, int channel, int rank, int module, int write_strobe_cycle, int print) {
     eye_t eye = DEFAULT_EYE;
-    int works = 1;
+    int works = 1, p_works;
 
     wr_dq_rst(channel, module, ctx->die_width);
     for (int cycle = 0; cycle < write_strobe_cycle - 3; ++cycle) {
@@ -1542,13 +1543,22 @@ static eye_t write_data_scan(training_ctx_t *ctx, int channel, int rank, int mod
             printf("DQ dly:%"PRIu16"\n", get_wr_dq_dly(channel, module, ctx->die_width));
 #endif // WRITE_DEBUG_DDR5
             works = 1;
+            p_works = 0;
 #ifndef DDR5_TRAINING_SIM
             works &= write_serial_check(ctx, channel, rank, module);
+#ifdef WRITE_INFO_DDR5
+            if (print && works)
+                p_works = 1;
+#endif // WRITE_INFO_DDR5
 #endif // DDR5_TRAINING_SIM
             if (works)
                 works &= write_lfsr_check(ctx, channel, rank, module);
+#ifdef WRITE_INFO_DDR5
+            if (print && works)
+                p_works = 3;
+#endif // WRITE_INFO_DDR5
             if (print)
-                printf("%d", works);
+                printf("%d", p_works);
 #ifdef WRITE_DEBUG_DDR5
             printf("\n");
 #endif // WRITE_DEBUG_DDR5
@@ -1615,7 +1625,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
                     printf("Vref:%2X", vref);
                     send_mrw(channel, rank, module, 10, vref);
                     busy_wait(1);
-#ifdef WRITE_DEBUG_DDR5
+#if defined(WRITE_DEBUG_DDR5) || defined(WRITE_INFO_DDR5)
                     printf("\n");
                     eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 1);
 #else
