@@ -1362,8 +1362,8 @@ static int write_serial_check(training_ctx_t *ctx, int channel, int rank, int mo
     int cnt_seed, it;
     int works = 1;
     for (cnt_seed = 0; cnt_seed < serial_count; ++cnt_seed) {
-        for (int i=0; i < 16; ++i) {
-            setup_serial_write_data(ctx, cnt_seed, channel, module, 0);
+        setup_serial_write_data(ctx, cnt_seed, channel, module, 0);
+        for (int i=0; i < 8; ++i) {
             send_write(channel, rank);
             send_read(channel, rank);
             works &= compare_serial_write_data(ctx, cnt_seed, channel, module, 0);
@@ -1373,14 +1373,14 @@ static int write_serial_check(training_ctx_t *ctx, int channel, int rank, int mo
                 compare_serial_write_data(ctx, cnt_seed, channel, module, 1);
             }
 #endif
-            // Set all 0's
-            for (it =0; it <8; ++it) {
-                set_data_module_phase(channel, module, ctx->die_width, it, 0);
-            }
-            send_write(channel, rank);
             if (!works)
                 return works;
         }
+        // Set all 0's
+        for (it =0; it <8; ++it) {
+            set_data_module_phase(channel, module, ctx->die_width, it, 0);
+        }
+        send_write(channel, rank);
     }
     return works;
 }
@@ -1420,7 +1420,7 @@ static int compare_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, i
         lfsr = lfsr_next(lfsr);
         if (ctx->die_width > 4) {
             rddata >>= 8;
-            works &= (rddata == (lfsr^0x55));
+            works &= ((rddata&0xff) == (lfsr^0x55));
             lfsr = lfsr_next(lfsr);
         }
     }
@@ -1439,7 +1439,7 @@ static int write_lfsr_check(training_ctx_t *ctx, int channel, int rank, int modu
         else
             seed = seeds1[cnt_seed - seeds_count];
 
-        for (int i = 0; i < 16; ++i) {
+        for (int i = 0; i < 8; ++i) {
             setup_lfsr_write_data(ctx, seed, channel, module, 0);
             send_write(channel, rank);
             send_read(channel, rank);
@@ -1450,13 +1450,13 @@ static int write_lfsr_check(training_ctx_t *ctx, int channel, int rank, int modu
                 compare_lfsr_write_data(ctx, seed, channel, module, 1);
             }
 #endif
-            for (it =0; it <8; ++it) {
-                set_data_module_phase(channel, module, ctx->die_width, it, 0);
-            }
-            send_write(channel, rank);
             if (!works)
                 return works;
         }
+        for (it =0; it <8; ++it) {
+            set_data_module_phase(channel, module, ctx->die_width, it, 0);
+        }
+        send_write(channel, rank);
     }
     return works;
 }
@@ -1597,6 +1597,7 @@ void sdram_ddr5_write_training(training_ctx_t *ctx) {
             printf("DQ write training\n");
             mr5 = 0;
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+                best_vref = -1;
                 send_mrr(channel, rank, 5);
                 mr5 = recover_mrr_value(channel, module, ctx->die_width);
                 printf("m%2d|\n", module);
