@@ -1551,7 +1551,11 @@ static eye_t write_data_scan(training_ctx_t *ctx, int channel, int rank, int mod
                 p_works = 3;
 #endif // WRITE_INFO_DDR5
             if (print)
+#ifdef WRITE_INFO_DDR5
                 printf("%d", p_works);
+#else
+                printf("%d", works);
+#endif // WRITE_INFO_DDR5
 #ifdef WRITE_DEBUG_DDR5
             printf("\n");
 #endif // WRITE_DEBUG_DDR5
