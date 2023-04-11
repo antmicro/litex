@@ -2060,8 +2060,10 @@ void sdram_ddr5_flow(void) {
     }
 
 #if defined(CONFIG_HAS_I2C)
-    if (is_rdimm)
-        base_ctx->max_delay_taps = host_rcd_ctx.max_delay_taps;
+    if (is_rdimm) {
+        base_ctx = &host_dram_ctx;
+        host_dram_ctx.ranks = rcd_dram_ctx.ranks;
+    }
 #endif // defined(CONFIG_HAS_I2C)
 
     sdram_ddr5_read_training(base_ctx);
