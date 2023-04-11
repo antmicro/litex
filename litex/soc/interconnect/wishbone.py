@@ -365,7 +365,7 @@ class Converter(Module):
 # Wishbone SRAM ------------------------------------------------------------------------------------
 
 class SRAM(Module):
-    def __init__(self, mem_or_size, read_only=None, init=None, bus=None, name=None):
+    def __init__(self, mem_or_size, read_only=None, init=None, bus=None, name=None, mode=None):
         if bus is None:
             bus = Interface()
         self.bus = bus
@@ -459,7 +459,7 @@ class SRAM(Module):
         # Memory.
         # -------
         port = self.mem.get_port(write_capable=not read_only, we_granularity=8,
-            mode=READ_FIRST if read_only else WRITE_FIRST)
+            mode=mode if mode is not None else READ_FIRST if read_only else WRITE_FIRST)
         self.specials += self.mem, port
         # Generate write enable signal
         if not read_only:
