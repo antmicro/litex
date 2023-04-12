@@ -11,9 +11,10 @@ import os
 import re
 
 from migen.fhdl.structure import Signal, Cat
+from migen.fhdl.specials import Memory
 from migen.genlib.record import Record
 
-from litex.gen.fhdl import verilog
+from litex.gen.fhdl import verilog, memory
 
 from litex.build.io import CRG
 from litex.build import tools
@@ -323,6 +324,10 @@ class ConstraintManager:
 
 class GenericPlatform:
     device_family = None
+    overrides = {
+        Memory: memory.LiteXMemoryImpl,
+    }
+
 
     def __init__(self, device, io, connectors=[], name=None):
         self.toolchain          = None
