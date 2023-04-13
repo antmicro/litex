@@ -180,9 +180,9 @@ int sdram_hw_test(uint64_t origin, uint64_t size, uint64_t burst_length) {
 	}
 
 	for (uint64_t address = origin; address < origin + size; address += burst_size) {
-		if (address + burst_size > size) {
+		if (address + burst_size > origin + size) {
 			old_burst_size = burst_size;
-			burst_size = size - address;
+			burst_size = origin + size - address;
 		}
 
 		if (burst_size < SDRAM_TEST_DATA_BYTES || old_burst_size < burst_size)
