@@ -2336,11 +2336,11 @@ int qcs_check_if_works(int channel, int rank, int address, int shift_0101) {
 
     uint8_t rcd = get_rcd_id(rank);
 
-    uint8_t *qcs_dly = &qcs_delays[channel][rank];
-     *qcs_dly |= shift_0101 << 6;
+    uint8_t qcs_dly = qcs_delays[channel][rank];
+    qcs_dly |= shift_0101 << 6;
 
     uint8_t rw_number = 0x17 + (rank & 1);
-    uint8_t rw_value = *qcs_dly | (1 << 7); // enable delays
+    uint8_t rw_value = qcs_dly | (1 << 7); // enable delays
 
     ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
     cdelay(2000);
