@@ -123,11 +123,11 @@ def generate_docs(soc, base_dir,
     # If the user has set `from_scratch=False`, then skip this step.
     if from_scratch or not os.path.isfile(base_dir + "index.rst"):
         with open(base_dir + "index.rst", "w", encoding="utf-8") as index:
-            print("""
+            print("""{}
 Documentation for {}
 {}
 
-""".format(project_name, "="*len("Documentation for " + project_name)), file=index)
+""".format("="*len("Documentation for " + project_name), project_name, "="*len("Documentation for " + project_name)), file=index)
 
             if len(additional_modules) > 0:
                 print("""
@@ -150,15 +150,6 @@ Register Groups
 """, file=index)
                 for region in documented_regions:
                     print("    {}".format(region.name), file=index)
-
-            print("""
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-""", file=index)
 
     # Create a Region file for each of the documented CSR regions.
     for region in documented_regions:
