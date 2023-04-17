@@ -13,11 +13,18 @@
 //#define INFO_DDR5
 //#define DEBUG_DDR5
 //#define CA_DEBUG_DDR5
+//#define READ_INFO_DDR5
 //#define READ_DEBUG_DDR5
 //#define WRITE_INFO_DDR5
 //#define WRITE_DEBUG_DDR5
 #if defined(DEBUG_DDR5) && !defined(CA_DEBUG_DDR5)
     #define CA_DEBUG_DDR5
+#endif
+#if defined(INFO_DDR5) && !defined(READ_INFO_DDR5)
+    #define READ_INFO_DDR5
+#endif
+#if defined(DEBUG_DDR5) && !defined(WRITE_INFO_DDR5)
+    #define WRITE_INFO_DDR5
 #endif
 #if defined(DEBUG_DDR5) && !defined(READ_DEBUG_DDR5)
     #define READ_DEBUG_DDR5
@@ -792,16 +799,16 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
     // in this stage we don't care about eye end
     eye_t eye = DEFAULT_EYE;
 
-#ifdef INFO_DDR5
+#ifdef READ_INFO_DDR5
     printf("Finding read preamble\n");
-#endif // INFO_DDR5
+#endif // READ_INFO_DDR5
 
     /* Coarse alignment */
     rd_rst(channel, module, width);
     for (rd_cycle_dly = 0; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye.state != AFTER; rd_cycle_dly ++) {
-#ifdef INFO_DDR5
+#ifdef READ_INFO_DDR5
         printf("%2d|", rd_cycle_dly);
-#endif // INFO_DDR5
+#endif // READ_INFO_DDR5
 #ifdef READ_DEBUG_DDR5
         printf("Preamble CK dly:%"PRIu16"\n", get_rd_preamble_ck_dly(channel, module, width));
 #endif // READ_DEBUG_DDR5
@@ -814,9 +821,9 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
 #ifdef READ_DEBUG_DDR5
             printf("DQS dly:%"PRIu16"\n", get_rd_dqs_dly(channel, module, width));
 #endif // READ_DEBUG_DDR5
-#ifdef INFO_DDR5
+#ifdef READ_INFO_DDR5
             printf("%01x", preamble);
-#endif // INFO_DDR5
+#endif // READ_INFO_DDR5
 
             // Should be 1tCK preamble 0b10 (JESD79-5A 4.18.3),
             // but due to the way basephy.py works we sample 2 cycles,
@@ -830,9 +837,9 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
             idly_inc(channel, module, width);
         }
 
-#ifdef INFO_DDR5
+#ifdef READ_INFO_DDR5
         printf("\n");
-#endif // INFO_DDR5
+#endif // READ_INFO_DDR5
 
         rd_inc(channel, module, width);
     }
@@ -929,7 +936,7 @@ static void read_training_data_scan(int channel, int rank, int module, int width
 #endif // READ_DEBUG_DDR5
 }
 
-#ifdef INFO_DDR5
+#ifdef READ_INFO_DDR5
 /**
  * simple_read_check
  *
@@ -959,7 +966,7 @@ static int simple_read_check(int channel, int rank, int module, int width) {
 
     return works;
 }
-#endif // INFO_DDR5
+#endif // READ_INFO_DDR5
 
 /**
  * sdram_ddr5_read_training
@@ -1012,7 +1019,7 @@ void sdram_ddr5_read_training(training_ctx_t *ctx) {
                     read_serial_number(channel, rank, module, ctx->die_width)
                 );
 
-#ifdef INFO_DDR5
+#ifdef READ_INFO_DDR5
                 if (ctx->training_type == HOST_DRAM) {
                     if (!simple_read_check(channel, rank, module, ctx->die_width)) {
                         printf("Simple read check failure!\n");
@@ -1022,7 +1029,7 @@ void sdram_ddr5_read_training(training_ctx_t *ctx) {
 
                 printf("Channel:%c rank:%d module:%d\n", (char)('A'+channel), rank, module);
                 read_registers(channel, rank, module, ctx->die_width);
-#endif // INFO_DDR5
+#endif // READ_INFO_DDR5
             }
         }
     }
@@ -1239,9 +1246,9 @@ static int write_leveling(training_ctx_t *ctx, int channel, int rank, int module
     int transition_delay = wltm_align_to_eye_edge(
         channel, rank, module, ctx->die_width, ctx->max_delay_taps, &transition_cycle);
 
-#ifdef INFO_DDR5
+#ifdef WRITE_INFO_DDR5
     printf("cycle:%2d delay:%2d\n", transition_cycle, transition_delay);
-#endif // INFO_DDR5
+#endif // WRITE_INFO_DDR5
 
     // ==================== Internal Write Leveling ====================
 
@@ -1257,10 +1264,10 @@ static int write_leveling(training_ctx_t *ctx, int channel, int rank, int module
         transition_delay -= ctx->max_delay_taps;
     }
 
-#ifdef INFO_DDR5
+#ifdef WRITE_INFO_DDR5
     printf("After adjusting by WL_ADJ_start (-0.75 tCK); cycle:%2d delay:%2d\n",
         transition_cycle, transition_delay);
-#endif // INFO_DDR5
+#endif // WRITE_INFO_DDR5
 
     // Set new cycle delay
     wr_dqs_rst(channel, module, ctx->die_width);
