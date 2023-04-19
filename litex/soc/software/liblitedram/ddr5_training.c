@@ -676,6 +676,13 @@ static const int serial_count = sizeof(serial) / sizeof(serial[0]);
 
 // MR2:OP[7] value to use, whenever MR2 is being modified
 static int use_internal_write_timing = 0;
+#ifdef READ_DEBUG_DDR5
+static int _read_verbosity = 2;
+#elif defined(READ_INFO_DDR5)
+static int _read_verbosity = 1;
+#else
+static int _read_verbosity = 0;
+#endif
 
 /**
  * read_serial_number
@@ -761,7 +768,11 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module, i
         send_mrw(channel, rank, module, 27, serial[seed]>>8);
         for (int i = 0 ; i < 16 && works; ++i) {
             send_mrr(channel, rank, 31);
-            works &= compare_serial(channel, module, width, serial[seed], 0xA5);
+            works &= compare_serial(channel, module, width, serial[seed], 0xA5, 0);
+            if (!works && _read_verbosity) {
+                printf("Module: %d,Iternation:%d, %02x%02x\t", module, i, serial[seed]&0xff, serial[seed]>>8);
+                compare_serial(channel, module, width, serial[seed], 0xA5, _read_verbosity);
+            }
         }
     }
 #endif // DDR5_TRAINING_SIM
@@ -776,11 +787,14 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module, i
             send_mrw(channel, rank, module, 26, seeds0[seed]);
             send_mrw(channel, rank, module, 27, seeds1[seed]);
             send_mrr(channel, rank, 31);
-            works &= compare(channel, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33);
+            works &= compare(channel, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33, 0);
+            if (!works && _read_verbosity)
+                compare(channel, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33, _read_verbosity);
         }
     }
-
-    return works;
+    if (!works)
+        return 1;
+    return 3;
 }
 
 /**
@@ -799,31 +813,28 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
     // in this stage we don't care about eye end
     eye_t eye = DEFAULT_EYE;
 
-#ifdef READ_INFO_DDR5
-    printf("Finding read preamble\n");
-#endif // READ_INFO_DDR5
+    if (_read_verbosity)
+        printf("Finding read preamble\n");
 
     /* Coarse alignment */
     rd_rst(channel, module, width);
     for (rd_cycle_dly = 0; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye.state != AFTER; rd_cycle_dly ++) {
-#ifdef READ_INFO_DDR5
-        printf("%2d|", rd_cycle_dly);
-#endif // READ_INFO_DDR5
-#ifdef READ_DEBUG_DDR5
-        printf("Preamble CK dly:%"PRIu16"\n", get_rd_preamble_ck_dly(channel, module, width));
-#endif // READ_DEBUG_DDR5
+        if (_read_verbosity)
+            printf("%2d|", rd_cycle_dly);
+        if (_read_verbosity > 1)
+            printf("\nPreamble CK dly:%"PRIu16, get_rd_preamble_ck_dly(channel, module, width));
 
         idly_rst(channel, module, width);
         for (idly = 0; idly < max_delay_taps; idly++) {
             send_mrr(channel, rank, 31);
             preamble = captured_preamble(channel, module, width);
 
-#ifdef READ_DEBUG_DDR5
-            printf("DQS dly:%"PRIu16"\n", get_rd_dqs_dly(channel, module, width));
-#endif // READ_DEBUG_DDR5
-#ifdef READ_INFO_DDR5
-            printf("%01x", preamble);
-#endif // READ_INFO_DDR5
+            if (_read_verbosity > 1)
+                printf("\nDQS dly:%"PRIu16"|", get_rd_dqs_dly(channel, module, width));
+            if (_read_verbosity)
+                printf("%01x", preamble);
+            if (_read_verbosity > 1)
+                printf("\n");
 
             // Should be 1tCK preamble 0b10 (JESD79-5A 4.18.3),
             // but due to the way basephy.py works we sample 2 cycles,
@@ -837,9 +848,8 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
             idly_inc(channel, module, width);
         }
 
-#ifdef READ_INFO_DDR5
-        printf("\n");
-#endif // READ_INFO_DDR5
+        if (_read_verbosity)
+            printf("\n");
 
         rd_inc(channel, module, width);
     }
@@ -873,25 +883,19 @@ static void read_training_data_scan(int channel, int rank, int module, int width
 
     for (rd_cycle_dly = preamble_cycle; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye.state != AFTER; rd_cycle_dly++) {
         printf("%2d|", rd_cycle_dly);
-#ifdef READ_DEBUG_DDR5
-        printf("DQ CK dly:%"PRIu16"\n", get_rd_dq_ck_dly(channel, module, width));
-#endif // READ_DEBUG_DDR5
-
-#ifdef READ_DEBUG_DDR5
-        printf("\n");
-#endif // READ_DEBUG_DDR5
+        if (_read_verbosity > 1)
+            printf("\nDQ CK dly:%"PRIu16, get_rd_dq_ck_dly(channel, module, width));
 
         idly_rst(channel, module, width);
         for(idly = 0; idly < max_delay_taps; idly++){
 
-#ifdef READ_DEBUG_DDR5
-            printf("DQ dly:%"PRIu16"\n", get_rd_dq_dly(channel, module, width));
-#endif // READ_DEBUG_DDR5
+            if (_read_verbosity > 1)
+                printf("\nDQ dly:%"PRIu16"|", get_rd_dq_dly(channel, module, width));
 
             works = rd_cycle_dly_idly_check_if_works(channel, rank, module, width);
             printf("%d", works);
 
-            if (works && eye.state == BEFORE) {
+            if (works == 3 && eye.state == BEFORE) {
                 eye.start = rd_cycle_dly * max_delay_taps + idly;
                 eye.state = INSIDE;
             } else if (!works && eye.state == INSIDE) {
@@ -899,9 +903,8 @@ static void read_training_data_scan(int channel, int rank, int module, int width
                 eye.state = AFTER;
             }
 
-#ifdef READ_DEBUG_DDR5
-            printf("\n");
-#endif // READ_DEBUG_DDR5
+            if (_read_verbosity > 1)
+                printf("\n");
 
             idly_inc(channel, module, width);
         }
@@ -923,20 +926,18 @@ static void read_training_data_scan(int channel, int rank, int module, int width
     for (rd_cycle_dly = 0; rd_cycle_dly < eye_center_cycle; rd_cycle_dly++) {
         rd_inc(channel, module, width);
     }
-#ifdef READ_DEBUG_DDR5
-    printf("Final DQ CK dly:%"PRIu16"\n", get_rd_dq_ck_dly(channel, module, width));
-#endif // READ_DEBUG_DDR5
+    if (_read_verbosity)
+        printf("Final DQ CK dly:%"PRIu16"\n", get_rd_dq_ck_dly(channel, module, width));
 
     idly_rst(channel, module, width);
     for (idly = 0; idly < eye_center_delay; idly++) {
         idly_inc(channel, module, width);
     }
-#ifdef READ_DEBUG_DDR5
-    printf("Final DQ dly:%"PRIu16"\n", get_rd_dq_dly(channel, module, width));
-#endif // READ_DEBUG_DDR5
+
+    if (_read_verbosity)
+        printf("Final DQ dly:%"PRIu16"\n", get_rd_dq_dly(channel, module, width));
 }
 
-#ifdef READ_INFO_DDR5
 /**
  * simple_read_check
  *
@@ -966,7 +967,6 @@ static int simple_read_check(int channel, int rank, int module, int width) {
 
     return works;
 }
-#endif // READ_INFO_DDR5
 
 /**
  * sdram_ddr5_read_training
@@ -1019,17 +1019,17 @@ void sdram_ddr5_read_training(training_ctx_t *ctx) {
                     read_serial_number(channel, rank, module, ctx->die_width)
                 );
 
-#ifdef READ_INFO_DDR5
-                if (ctx->training_type == HOST_DRAM) {
-                    if (!simple_read_check(channel, rank, module, ctx->die_width)) {
-                        printf("Simple read check failure!\n");
-                        continue;
+                if (_read_verbosity) {
+                    if (ctx->training_type == HOST_DRAM && !ctx->RDIMM) {
+                        if (!simple_read_check(channel, rank, module, ctx->die_width)) {
+                            printf("Simple read check failure!\n");
+                            continue;
+                        }
                     }
-                }
 
-                printf("Channel:%c rank:%d module:%d\n", (char)('A'+channel), rank, module);
-                read_registers(channel, rank, module, ctx->die_width);
-#endif // READ_INFO_DDR5
+                    printf("Channel:%c rank:%d module:%d\n", (char)('A'+channel), rank, module);
+                    read_registers(channel, rank, module, ctx->die_width);
+                }
             }
         }
     }
@@ -1785,6 +1785,7 @@ training_ctx_t host_dram_ctx = {
     .rate = DDR,
     .CS_CA_successful = true,
     .max_delay_taps = SDRAM_PHY_DELAYS,
+    .RDIMM = false,
 };
 
 #if defined(CONFIG_HAS_I2C)
@@ -1826,6 +1827,7 @@ training_ctx_t host_rcd_ctx = {
     .rate = DDR,
     .CS_CA_successful = true,
     .max_delay_taps = SDRAM_PHY_DELAYS,
+    .RDIMM = true,
 };
 
 training_ctx_t rcd_dram_ctx = {
@@ -1862,6 +1864,7 @@ training_ctx_t rcd_dram_ctx = {
     .rate = DDR,
     .CS_CA_successful = true,
     .max_delay_taps = 64,
+    .RDIMM = true,
 };
 
 
@@ -2070,6 +2073,7 @@ void sdram_ddr5_flow(void) {
     if (is_rdimm) {
         base_ctx = &host_dram_ctx;
         host_dram_ctx.ranks = rcd_dram_ctx.ranks;
+        host_dram_ctx.RDIMM = rcd_dram_ctx.RDIMM;
     }
 #endif // defined(CONFIG_HAS_I2C)
 

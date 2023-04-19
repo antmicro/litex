@@ -831,64 +831,106 @@ uint8_t lfsr_next(uint8_t input) {
     return temp;
 }
 
-int compare_serial(int channel, int module, int width, uint16_t data, int inv) {
-    uint16_t module_data[8];
-    int phase;
-    int _dq, it, _bit;
+int compare_serial(int channel, int module, int width, uint16_t data, int inv, int print) {
+    uint16_t module_data;
+    uint16_t expected_data[8];
+    uint16_t phase, _temp, _mask, _error;
+    int _it;
+
+    _mask = (1<<width) - 1;
+    if (print)
+        printf("expected:");
     for (phase = 0; phase < 8; ++phase) {
-        module_data[phase] = get_data_module_phase(channel, module, width, phase);
-#ifdef DEBUG_DDR5
-        printf("%d:%x,", phase, module_data[phase]);
-#endif
+        _temp = 0;
+        _temp |=   (((data & 1) << width) - (data & 1)) ^ (inv & _mask);
+        data >>= 1;
+        _temp |= (((((data & 1) << width) - (data & 1)) ^ (inv & _mask)) << width);
+        data >>= 1;
+        expected_data[phase] = _temp;
+        if (print)
+            printf("%04"PRIx16"|", expected_data[phase]);
     }
-#ifdef DEBUG_DDR5
-    printf("\n");
-#endif
-    for (_dq = 0; _dq < width; ++_dq) {
-        for (it = 0; it < 16; ++it) {
-            _bit = (module_data[it>>1] >> (_dq+((it&1)*width))) & 1;
-            if (inv & (1<<_dq))
-                _bit = !_bit;
-            if (_bit != ((data>>it)&1)) {
-#ifdef DEBUG_DDR5
-                printf("Failed for line:%d bit:%d, expected %d got %d\n", _dq, it, (data>>it)&1, _bit);
-#endif
-                return 0;
-            }
+    if (print)
+        printf("\nrddata:");
+    for (phase = 0; phase < 8; ++phase) {
+        if (print)
+            printf("%d %d %d %d", channel, module, width, phase);
+        module_data = get_data_module_phase(channel, module, width, phase);
+        if (print)
+            printf("%04"PRIx16"|", module_data);
+        _error = module_data ^ expected_data[phase];
+        if (_error) {
+            if (print > 1)
+                for (_it = 0; _it < 2*width; ++_it)
+                    if ((_error >> _it) & 1)
+                        printf("\nFailed for line:%d bit:%d, expected %d got %d",
+                            _it % width, phase*2 + _it / width,
+                            (expected_data[phase] >> _it) & 1, (module_data >> _it) & 1);
+            if (print)
+                printf("\n");
+            return 0;
         }
     }
+    if (print)
+        printf("\n");
     return 1;
 }
 
-int compare(int channel, int module, int width, int data0, int data1, int inv, int select) {
-    uint16_t module_data[8];
-    uint8_t lfsr;
-    int phase;
-    int _dq, it, _bit;
+int compare(int channel, int module, int width, int data0, int data1, int inv, int select, int print) {
+    uint16_t expected_data[8];
+    uint16_t module_data;
+    uint16_t phase, _temp, _mask,_error;
+    uint8_t  lfsr0, lfsr1;
+    int      _it;
+
+    _mask = (1<<width) - 1;
+    lfsr0 = data0;
+    lfsr1 = data1;
+    if (print)
+        printf("\nexpected:");
     for (phase = 0; phase < 8; ++phase) {
-        module_data[phase] = get_data_module_phase(channel, module, width, phase);
-#ifdef DEBUG_DDR5
-        printf("%d:%x,", phase, module_data[phase]);
-#endif
+        _temp = 0;
+        for (_it = 0; _it < width; ++_it) {
+            _temp |= (((select & (1 << _it)) ? (lfsr1 & 1) : (lfsr0 & 1)) & 1) << _it;
+        }
+
+        lfsr0 = lfsr_next(lfsr0);
+        lfsr1 = lfsr_next(lfsr1);
+        _temp ^= (inv & _mask);
+
+        for (_it = 0; _it < width; ++_it) {
+            _temp |= (((select & (1 << _it)) ? (lfsr1 & 1) : (lfsr0 & 1)) & 1 ) << (_it + width);
+        }
+
+        lfsr0 = lfsr_next(lfsr0);
+        lfsr1 = lfsr_next(lfsr1);
+        _temp ^= ((inv & _mask) << width);
+
+        expected_data[phase] = _temp;
+        if (print)
+            printf("%04"PRIx16"|", expected_data[phase]);
     }
-#ifdef DEBUG_DDR5
-    printf("\n");
-#endif
-    for (_dq = 0; _dq < width; ++_dq) {
-        lfsr = (select & 1<<_dq) ? data1 : data0;
-        for (it = 0; it < 16; ++it) {
-            _bit = (module_data[it>>1] >> (_dq+((it&1)*width))) & 1;
-            if (inv & (1<<_dq))
-                _bit = !_bit;
-            if (_bit != (lfsr&1)) {
-#ifdef DEBUG_DDR5
-                printf("Failed for line:%d bit:%d, expected %d got %d\n", _dq, it, (lfsr&1), _bit);
-#endif
-                return 0;
-            }
-            lfsr = lfsr_next(lfsr);
+    if (print)
+        printf("\nrddata:");
+    for (phase = 0; phase < 8; ++phase) {
+        module_data = get_data_module_phase(channel, module, width, phase);
+        if (print)
+            printf("%04"PRIx16"|", module_data);
+        _error = module_data ^ expected_data[phase];
+        if (_error) {
+            if (print > 1)
+                for (_it = 0; _it < 2*width; ++_it)
+                    if ((_error >> _it) & 1)
+                        printf("\nFailed for line:%d bit:%d, expected %d got %d",
+                            _it % width, phase*2 + _it / width,
+                            (expected_data[phase] >> _it) & 1, (module_data >> _it) & 1);
+            if (print)
+                printf("\n");
+            return 0;
         }
     }
+    if (print)
+        printf("\n");
     return 1;
 }
 

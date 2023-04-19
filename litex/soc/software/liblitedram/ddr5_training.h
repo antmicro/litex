@@ -81,6 +81,7 @@ typedef struct {
     int die_width;
     int max_delay_taps;
     bool CS_CA_successful;
+    bool RDIMM;
 } training_ctx_t;
 
 void sdram_ddr5_module_enumerate(int rank, int width, int channels);

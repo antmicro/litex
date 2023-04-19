@@ -87,10 +87,10 @@ void par_inc(int channel, int rank, int address);
 
 uint8_t lfsr_next(uint8_t input);
 int compare_serial(int channel, int module, int width,
-                   uint16_t data, int inv);
+                   uint16_t data, int inv, int print);
 int compare(int channel, int module, int width,
             int data0, int data1,
-            int inv, int select);
+            int inv, int select, int print);
 
 void rd_rst(int channel, int module, int width);
 void rd_inc(int channel, int module, int width);
