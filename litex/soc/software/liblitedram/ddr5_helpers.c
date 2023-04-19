@@ -26,7 +26,7 @@ void prep_payload(int channel, int cs, int command, int wrdata_en,
         sdram_dfii_b_cmdinjector_command_storage_wr_mask_write(wrdata_mask);
     } else {
         sdram_dfii_a_cmdinjector_command_storage_write(
-            command << CSR_SDRAM_DFII_B_CMDINJECTOR_COMMAND_STORAGE_CA_OFFSET |
+            command << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_CA_OFFSET |
             cs << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_CS_OFFSET |
             wrdata_en << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_WRDATA_EN_OFFSET |
             rddata_en << CSR_SDRAM_DFII_A_CMDINJECTOR_COMMAND_STORAGE_RDDATA_EN_OFFSET
