@@ -126,7 +126,7 @@ uint16_t get_wr_dm_dly(int channel, int module, int width);
 int captured_preamble(int channel, int module, int width);
 uint8_t recover_mrr_value(int channel, int module, int width);
 void setup_enumerate(int channel, int rank, int module, int width);
-void send_mpc(int channel, int rank, int cmd);
+void send_mpc(int channel, int rank, int cmd, int wrdata_active);
 void send_mrw(int channel, int rank, int module, int reg, int value);
 void send_mrr(int channel, int rank, int reg);
 void send_wleveling_write(int channel, int rank);

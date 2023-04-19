@@ -12,6 +12,7 @@
 
 static int N2_mode = 1;
 extern int enumerated;
+extern int single_cycle_MPC;
 
 void prep_payload(int channel, int cs, int command, int wrdata_en,
                   uint64_t wrdata_mask, int rddata_en) {
@@ -393,7 +394,7 @@ int in_2n_mode(void) {
 }
 
 void disable_dram_2n_mode(int channel, int rank) {
-    send_mpc(channel, rank, 0b1001);
+    send_mpc(channel, rank, 0b1001, 0);
     printf("Switching DRAM on channel:%c rank:%d to 1N mode\n", 'A'+channel, rank);
 }
 
@@ -1307,47 +1308,56 @@ uint8_t recover_mrr_value(int channel, int module, int width) {
 void setup_enumerate(int channel, int rank, int module, int width) {
     int module_, i;
     for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
-        for (i = 0; i < 4; ++i)
+        for (i = 0; i < 8; ++i)
             set_data_module_phase(channel, module_, width, i, 0xffff);
     }
-    for (i = 0; i < 4; ++i)
+    for (i = 0; i < 8; ++i)
         set_data_module_phase(channel, module, width, i, 0);
-    cmd_injector(channel, 0xf, 0, 0, 1, 0, 0, 0);
-    store_continuous(channel);
-    cdelay(50);
-    cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
-    store_continuous(channel);
-    cdelay(50);
-    cmd_injector(channel, 0xf, 1<<rank, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
-    store_continuous(channel);
-    cdelay(50);
-    cmd_injector(channel, 0xf, 0, 0xf | ((0x60|(module&0xf))<<5), 1, 0, 0, 0);
-    store_continuous(channel);
-    cdelay(50);
-    cmd_injector(channel, 0xf, 0, 0, 0, 0, 0, 0);
-    store_continuous(channel);
-    cdelay(50);
+    cdelay(500);
+    send_mpc(channel, rank, (0x60 | (module & 0xf)), 1);
+    for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
+        for (i = 0; i < 8; ++i)
+            set_data_module_phase(channel, module_, width, i, 0xffff);
+    }
 }
 
-void send_mpc(int channel, int rank, int cmd) {
-    cmd_injector(channel, 0xf, 0, 0xf | (cmd<<5), 0, 0, 0, 0);
+static void long_mpc(int channel, int rank, int cmd, int wrdata_active) {
+    cmd_injector(channel, 0xf,  0,       0xf | (cmd<<5), wrdata_active, 0, 0, 0);
     store_continuous(channel);
     cdelay(50);
-    cmd_injector(channel, 0xf, 1<<rank, 0xf | (cmd<<5), 0, 0, 0, 0);
-    store_continuous(channel);
+    cmd_injector(channel, 0xff, 1<<rank, 0xf | (cmd<<5), wrdata_active, 0, 0, 1);
+    issue_single(channel);
     cdelay(50);
-    cmd_injector(channel, 0xf, 0, 0xf | (cmd<<5), 0, 0, 0, 0);
+    cmd_injector(channel, 0xff, 0,       0,              0, 0, 0, 1);
+    cmd_injector(channel, 0xf,  0,       0,              0, 0, 0, 0);
     store_continuous(channel);
-    cdelay(50);
-    cmd_injector(channel, 0xf, 0, 0, 0, 0, 0, 0);
-    store_continuous(channel);
-    cdelay(50);
+    cdelay(250);
 }
+
+static void short_mpc(int channel, int rank, int cmd, int wrdata_active) {
+    cmd_injector(channel, 0xf,  0,       0,              wrdata_active, 0, 0, 0);
+    store_continuous(channel);
+    cdelay(50);
+    cmd_injector(channel, 0xff, 0,       0,              wrdata_active, 0, 0, 1);
+    cmd_injector(channel, 0x1,  1<<rank, 0xf | (cmd<<5), wrdata_active, 0, 0, 1);
+    issue_single(channel);
+    cdelay(50);
+    cmd_injector(channel, 0xff, 0,       0,              0, 0, 0, 1);
+    cmd_injector(channel, 0xf,  0,       0,              0, 0, 0, 0);
+    store_continuous(channel);
+    cdelay(250);
+}
+
+void send_mpc(int channel, int rank, int cmd, int wrdata_active) {
+    if (single_cycle_MPC)
+        short_mpc(channel, rank, cmd, wrdata_active);
+    else
+        long_mpc(channel, rank, cmd, wrdata_active);
+}
+
 
 void send_mrw(int channel, int rank, int module, int reg, int value) {
-    if (enumerated)
-        send_mpc(channel, rank, 0x7<<4|(module&0xF));
-
+    send_mpc(channel, rank, 0x70 | (module&0xF), 0);
     cmd_injector(channel, 1<<0, 1<<rank, 0x5 | (reg<<5), 0, 0, 0, 1);
     if (N2_mode)
         cmd_injector(channel, 1<<1, 0, 0x5 | (reg<<5), 0, 0, 0, 1);
@@ -1361,7 +1371,7 @@ void send_mrw(int channel, int rank, int module, int reg, int value) {
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
     issue_single(channel);
     cdelay(50);
-    send_mpc(channel, rank, 0x7f);
+    send_mpc(channel, rank, 0x7f, 0);
 }
 
 void send_mrr(int channel, int rank, int reg) {
@@ -1568,7 +1578,7 @@ void force_issue_single(void) {
  * JESD79-5A 4.20.2
  */
 void enter_cstm(int channel, int rank) {
-    send_mpc(channel, rank, 1);
+    send_mpc(channel, rank, 1, 0);
 }
 
 /**
@@ -1579,7 +1589,7 @@ void enter_cstm(int channel, int rank) {
  * JESD79-5A 4.20.2
  */
 void exit_cstm(int channel, int rank) {
-    send_mpc(channel, rank, 0);
+    send_mpc(channel, rank, 0, 0);
 }
 
 static void cs_sample_prep(int channel, int rank, int address, int shift_0101) {
@@ -1615,7 +1625,7 @@ int cs_check_if_works(int channel, int rank, int address, int shift_0101) {
  * JESD79-5A 4.19.2
  */
 void enter_catm(int channel, int rank) {
-    send_mpc(channel, rank, 3);
+    send_mpc(channel, rank, 3, 0);
 }
 
 /**

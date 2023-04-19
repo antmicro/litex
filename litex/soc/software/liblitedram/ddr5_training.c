@@ -620,6 +620,12 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *ctx, int channel) {
 }
 #endif // SKIP_NO_DELAYS
 
+// MR2:OP[7] value to use, whenever MR2 is being modified
+static int use_internal_write_timing = 0;
+
+// MR2:OP[4] indicates that MPCs are single cycle
+int single_cycle_MPC = 0;
+
 int enumerated = 0;
 
 void sdram_ddr5_module_enumerate(int rank, int width, int channels) {
@@ -633,20 +639,20 @@ void sdram_ddr5_module_enumerate(int rank, int width, int channels) {
     printf("Enumerating rank:%2d\n", rank);
     for (channel = 0; channel < channels; channel++) {
         printf("\tEnumerating subchannel:%c\n", (char)('A'+channel));
-        // Enter PDA Enumerate Programming Mode
-        send_mpc(channel, rank, 0xB);
         for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+            // Enter PDA Enumerate Programming Mode
+            send_mpc(channel, rank, 0xB, 0);
             printf("\t\tmodule:%2d\n", module);
             setup_enumerate(channel, rank, module, width);
+            // Exit PDA Enumerate Programming Mode
+            send_mpc(channel, rank, 0xA, 0);
+            cdelay(100);
         }
-        // Exit PDA Enumerate Programming Mode
-        send_mpc(channel, rank, 0xA);
     }
     enumerated = 1;
 }
 
-static void dram_setup_and_enumerate(training_ctx_t *ctx, int rank) {
-    setup_dram_mrs_sequence(rank);
+static void dram_enumerate(training_ctx_t *ctx, int rank) {
     sdram_ddr5_module_enumerate(rank, ctx->die_width, ctx->channels);
 }
 
@@ -674,8 +680,6 @@ static const uint16_t serial[] = {
     0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000};
 static const int serial_count = sizeof(serial) / sizeof(serial[0]);
 
-// MR2:OP[7] value to use, whenever MR2 is being modified
-static int use_internal_write_timing = 0;
 #ifdef READ_DEBUG_DDR5
 static int _read_verbosity = 2;
 #elif defined(READ_INFO_DDR5)
@@ -720,7 +724,7 @@ static void enter_rptm(int channel, int rank) {
     send_mrw(channel, rank, MODULE_BROADCAST, 30, 0x33); // select data sources for DQ lines
 
     // Actual write to enter Read Preamble Training Mode
-    send_mrw(channel, rank, MODULE_BROADCAST, 2, 1|use_internal_write_timing);
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 1|use_internal_write_timing|single_cycle_MPC);
 }
 
 /**
@@ -739,7 +743,7 @@ static void exit_rptm(int channel, int rank) {
     send_mrw(channel, rank, MODULE_BROADCAST, 29, 0); // don't invert DQU[7:0]
 
     // Actual write to exit Read Preamble Training Mode
-    send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing);
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
 }
 
 /**
@@ -1045,7 +1049,7 @@ static void enter_wltm(int channel, int rank) {
     enter_write_leveling(channel);
 
     // Set MR2:OP[1]
-    send_mrw(channel, rank, MODULE_BROADCAST, 2, 2);
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 2|single_cycle_MPC);
 }
 
 /**
@@ -1058,7 +1062,7 @@ static void enter_wltm(int channel, int rank) {
  */
 static void exit_wltm(int channel, int rank) {
     // Unset MR2:OP[1] while keeping MR2:OP[7]
-    send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing);
+    send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
 
     exit_write_leveling(channel);
     clear_phy_fifos(channel);
@@ -1172,7 +1176,7 @@ static void wltm_align_internal_cycle(int channel, int rank, int module, int wid
     // Enable Internal Write Timing (stored in MR3)
     // JESD79-5A 3.5.4 and 3.5.5
     use_internal_write_timing = 1 << 7;
-    send_mrw(channel, rank, module, 2, 2|use_internal_write_timing);
+    send_mrw(channel, rank, module, 2, 2|use_internal_write_timing|single_cycle_MPC);
 
     do {
         // Set WICA value (MR3:OP[3:0] = WICA)
@@ -2001,6 +2005,7 @@ static void rcd_init(training_ctx_t *ctx) {
  */
 void sdram_ddr5_flow(void) {
     training_ctx_t *base_ctx = &host_dram_ctx;
+    single_cycle_MPC = 0;
     enable_phy();
 
     bool is_rdimm = false;
@@ -2034,28 +2039,26 @@ void sdram_ddr5_flow(void) {
     dram_start_sequence(base_ctx->ranks);
 
     if (is_rdimm) {
-        enter_ca_pass(0);
-    }
-    for (int rank = 0; rank < base_ctx->ranks; ++rank) {
-        if (is_rdimm)
+        enter_ca_pass(0); // FIXME: handle multiple RCDs
+        for (int rank = 0; rank < base_ctx->ranks; ++rank) {
             select_ca_pass(rank);
-        dram_setup_and_enumerate(base_ctx, rank);
-    }
-    if (is_rdimm) {
-        exit_ca_pass(0);
-    }
-
-    if (is_rdimm) {
+            setup_dram_mrs_sequence(rank);
+        }
+        exit_ca_pass(0); // FIXME: handle multiple RCDs
         for (int channel = 0; channel < base_ctx->channels; ++channel) {
             sdram_ddr5_cs_ca_training(base_ctx, channel);
         }
     } else {
+        for (int rank = 0; rank < base_ctx->ranks; ++rank)
+            setup_dram_mrs_sequence(rank);
         sdram_ddr5_cs_ca_training(base_ctx, -1);
     }
 
-    if (base_ctx->CS_CA_successful && base_ctx->rate == DDR) {
-        for (int channel = 0; channel < base_ctx->channels; channel++) {
-            for (int rank = 0; rank < base_ctx->ranks; rank++) {
+    single_cycle_MPC = 1<<4;
+    for (int channel = 0; channel < base_ctx->channels; channel++) {
+        for (int rank = 0; rank < base_ctx->ranks; rank++) {
+            send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
+            if (base_ctx->CS_CA_successful && base_ctx->rate == DDR) {
                 disable_dram_2n_mode(channel, rank);
             }
         }
@@ -2068,6 +2071,9 @@ void sdram_ddr5_flow(void) {
         printf("1N mode setup\n");
         init_sequence_1n(base_ctx->ranks);
     }
+
+    for (int rank = 0; rank < base_ctx->ranks; ++rank)
+        dram_enumerate(base_ctx, rank);
 
 #if defined(CONFIG_HAS_I2C)
     if (is_rdimm) {
