@@ -104,6 +104,7 @@ static int CS_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int sh
  */
 static int CS_should_shift_pattern(training_ctx_t *ctx, int32_t channel, int32_t rank) {
     int csdly, shift_0101;
+    shift_0101 = 0;
 
     ctx->cs.rst_dly(channel, rank, 0);
     for (csdly = 0; csdly < ctx->max_delay_taps; csdly++) {
@@ -146,12 +147,13 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
 
     int shift_0101 = 0;
     for (uint32_t _rank = 0; _rank < ctx->ranks; ++_rank) {
-        // Enter CS training
-        ctx->cs.enter_training_mode(channel, _rank);
-        printf("Rank: %2"PRId32"", _rank);
-
         left_side = UNSET_DELAY;
         right_side = UNSET_DELAY;
+        ctx->cs.rst_dly(channel, _rank, 0);
+
+        // Enter CS training
+        printf("Rank: %2"PRId32"", _rank);
+        ctx->cs.enter_training_mode(channel, _rank);
 
         // Scan clock delays only if one of patterns work (0x55 or 0xAA)
         // If neither works then we are in meta state, both clock and CS change
@@ -159,11 +161,13 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
         if (CS_in_eye(ctx, channel, _rank, &shift_0101)) {
             // We are already in the eye and can look for the eye start by changing CK delay
             right_side = CS_ck_scan(ctx, channel, _rank, shift_0101);
-
         }
-        shift_0101 = CS_should_shift_pattern(ctx, channel, _rank);
-
+        // Reset CS_n training states
+        ctx->cs.exit_training_mode(channel, _rank);
         printf("|");
+
+        ctx->cs.enter_training_mode(channel, _rank);
+        shift_0101 = CS_should_shift_pattern(ctx, channel, _rank);
         CS_scan(ctx, channel, _rank, &left_side, &right_side, shift_0101);
 
         printf("|\n");
