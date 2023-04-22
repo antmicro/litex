@@ -47,6 +47,7 @@ void setup_rddata_cnt(int channel, int value);
 void store_continuous(int channel);
 void issue_single(int channel);
 uint16_t get_data_module_phase(int channel, int module, int width, int phase);
+uint16_t get_wdata_module_phase(int channel, int module, int width, int phase);
 void set_data_module_phase(int channel, int module, int width, int phase, uint16_t wrdata);
 
 void reset_all_phy_regs(int channels, int ranks, int addresses, int modules, int width);

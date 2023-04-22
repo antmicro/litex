@@ -168,6 +168,37 @@ uint16_t get_data_module_phase(int channel, int module, int width, int phase) {
     return ret_value;
 }
 
+uint16_t get_wdata_module_phase(int channel, int module, int width, int phase) {
+    uint16_t ret_value;
+    int pebo;   // module's positive_edge_byte_offset
+    int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
+    int ibo;    // module's in byte offset (x4 ICs)
+    uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
+    uint16_t die_mask = (1<<width)-1;
+    ret_value = 0;
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (channel) {
+        sdram_dfii_b_cmdinjector_wrdata_select_write(phase);
+        csr_rd_buf_uint8(CSR_SDRAM_DFII_B_CMDINJECTOR_WRDATA_S_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+    } else {
+        sdram_dfii_a_cmdinjector_wrdata_select_write(phase);
+        csr_rd_buf_uint8(CSR_SDRAM_DFII_A_CMDINJECTOR_WRDATA_S_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+    }
+#else
+    sdram_dfii_cmdinjector_wrdata_select_write(phase);
+    csr_rd_buf_uint8(CSR_SDRAM_DFII_CMDINJECTOR_WRDATA_S_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+#endif
+    // CSR are read as BIG Endian
+    nebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4);
+    pebo = ((DFII_CMDINJECTOR_DATA_BYTES / (width/4)) - 1 - module) * (width/4) + (width/8);
+
+    ibo = 0; // Non zero only if x4 ICs are used
+    ret_value |= (data[pebo] >> ibo) & die_mask;
+    ibo = (0x4*(width/4)) % 8;
+    ret_value |= ((data[nebo] >> ibo) & die_mask) << width;
+    return ret_value;
+}
+
 void set_data_module_phase(int channel, int module, int width, int phase, uint16_t wrdata) {
     int pebo;   // module's positive_edge_byte_offset
     int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
