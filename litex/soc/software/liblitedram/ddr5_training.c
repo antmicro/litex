@@ -12,6 +12,7 @@
 
 //#define INFO_DDR5
 //#define DEBUG_DDR5
+//#define CA_INFO_DDR5
 //#define CA_DEBUG_DDR5
 //#define READ_INFO_DDR5
 //#define READ_DEBUG_DDR5
@@ -643,21 +644,55 @@ void sdram_ddr5_module_enumerate(int rank, int width, int channels) {
     printf("Enumerating rank:%2d\n", rank);
     for (channel = 0; channel < channels; channel++) {
         printf("\tEnumerating subchannel:%c\n", (char)('A'+channel));
+        // Enter PDA Enumerate Programming Mode
+        send_mpc(channel, rank, 0xB, 1);
         for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
-            // Enter PDA Enumerate Programming Mode
-            send_mpc(channel, rank, 0xB, 0);
             printf("\t\tmodule:%2d\n", module);
-            setup_enumerate(channel, rank, module, width);
-            // Exit PDA Enumerate Programming Mode
-            send_mpc(channel, rank, 0xA, 0);
-            cdelay(100);
+#ifndef CA_INFO_DDR5
+            setup_enumerate(channel, rank, module, width, 0);
+#else
+            setup_enumerate(channel, rank, module, width, 1);
+#endif // CA_INFO_DDR5
         }
+        // Exit PDA Enumerate Programming Mode
+        send_mpc(channel, rank, 0xA, 1);
+        cdelay(100);
+        send_mpc(channel, rank, 0xA, 0);
+        cdelay(100);
     }
     enumerated = 1;
 }
 
-static void dram_enumerate(training_ctx_t *ctx, int rank) {
+static void sdram_ddr5_check_enumerate(int rank, int width, int channels) {
+    int channel, module;
+    if (!enumerated)
+        return;
+    printf("Checking rank:%2d\n", rank);
+    for (channel = 0; channel < channels; channel++) {
+        printf("\tChecking subchannel:%c\n", (char)('A'+channel));
+        send_mrw(channel, rank, MODULE_BROADCAST, 2, 1|use_internal_write_timing|single_cycle_MPC);
+        printf("\tBase line:");
+#ifndef CA_INFO_DDR5
+        check_enumerate(channel, rank, -1, width, 0);
+#else
+        check_enumerate(channel, rank, -1, width, 1);
+#endif // CA_INFO_DDR5
+        for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+            printf("\t\tmodule:%2d", module);
+#ifndef CA_INFO_DDR5
+            check_enumerate(channel, rank, module, width, 0);
+#else
+            check_enumerate(channel, rank, module, width, 1);
+#endif // CA_INFO_DDR5
+        }
+        send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
+        cdelay(100);
+    }
+}
+
+static void dram_enumerate(training_ctx_t *const ctx , int rank) {
     sdram_ddr5_module_enumerate(rank, ctx->die_width, ctx->channels);
+    sdram_ddr5_check_enumerate(rank, ctx->die_width, ctx->channels);
 }
 
 static const uint8_t seeds0[] = {
