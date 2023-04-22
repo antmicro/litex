@@ -77,7 +77,6 @@ static int CS_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int sh
     works = 1;
     printf("|");
     last_good = 0;
-    ctx->cs.rst_dly(channel, rank, 0);
     for(ckdly = 0; ckdly < ctx->max_delay_taps && works; ckdly++) {
         _result = ctx->cs.check(channel, rank, 0, shift_0101);
         printf("%d", !!_result);
@@ -118,12 +117,12 @@ static int CS_should_shift_pattern(training_ctx_t *ctx, int32_t channel, int32_t
     return shift_0101;
 }
 
-static void CS_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int* left, int* right, int shift_0101) {
+static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank,
+        int* left, int* right, int shift_0101, int start_cs) {
     int works, csdly;
     eye_t eye = DEFAULT_EYE;
 
-    ctx->cs.rst_dly(channel, rank, 0);
-    for (csdly = 0; csdly < ctx->max_delay_taps; csdly++) {
+    for (csdly = start_cs; csdly < ctx->max_delay_taps; csdly++) {
         works = ctx->cs.check(channel, rank, 0, shift_0101);
         printf("%d", !!works);
         if (works && eye.state == BEFORE) {
@@ -148,10 +147,11 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
     int32_t csdly, coarse;
 
     int shift_0101 = 0;
-    for (uint32_t _rank = 0; _rank < ctx->ranks; ++_rank) {
+    for (int _rank = 0; _rank < ctx->ranks; ++_rank) {
         left_side = UNSET_DELAY;
         right_side = UNSET_DELAY;
         ctx->cs.rst_dly(channel, _rank, 0);
+        ctx->ck.rst_dly(channel, _rank, 0);
 
         // Enter CS training
         printf("Rank: %2"PRId32"", _rank);
@@ -170,7 +170,7 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
 
         ctx->cs.enter_training_mode(channel, _rank);
         shift_0101 = CS_should_shift_pattern(ctx, channel, _rank);
-        CS_scan(ctx, channel, _rank, &left_side, &right_side, shift_0101);
+        CS_scan(ctx, channel, _rank, &left_side, &right_side, shift_0101, 0);
 
         printf("|\n");
 
@@ -381,8 +381,7 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly, int channel) {
             ctx->cs.enter_training_mode(_channel, _rank);
 
             // Get shift_0101 value
-            shift_0101 = CS_should_shift_pattern(ctx, _channel, _rank);
-            ctx->cs.rst_dly(_channel, _rank, 0);
+            CS_in_eye(ctx, _channel, _rank, &shift_0101);
 
             CS_ck_scan(ctx, _channel, _rank, shift_0101);
             // Restore CK delay after CS_ck_scan
@@ -390,10 +389,14 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly, int channel) {
             for (cntdly = 0; cntdly < ckdly; ++cntdly)
                 ctx->ck.inc_dly(_channel, _rank, 0);
 
+            // Reset CS_n training states
+            ctx->cs.exit_training_mode(_channel, _rank);
             printf("|");
-            shift_0101 = CS_should_shift_pattern(ctx, _channel, _rank);
-            ctx->cs.rst_dly(_channel, _rank, 0);
-            CS_scan(ctx, _channel, _rank, &discard, &discard, shift_0101);
+            ctx->cs.enter_training_mode(_channel, _rank);
+
+            CS_in_eye(ctx, _channel, _rank, &shift_0101);
+            CS_scan(ctx, _channel, _rank, &discard, &discard,
+                shift_0101, ctx->cs.final_delays[_channel][_rank]);
             printf("|\n");
 
             // Restore CS delay
