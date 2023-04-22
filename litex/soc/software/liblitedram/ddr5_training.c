@@ -298,22 +298,23 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
     if (ctx->training_type == HOST_RCD)
         _max_rank = 1;
 
+    ctx->ck.rst_dly(channel, _rank, 0);
     for (; _rank < _max_rank; ++_rank) {
         printf("Rank:%2"PRId32"\n", _rank);
-        // Enter CA training
-        ctx->ca.enter_training_mode(channel, _rank);
 
         start_address = 0;
         end_address = ctx->ca.line_count;
 
         for (address = start_address; address < end_address; address++) {
+            // Reset CA delay
+            ctx->ca.rst_dly(channel, _rank, address);
+
+            // Enter CA training
+            ctx->ca.enter_training_mode(channel, _rank);
             printf("CA line:%2"PRId32"", address);
 
             left_side = UNSET_DELAY;
             right_side = UNSET_DELAY;
-
-            // Reset CA delay
-            ctx->ca.rst_dly(channel, _rank, address);
 
             // Check if we are already in the eye
             if (ctx->ca.check(channel, _rank, address, 0)) {
@@ -341,10 +342,10 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
 
             if (left_side < ctx->ca.delays[channel][address][1])
                 ctx->ca.delays[channel][address][1] = left_side;
-        }
 
-        // Exit CA training
-        ctx->ca.exit_training_mode(channel, _rank);
+            // Exit CA training
+            ctx->ca.exit_training_mode(channel, _rank);
+        }
     }
 }
 
@@ -406,18 +407,20 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly, int channel) {
             if (ctx->training_type == HOST_RCD && _rank == 1)
                 continue;
             //                    CA rescan                    //
-            ctx->ca.enter_training_mode(_channel, _rank);
 
             start_address = 0;
             end_address = ctx->ca.line_count;
 
             for (address = start_address; address < end_address; address++) {
                 printf("CA line:\t%2d", address);
+                ctx->ca.enter_training_mode(_channel, _rank);
                 CA_ck_scan(ctx, _channel, _rank, address, ctx->cs.final_delays[_channel][_rank]);
                 // Restore CK delay after CA_ck_scan
                 ctx->ck.rst_dly(_channel, _rank, 0);
                 for (cntdly = 0; cntdly < ckdly; ++cntdly)
                     ctx->ck.inc_dly(_channel, _rank, 0);
+                ctx->ca.exit_training_mode(_channel, _rank);
+                ctx->ca.enter_training_mode(_channel, _rank);
 
                 printf("|");
                 CA_scan(ctx, _channel, _rank, address, &discard, &discard);
@@ -427,8 +430,8 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly, int channel) {
                 ctx->ca.rst_dly(_channel, _rank, address);
                 for (cntdly = 0; cntdly < ctx->ca.final_delays[_channel][address]; ++cntdly)
                     ctx->ca.inc_dly(_channel, _rank, address);
+                ctx->ca.exit_training_mode(_channel, _rank);
             }
-            ctx->ca.exit_training_mode(_channel, _rank);
         }
     }
 }
