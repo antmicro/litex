@@ -258,10 +258,11 @@ void reset_all_phy_regs(int channels, int ranks, int addresses, int modules, int
 void enable_phy(void) {
     ddrphy_CSRModule_enable_fifos_write(0);
     cdelay(5000);
-    ddrphy_CSRModule_rst_write(1);
-    cdelay(5000);
     clear_phy_fifos(0);
     clear_phy_fifos(1);
+    cdelay(5000);
+    ddrphy_CSRModule_rst_write(1);
+    cdelay(5000);
     ddrphy_CSRModule_rst_write(0);
     cdelay(5000);
     ddrphy_CSRModule_enable_fifos_write(1);
