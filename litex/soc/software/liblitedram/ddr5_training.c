@@ -813,9 +813,8 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module, i
         for (int i = 0 ; i < 16 && works; ++i) {
             send_mrr(channel, rank, 31);
             works &= compare_serial(channel, module, width, serial[seed], 0xA5, 0);
-            if (!works && _read_verbosity) {
-                printf("Module: %d,Iternation:%d, %02x%02x\t", module, i, serial[seed]&0xff, serial[seed]>>8);
-                compare_serial(channel, module, width, serial[seed], 0xA5, _read_verbosity);
+            if (!works && _read_verbosity > 1) {
+                compare_serial(channel, module, width, serial[seed], 0xA5, 1);
             }
         }
     }
@@ -832,8 +831,8 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module, i
             send_mrw(channel, rank, module, 27, seeds1[seed]);
             send_mrr(channel, rank, 31);
             works &= compare(channel, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33, 0);
-            if (!works && _read_verbosity)
-                compare(channel, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33, _read_verbosity);
+            if (!works && _read_verbosity > 1)
+                compare(channel, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33, 1);
         }
     }
     if (!works)
