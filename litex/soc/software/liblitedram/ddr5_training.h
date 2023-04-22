@@ -78,6 +78,7 @@ typedef struct {
     enum dca_rate rate;
     int ranks;
     int channels;
+    int all_ca_count;
     int die_width;
     int max_delay_taps;
     bool CS_CA_successful;
