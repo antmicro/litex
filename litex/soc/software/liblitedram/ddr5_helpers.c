@@ -1967,6 +1967,62 @@ void rcd_set_termination_and_vref(int rank) {
     }
 }
 
+void rcd_set_enables_and_slew_rates(
+    int rank, int qcke, int qcae, int qckh, int qcah, int slew) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[5];
+    for (int i=0; i<2; ++i) {
+        ok = true;
+        // we need to modify from RW08 to RW0F
+        // 0D and 0F are only for LRDIMMs
+        ok &= sdram_rcd_read(rcd, 0, i, 0, 0x08, rw_data, false);
+        rw_data[0] = qcke;
+        rw_data[1] = qcae;
+        rw_data[2] = qckh;
+        // write the settings back
+        ok &= sdram_rcd_write(rcd, 0, i, 0, 0x08, rw_data, 4, false);
+        cdelay(2000);
+        if (!ok)
+            printf("There was a problem with setting channel's:%c "
+                   "Clock Driver enable, QCA/CS enable or "
+                   "Clock Driver characteristics in the RCD\n", 'A'+i);
+
+        ok = true;
+        ok &= sdram_rcd_read(rcd, 0, i, 0, 0x0C, rw_data, false);
+        rw_data[0] = qcah;
+        rw_data[2] = slew;
+        // write the settings back
+        ok &= sdram_rcd_write(rcd, 0, i, 0, 0x0C, rw_data, 4, false);
+        cdelay(2000);
+        if (!ok)
+            printf("There was a problem with setting channel's:%c "
+                   "QCK/QCA/QCS drivers slew rate or "
+                   "QCA/QCS driver characteristics in the RCD\n", 'A'+i);
+    }
+}
+
+
+/**
+ * rcd_set_qrst
+ *
+ * Sets DRAMs QRST signal.
+ */
+void rcd_set_qrst(int channel, int rank) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+
+    // we send Set CH_[AB]_DRAM Reset commands (CMD5 or CMD7)
+    // to the RW04 register (JESD82-511 8.6.5)
+    uint8_t cmd = 5 + (2 * channel);
+
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, &cmd, 1, false);
+    cdelay(2000);
+
+    if (!ok)
+        printf("There was a problem with setting DRAM reset for channel %c\n", 'A'+channel);
+}
+
 /**
  * rcd_clear_qrst
  *
