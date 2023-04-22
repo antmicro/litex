@@ -154,7 +154,7 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
         ctx->ck.rst_dly(channel, _rank, 0);
 
         // Enter CS training
-        printf("Rank: %2"PRId32"", _rank);
+        printf("Rank: %2d", _rank);
         ctx->cs.enter_training_mode(channel, _rank);
 
         // Scan clock delays only if one of patterns work (0x55 or 0xAA)
@@ -189,7 +189,7 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
         ctx->cs.exit_training_mode(channel, _rank);
 
         if (left_side == UNSET_DELAY || right_side == UNSET_DELAY) {
-            printf("CS:%2"PRId32" Eye width:0 Failed\n", _rank);
+            printf("CS:%2d Eye width:0 Failed\n", _rank);
             *success = 0;
             return;
         }
@@ -252,7 +252,6 @@ static int CA_ck_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, 
             last_good = -ckdly;
         }
         ctx->ck.inc_dly(channel, rank, 0);
-        //ctx->cs.inc_dly(channel, rank, 0);
     }
 
     ctx->ck.rst_dly(channel, rank, 0);
