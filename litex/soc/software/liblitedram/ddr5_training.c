@@ -1572,6 +1572,7 @@ static int write_dm_lfsr_check(training_ctx_t *ctx, int channel, int rank, int m
 
 static eye_t write_data_scan(training_ctx_t *const ctx , int channel, int rank, int module, int write_strobe_cycle, int print) {
     eye_t eye = DEFAULT_EYE;
+    eye_t serial_only_eye = DEFAULT_EYE;
     int works = 1, p_works;
 
     wr_dq_rst(channel, module, ctx->die_width);
@@ -1580,8 +1581,7 @@ static eye_t write_data_scan(training_ctx_t *const ctx , int channel, int rank, 
     }
     if (print)
         printf("Data scan:\n");
-    for (int cycle = write_strobe_cycle - 3; eye.state != AFTER && cycle < 65 && cycle < write_strobe_cycle + 5; ++cycle) {
-        if (print)
+    for (int cycle = write_strobe_cycle - 3; eye.state != AFTER && serial_only_eye.state != AFTER && cycle < 65 && cycle < write_strobe_cycle + 5; ++cycle) {
         if (print) {
             printf("%2d|", cycle);
             if (_write_verbosity > 2)
@@ -1616,6 +1616,12 @@ static eye_t write_data_scan(training_ctx_t *const ctx , int channel, int rank, 
             } else if (!works && eye.state == INSIDE) {
                 eye.end = cycle * ctx->max_delay_taps + delay;
                 eye.state  = AFTER;
+            }
+
+            if ((p_works & 1) && serial_only_eye.state == BEFORE) {
+                serial_only_eye.state  = INSIDE;
+            } else if (!(p_works & 1) && serial_only_eye.state == INSIDE) {
+                serial_only_eye.state  = AFTER;
             }
             odly_dq_inc(channel, module, ctx->die_width);
         }
