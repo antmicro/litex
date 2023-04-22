@@ -1976,16 +1976,30 @@ static void rcd_init(training_ctx_t *const ctx ) {
     reset_sequence(ctx->ranks);
     rcd_set_dimm_operating_speed_band(0, 0, 2000);
     busy_wait_us(50);
+    rcd_forward_all_dram_cmds(0, 0, false); // FIXME: this should forward for all RCDs
+
+    for (int channel = 0; channel < ctx->channels; channel++) {
+        rcd_set_qrst(channel, 0); // FIXME: this should set QRST for all RCDs
+    }
+    busy_wait_us(500);
 
     for (int channel = 0; channel < ctx->channels; channel++)
         rcd_clear_qrst(channel, 0); // FIXME: this should clear QRST for all RCDs
 
     sdram_ddr5_cs_ca_training(ctx, -1);
-    rcd_forward_all_dram_cmds(0, 0, true); // FIXME: this should forward for all RCDs
-
     busy_wait(6);
-    for (int channel = 0; channel < ctx->channels; channel++)
+
+    rcd_forward_all_dram_cmds(0, 0, true); // FIXME: this should forward for all RCDs
+    busy_wait(6);
+
+    for (int channel = 0; channel < ctx->channels; channel++) {
+        rcd_release_qcs(channel, 0, true); // FIXME: this should set QRST for all RCDs
+    }
+    busy_wait(6);
+
+    for (int channel = 0; channel < ctx->channels; ++channel)
         prep_nop(channel, 0);
+
     force_issue_single();
     busy_wait_us(5);
 }
