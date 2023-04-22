@@ -898,7 +898,7 @@ int compare_serial(int channel, int module, int width, uint16_t data, int inv, i
             printf("%04"PRIx16"|", module_data);
         _error = module_data ^ expected_data[phase];
         if (_error) {
-            if (print > 1)
+            if (print)
                 for (_it = 0; _it < 2*width; ++_it)
                     if ((_error >> _it) & 1)
                         printf("\nFailed for line:%d bit:%d, expected %d got %d",
@@ -956,7 +956,7 @@ int compare(int channel, int module, int width, int data0, int data1, int inv, i
             printf("%04"PRIx16"|", module_data);
         _error = module_data ^ expected_data[phase];
         if (_error) {
-            if (print > 1)
+            if (print)
                 for (_it = 0; _it < 2*width; ++_it)
                     if ((_error >> _it) & 1)
                         printf("\nFailed for line:%d bit:%d, expected %d got %d",
