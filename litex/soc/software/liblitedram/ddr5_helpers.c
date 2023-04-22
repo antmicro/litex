@@ -142,7 +142,6 @@ uint16_t get_data_module_phase(int channel, int module, int width, int phase) {
     int pebo;   // module's positive_edge_byte_offset
     int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
     int ibo;    // module's in byte offset (x4 ICs)
-    int byte_off;
     uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
     uint16_t die_mask = (1<<width)-1;
     ret_value = 0;
@@ -173,7 +172,6 @@ void set_data_module_phase(int channel, int module, int width, int phase, uint16
     int pebo;   // module's positive_edge_byte_offset
     int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
     int ibo;    // module's in byte offset (x4 ICs)
-    int byte_off, mask_offset;
     uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
     uint8_t die_mask = ( 1 << width) - 1;
 #ifdef SDRAM_PHY_SUBCHANNELS
@@ -324,6 +322,7 @@ uint32_t capture_and_reduce_result(int channel, int operation) {
 #else
     csr_rd_buf_uint8(CSR_SDRAM_DFII_CMDINJECTOR_RESULT_ARRAY_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
 #endif
+
     for (i = 1; i < DFII_CMDINJECTOR_DATA_BYTES; ++i) {
         data[0] = operation ? (data[0] & data[i]) : (data[0] | data[i]);
     }
@@ -344,7 +343,6 @@ uint32_t capture_and_reduce_module(int channel, int module, int width, int opera
     int pebo;   // module's positive_edge_byte_offset
     int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
     int ibo;    // module's in byte offset (x4 ICs)
-    int byte_off;
     uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
     uint16_t die_mask = (1<<width)-1;
 #ifdef SDRAM_PHY_SUBCHANNELS
@@ -895,8 +893,6 @@ int compare_serial(int channel, int module, int width, uint16_t data, int inv, i
     if (print)
         printf("\nrddata:");
     for (phase = 0; phase < 8; ++phase) {
-        if (print)
-            printf("%d %d %d %d", channel, module, width, phase);
         module_data = get_data_module_phase(channel, module, width, phase);
         if (print)
             printf("%04"PRIx16"|", module_data);
