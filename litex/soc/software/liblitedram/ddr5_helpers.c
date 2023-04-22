@@ -2036,7 +2036,7 @@ void rcd_release_qcs(int channel, int rank, bool sideband) {
 
         // we send CH_[AB]_QCS_HIGH commands (CMD14 or CMD15)
         // to the RW04 register (JESD82-511 8.6.5)
-        uint8_t cmd = 14 + !!channel;
+        uint8_t cmd = 14 + channel;
         ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, &cmd, 1, false);
         cdelay(2000);
 
