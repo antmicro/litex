@@ -1392,6 +1392,22 @@ void send_mpc(int channel, int rank, int cmd, int wrdata_active) {
         long_mpc(channel, rank, cmd, wrdata_active);
 }
 
+void send_mrw_rcd(int channel, int rank, int reg, int value) {
+    cmd_injector(channel, 1<<0, 1<<rank, 0x5 | (reg<<5), 0, 0, 0, 1);
+    if (N2_mode)
+        cmd_injector(channel, 1<<1, 0, 0x5 | (reg<<5), 0, 0, 0, 1);
+    else
+        cmd_injector(channel, 1<<1, 0, value | 1<<10, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<2, 0, value | 1<<10, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<3, 0, value | 1<<10, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<4, 0, 0, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<5, 0, 0, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<6, 0, 0, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
+    issue_single(channel);
+    cdelay(150);
+    cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
+}
 
 void send_mrw(int channel, int rank, int module, int reg, int value) {
     send_mpc(channel, rank, 0x70 | (module&0xF), 0);
