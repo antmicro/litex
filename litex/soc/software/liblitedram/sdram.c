@@ -288,7 +288,10 @@ void sdram_mode_register_write(char reg, int value) {
 	command_p0(DFII_COMMAND_RAS|DFII_COMMAND_CAS|DFII_COMMAND_WE|DFII_COMMAND_CS);
 }
 #else
-void sdram_mode_register_write(char reg, int value) {}
+void sdram_mode_register_write(char reg, int value) {
+    send_mrw(0, 0, 0xf, reg, value);
+    send_mrw(1, 0, 0xf, reg, value);
+}
 #endif
 
 #if !defined(SDRAM_PHY_DDR5) && defined(CSR_DDRPHY_BASE)
