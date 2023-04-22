@@ -215,6 +215,46 @@ void set_data_module_phase(int channel, int module, int width, int phase, uint16
     return;
 }
 
+static void reset_CA_phy_regs(int channels, int ranks, int addresses) {
+    for (int channel = 0; channel < channels; ++channel) {
+        ck_rst(channel, 0, 0);
+        for (int rank = 0; rank < ranks; ++rank) {
+            cs_rst(channel, rank, 0);
+            par_rst(channel, rank, 0);
+            for (int address = 0; address < addresses; ++address) {
+                ca_rst(channel, rank, address);
+            }
+        }
+    }
+}
+
+static void reset_RD_phy_regs(int channels, int modules, int width) {
+    for (int channel = 0; channel < channels; ++channel) {
+        for (int module = 0; module < modules; ++module) {
+            rd_rst(channel, module, width);
+            idly_rst(channel, module, width);
+        }
+    }
+}
+
+static void reset_WR_phy_regs(int channels, int modules, int width) {
+    for (int channel = 0; channel < channels; ++channel) {
+        for (int module = 0; module < modules; ++module) {
+            wr_dqs_rst(channel, module, width);
+            odly_dqs_rst(channel, module, width);
+            wr_dq_rst(channel, module, width);
+            odly_dq_rst(channel, module, width);
+            odly_dm_rst(channel, module, width);
+        }
+    }
+}
+
+void reset_all_phy_regs(int channels, int ranks, int addresses, int modules, int width) {
+    reset_CA_phy_regs(channels, ranks, addresses);
+    reset_RD_phy_regs(channels, modules, width);
+    reset_WR_phy_regs(channels, modules, width);
+}
+
 void enable_phy(void) {
     ddrphy_CSRModule_enable_fifos_write(0);
     cdelay(5000);

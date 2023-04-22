@@ -49,6 +49,7 @@ void issue_single(int channel);
 uint16_t get_data_module_phase(int channel, int module, int width, int phase);
 void set_data_module_phase(int channel, int module, int width, int phase, uint16_t wrdata);
 
+void reset_all_phy_regs(int channels, int ranks, int addresses, int modules, int width);
 void enable_phy(void);
 
 void setup_capture(int channel, int setup);
