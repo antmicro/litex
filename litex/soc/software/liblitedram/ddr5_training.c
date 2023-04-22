@@ -1758,125 +1758,7 @@ static int ca_check_if_has_line13(int32_t channel) {
     return and_sample(channel);
 }
 
-training_ctx_t host_dram_ctx = {
-    .ck = {
-        .rst_dly = ck_rst,
-        .inc_dly = ck_inc,
-    },
-    .cs = {
-        .enter_training_mode = enter_cstm,
-        .exit_training_mode  = exit_cstm,
-        .rst_dly = cs_rst,
-        .inc_dly = cs_inc,
-        .check = cs_check_if_works,
-    },
-    .ca = {
-        .line_count = 13,
-        .enter_training_mode = enter_catm,
-        .exit_training_mode  = exit_catm,
-        .inc_dly = ca_inc,
-        .rst_dly = ca_rst,
-        .check = ca_check_if_works,
-        .has_line13 = ca_check_if_has_line13,
-    },
-    .training_type = HOST_DRAM,
-
-    // So far, all PHYs have support for single delay far all ranks,
-    // use only first rank, leave all other as inactive.
-    // Use SDRAM_PHY_RANKS if we ever support multiple ranks
-    // and independent timing for them.
-    .ranks = 1,
-    .channels = CHANNELS,
-    // should be populated from SPD
-    // defualts to dq_dqs_ratio from sdram_phy.h
-    .die_width = SDRAM_PHY_DQ_DQS_RATIO,
-    .rate = DDR,
-    .CS_CA_successful = true,
-    .max_delay_taps = SDRAM_PHY_DELAYS,
-    .RDIMM = false,
-};
-
 #if defined(CONFIG_HAS_I2C)
-training_ctx_t host_rcd_ctx = {
-    .ck = {
-        .rst_dly = ck_rst,
-        .inc_dly = ck_inc,
-    },
-    .cs = {
-        .enter_training_mode = enter_dcstm,
-        .exit_training_mode  = exit_dcstm,
-        .rst_dly = cs_rst,
-        .inc_dly = cs_inc,
-        .check = dcs_check_if_works,
-    },
-    .ca = {
-        .line_count = 7,
-        .enter_training_mode = enter_dcatm,
-        .exit_training_mode  = exit_dcatm,
-        .inc_dly = ca_inc,
-        .rst_dly = ca_rst,
-        .check = dca_check_if_works_ddr,
-        .has_line13 = NULL, // RCD has always 7 DCA lines
-    },
-    .par = {
-        .rst_dly = par_rst,
-        .inc_dly = par_inc,
-    },
-    .training_type = HOST_RCD,
-
-    // So far, all PHYs have support for single delay far all ranks,
-    // use only first rank, leave all other as inactive.
-    // Use SDRAM_PHY_RANKS if we ever support multiple ranks
-    // and independent timing for them.
-    .ranks = 2,
-    .channels = 2,
-    // must be populated from SPD
-    .die_width = -1,
-    .rate = DDR,
-    .CS_CA_successful = true,
-    .max_delay_taps = SDRAM_PHY_DELAYS,
-    .RDIMM = true,
-};
-
-training_ctx_t rcd_dram_ctx = {
-    .ck = {
-        .rst_dly = qck_rst,
-        .inc_dly = qck_inc,
-    },
-    .cs = {
-        .enter_training_mode = enter_qcstm,
-        .exit_training_mode  = exit_qcstm,
-        .rst_dly = qcs_rst,
-        .inc_dly = qcs_inc,
-        .check = qcs_check_if_works,
-    },
-    .ca = {
-        .line_count = 1,
-        .enter_training_mode = enter_qcatm,
-        .exit_training_mode  = exit_qcatm,
-        .inc_dly = qca_inc,
-        .rst_dly = qca_rst,
-        .check = qca_check_if_works,
-        .has_line13 = NULL,
-    },
-    .training_type = RCD_DRAM,
-
-    // So far, all PHYs have support for single delay far all ranks,
-    // use only first rank, leave all other as inactive.
-    // Use SDRAM_PHY_RANKS if we ever support multiple ranks
-    // and independent timing for them.
-    .ranks = 2,
-    .channels = 2,
-    // must be populated from SPD
-    .die_width = -1,
-    .rate = DDR,
-    .CS_CA_successful = true,
-    .max_delay_taps = 64,
-    .RDIMM = true,
-};
-
-
-
 enum module_type {
     RDIMM       = 0b0001,
     UDIMM       = 0b0010,
@@ -1967,7 +1849,24 @@ static uint8_t read_module_channels(uint8_t spd) {
     return module_channels;
 }
 
-static void rcd_init(training_ctx_t *ctx) {
+#endif // defined(CONFIG_HAS_I2C)
+
+training_ctx_t host_dram_ctx;
+#if defined(CONFIG_HAS_I2C)
+training_ctx_t host_rcd_ctx;
+training_ctx_t rcd_dram_ctx;
+#endif // defined(CONFIG_HAS_I2C)
+
+static void init_structs(void) {
+    host_dram_ctx = (training_ctx_t) DEFAULT_HOST_DRAM;
+#if defined(CONFIG_HAS_I2C)
+    host_rcd_ctx  = (training_ctx_t) DEFAULT_HOST_RCD;
+    rcd_dram_ctx  = (training_ctx_t) DEFAULT_RCD_DRAM;
+#endif // defined(CONFIG_HAS_I2C)
+}
+
+#if defined(CONFIG_HAS_I2C)
+static void rcd_init(training_ctx_t *const ctx ) {
     // Issue a VR_ENABLE command to the PMIC
     uint8_t cmd = 0xa0;
     i2c_write(0x48, 0x32, &cmd, 1, 1); // FIXME: this should be sent to all PMICs
@@ -2008,9 +1907,13 @@ static void rcd_init(training_ctx_t *ctx) {
  * training context.
  */
 void sdram_ddr5_flow(void) {
-    training_ctx_t *base_ctx = &host_dram_ctx;
     single_cycle_MPC = 0;
+    use_internal_write_timing = 0;
+    enumerated = 0;
+    init_structs();
     enable_phy();
+
+    training_ctx_t *base_ctx = &host_dram_ctx;
 
     bool is_rdimm = false;
 #if defined(CONFIG_HAS_I2C)
@@ -2025,11 +1928,19 @@ void sdram_ddr5_flow(void) {
     rcd_dram_ctx.die_width = die_width;
     rcd_dram_ctx.ranks     = read_module_ranks(0); // FIXME: handle multiple sticks and SPDs
     rcd_dram_ctx.channels  = read_module_channels(0); // FIXME: handle multiple sticks and SPDs
+    if (is_rdimm) {
+        base_ctx = &host_rcd_ctx;
+    }
+#endif // defined(CONFIG_HAS_I2C)
 
+    reset_all_phy_regs(base_ctx->channels, base_ctx->ranks, base_ctx->all_ca_count,
+        SDRAM_PHY_MODULES/CHANNELS, base_ctx->die_width);
+
+#if defined(CONFIG_HAS_I2C)
     if (is_rdimm) {
         printf("Detected RDIMM. Initializing RCD and running Host->RCD training\n");
         ddrphy_CSRModule_rdimm_mode_write(1);
-        rcd_init(&host_rcd_ctx);
+        rcd_init(base_ctx);
         base_ctx = &rcd_dram_ctx;
         base_ctx->rate = host_rcd_ctx.rate;
         base_ctx->CS_CA_successful &= host_rcd_ctx.CS_CA_successful;

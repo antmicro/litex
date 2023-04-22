@@ -85,6 +85,121 @@ typedef struct {
     bool RDIMM;
 } training_ctx_t;
 
+// So far, all PHYs have support for single delay far all ranks,
+// use only first rank, leave all other as inactive.
+// Use SDRAM_PHY_RANKS if we ever support multiple ranks
+// and independent timing for them.
+
+// should be populated from SPD
+// defualts to dq_dqs_ratio from sdram_phy.h
+
+#define DEFAULT_HOST_DRAM {                   \
+    .ck = {                                   \
+        .rst_dly = ck_rst,                    \
+        .inc_dly = ck_inc,                    \
+    },                                        \
+    .cs = {                                   \
+        .enter_training_mode = enter_cstm,    \
+        .exit_training_mode  = exit_cstm,     \
+        .rst_dly = cs_rst,                    \
+        .inc_dly = cs_inc,                    \
+        .check = cs_check_if_works,           \
+    },                                        \
+    .ca = {                                   \
+        .line_count = 13,                     \
+        .enter_training_mode = enter_catm,    \
+        .exit_training_mode  = exit_catm,     \
+        .inc_dly = ca_inc,                    \
+        .rst_dly = ca_rst,                    \
+        .check = ca_check_if_works,           \
+        .has_line13 = ca_check_if_has_line13, \
+    },                                        \
+    .training_type = HOST_DRAM,               \
+                                              \
+    .ranks = 1,                               \
+    .channels = CHANNELS,                     \
+    .all_ca_count = SDRAM_PHY_ADDRESS_LINES,  \
+    .die_width = SDRAM_PHY_DQ_DQS_RATIO,      \
+    .rate = DDR,                              \
+    .CS_CA_successful = true,                 \
+    .max_delay_taps = SDRAM_PHY_DELAYS,       \
+    .RDIMM = false,                           \
+}
+
+// die_width must be populated from SPD
+// has_line13 = NULL, RCD has always 7 DCA lines
+
+#define DEFAULT_HOST_RCD {                   \
+    .ck = {                                  \
+        .rst_dly = ck_rst,                   \
+        .inc_dly = ck_inc,                   \
+    },                                       \
+    .cs = {                                  \
+        .enter_training_mode = enter_dcstm,  \
+        .exit_training_mode  = exit_dcstm,   \
+        .rst_dly = cs_rst,                   \
+        .inc_dly = cs_inc,                   \
+        .check = dcs_check_if_works,         \
+    },                                       \
+    .ca = {                                  \
+        .line_count = 7,                     \
+        .enter_training_mode = enter_dcatm,  \
+        .exit_training_mode  = exit_dcatm,   \
+        .inc_dly = ca_inc,                   \
+        .rst_dly = ca_rst,                   \
+        .check = dca_check_if_works_ddr,     \
+        .has_line13 = NULL,                  \
+    },                                       \
+    .par = {                                 \
+        .rst_dly = par_rst,                  \
+        .inc_dly = par_inc,                  \
+    },                                       \
+    .training_type = HOST_RCD,               \
+                                             \
+    .ranks = 2,                              \
+    .channels = 2,                           \
+    .all_ca_count = SDRAM_PHY_ADDRESS_LINES, \
+    .die_width = -1,                         \
+    .rate = DDR,                             \
+    .CS_CA_successful = true,                \
+    .max_delay_taps = SDRAM_PHY_DELAYS,      \
+    .RDIMM = true,                           \
+}
+
+#define DEFAULT_RCD_DRAM {                  \
+    .ck = {                                 \
+        .rst_dly = qck_rst,                 \
+        .inc_dly = qck_inc,                 \
+    },                                      \
+    .cs = {                                 \
+        .enter_training_mode = enter_qcstm, \
+        .exit_training_mode  = exit_qcstm,  \
+        .rst_dly = qcs_rst,                 \
+        .inc_dly = qcs_inc,                 \
+        .check = qcs_check_if_works,        \
+    },                                      \
+    .ca = {                                 \
+        .line_count = 1,                    \
+        .enter_training_mode = enter_qcatm, \
+        .exit_training_mode  = exit_qcatm,  \
+        .inc_dly = qca_inc,                 \
+        .rst_dly = qca_rst,                 \
+        .check = qca_check_if_works,        \
+        .has_line13 = NULL,                 \
+    },                                      \
+    .training_type = RCD_DRAM,              \
+                                            \
+    .ranks = 2,                             \
+    .channels = 2,                          \
+    .all_ca_count = -1,                     \
+    .die_width = -1,                        \
+    .rate = DDR,                            \
+    .CS_CA_successful = true,               \
+    .max_delay_taps = 64,                   \
+    .RDIMM = true,                          \
+}
+
+
 void sdram_ddr5_module_enumerate(int rank, int width, int channels);
 void sdram_ddr5_cs_ca_training(training_ctx_t *ctx, int channel);
 void sdram_ddr5_read_training(training_ctx_t *ctx);
