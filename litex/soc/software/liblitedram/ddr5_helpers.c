@@ -1054,7 +1054,7 @@ uint16_t get_ca_dly(int channel, int rank, int address) {
 
 void par_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address, 0);
+    phy_select(channel, rank, 0);
     /* Reset PAR delay */
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel)
@@ -1062,13 +1062,13 @@ void par_rst(int channel, int rank, int address) {
     else
         ddrphy_CSRModule_A_pardly_rst_write(1);
 #endif //SDRAM_PHY_SUBCHANNELS
-    phy_deselect(channel, address, 0);
+    phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void par_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address, 0);
+    phy_select(channel, rank, 0);
     /* Reset PAR delay */
 #ifdef SDRAM_PHY_SUBCHANNELS
     if (channel)
@@ -1076,25 +1076,25 @@ void par_inc(int channel, int rank, int address) {
     else
         ddrphy_CSRModule_A_pardly_inc_write(1);
 #endif //SDRAM_PHY_SUBCHANNELS
-    phy_deselect(channel, address, 0);
+    phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void ck_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address, 0);
+    phy_select(channel, rank, 0);
     /* Reset CK delay */
     ddrphy_CSRModule_ckdly_rst_write(1);
-    phy_deselect(channel, address, 0);
+    phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 void ck_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    phy_select(channel, address, 0);
+    phy_select(channel, rank, 0);
     /* Increment CK delay */
     ddrphy_CSRModule_ckdly_inc_write(1);
-    phy_deselect(channel, address, 0);
+    phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
