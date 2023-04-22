@@ -2051,9 +2051,8 @@ void rcd_release_qcs(int channel, int rank, bool sideband) {
     cdelay(2000);
 }
 
-void enter_ca_pass(int rank) {
+void enter_ca_pass(int rcd) {
     bool ok = true;
-    uint8_t rcd = get_rcd_id(rank);
 
     uint8_t rw_data[5];
 
@@ -2069,9 +2068,8 @@ void enter_ca_pass(int rank) {
     cdelay(2000);
 }
 
-void exit_ca_pass(int rank) {
+void exit_ca_pass(int rcd) {
     bool ok = true;
-    uint8_t rcd = get_rcd_id(rank);
 
     uint8_t rw_data[5];
 
