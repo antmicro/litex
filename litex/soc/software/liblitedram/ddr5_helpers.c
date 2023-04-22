@@ -1902,7 +1902,7 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
 void rcd_set_dimm_operating_speed_band(int channel, int rank, int target_speed) {
     bool ok = true;
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[4];
+    uint8_t rw_data[5];
 
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 4, rw_data, false);
     if (target_speed <= 1400)
