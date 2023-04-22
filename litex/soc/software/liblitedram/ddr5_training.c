@@ -61,7 +61,7 @@
  * we check 0101 pattern and if it doesn't work, we shift
  * it by one and check again.
  */
-static int CS_in_eye(training_ctx_t *ctx, int32_t channel, int32_t rank, int *shift_0101) {
+static int CS_in_eye(const training_ctx_t *const ctx, int32_t channel, int32_t rank, int *const shift_0101) {
     int _shift_0101;
     for (_shift_0101 = 0; _shift_0101 < 2; _shift_0101++) {
         if (ctx->cs.check(channel, rank, 0, _shift_0101)) {
@@ -72,7 +72,7 @@ static int CS_in_eye(training_ctx_t *ctx, int32_t channel, int32_t rank, int *sh
     return 0;
 }
 
-static int CS_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int shift_0101) {
+static int CS_ck_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank, int shift_0101) {
     int works, last_good, _result, ckdly;
     works = 1;
     printf("|");
@@ -103,7 +103,7 @@ static int CS_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int sh
  * in which sampling began, we can change the pattern
  * to `1010` to solve that.
  */
-static int CS_should_shift_pattern(training_ctx_t *ctx, int32_t channel, int32_t rank) {
+static int CS_should_shift_pattern(const training_ctx_t *const ctx, int32_t channel, int32_t rank) {
     int csdly, shift_0101;
     shift_0101 = 0;
 
@@ -142,7 +142,7 @@ static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t ra
     *left = eye.end;
 }
 
-static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
+static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *success) {
     int left_side, right_side;
     int32_t csdly, coarse;
 
@@ -204,7 +204,7 @@ static void CS_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
  *
  * Fills CA delays array in the training_ctx_t with initial values
  */
-static void CA_setup_array(training_ctx_t *ctx) {
+static void CA_setup_array(training_ctx_t *const ctx) {
     int channel, address;
     for (channel = 0; channel < ctx->channels; ++channel) {
         for (address = 0; address < 14; ++address) {
@@ -221,7 +221,7 @@ static void CA_setup_array(training_ctx_t *ctx) {
  * Depending on the die density and usage of die stacking,
  * CA13 may be used or not.
  */
-static void CA_check_lines(training_ctx_t *ctx, int32_t channel) {
+static void CA_check_lines(training_ctx_t *const ctx, int32_t channel) {
     if (ctx->training_type == HOST_DRAM) {
         ctx->ca.enter_training_mode(channel, 0);
         if (ctx->ca.has_line13(channel))
@@ -233,7 +233,7 @@ static void CA_check_lines(training_ctx_t *ctx, int32_t channel) {
     printf("DDR5 module has %d address lines\n", ctx->ca.line_count);
 }
 
-static int CA_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t address, int32_t csdly_base) {
+static int CA_ck_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, int32_t address, int32_t csdly_base) {
     int works, last_good, _result, ckdly, csdly;
     printf("|");
     works = 1;
@@ -259,7 +259,7 @@ static int CA_ck_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_
     return last_good;
 }
 
-static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t address, int* left, int* right) {
+static void CA_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, int32_t address, int* left, int* right) {
     int works, cadly;
     eye_t eye = DEFAULT_EYE;
 
@@ -287,7 +287,7 @@ static void CA_scan(training_ctx_t *ctx, int32_t channel, int32_t rank, int32_t 
     *left = eye.end;
 }
 
-static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) {
+static void CA_training(training_ctx_t *const ctx , int32_t channel, uint8_t *success) {
     int left_side, right_side;
     int32_t address, start_address, end_address;
 
@@ -358,7 +358,7 @@ static void CA_training(training_ctx_t *ctx, int32_t channel, uint8_t *success) 
  * training procedure, we get output in the same format, which
  * can be used to compare training results.
  */
-static void CS_CA_rescan(training_ctx_t *ctx, int ckdly, int channel) {
+static void CS_CA_rescan(training_ctx_t *const ctx , int ckdly, int channel) {
     int _channel, _max_channel;
 
     int address, start_address, end_address;
@@ -448,7 +448,7 @@ static void CS_CA_rescan(training_ctx_t *ctx, int ckdly, int channel) {
  * Also find minimal and maximal used delays to use
  * them later to shift the clock.
  */
-static void CS_CA_calculate_midpoints(training_ctx_t *ctx, int *min, int *max, int channel) {
+static void CS_CA_calculate_midpoints(training_ctx_t *const ctx , int *min, int *max, int channel) {
     int _channel, _max_channel;
     int address;
 
@@ -503,7 +503,7 @@ static void CS_CA_calculate_midpoints(training_ctx_t *ctx, int *min, int *max, i
  * Delays are decreased by `ck_offset` to account for the
  * clock delay.
  */
-static void CS_CA_set_adjusted_delays(training_ctx_t *ctx, int ck_offset, int channel) {
+static void CS_CA_set_adjusted_delays(training_ctx_t *const ctx , int ck_offset, int channel) {
     int _channel, _max_channel;
     int address, cntdly;
 
@@ -555,7 +555,7 @@ static void CS_CA_set_adjusted_delays(training_ctx_t *ctx, int ck_offset, int ch
  * This way, all midpoints are in the [0, ctx->max_delay_taps)
  * range.
  */
-static void CK_CS_CA_finalize_timings(training_ctx_t *ctx, int channel) {
+static void CK_CS_CA_finalize_timings(training_ctx_t *const ctx , int channel) {
     int new_ckdly, cntdly;
     int min, max;
     min = ctx->max_delay_taps;
@@ -588,12 +588,12 @@ static void CK_CS_CA_finalize_timings(training_ctx_t *ctx, int channel) {
 }
 
 #ifdef SKIP_NO_DELAYS
-void sdram_ddr5_cs_ca_training(training_ctx_t *ctx, int channel) {
+void sdram_ddr5_cs_ca_training(training_ctx_t *const ctx , int channel) {
     printf("CS/CA training impossible\n"
            "Keeping DRAM in 2N mode\n");
 }
 #else
-void sdram_ddr5_cs_ca_training(training_ctx_t *ctx, int channel) {
+void sdram_ddr5_cs_ca_training(training_ctx_t *const ctx , int channel) {
 #ifndef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     printf("WARNING:\n"
            "PHY does not have IO delays on address lines!!!\n"
@@ -1027,7 +1027,7 @@ static int simple_read_check(int channel, int rank, int module, int width) {
  * 2. With the preamble cycle, find the best read DQ delay
  * 3. Perform a simple read check
  */
-void sdram_ddr5_read_training(training_ctx_t *ctx) {
+void sdram_ddr5_read_training(training_ctx_t *const ctx ) {
     int channel, rank, module;
     for (channel = 0; channel < ctx->channels; channel++) {
         printf("Subchannel:%c Read training\n", (char)('A'+channel));
@@ -1279,7 +1279,7 @@ static void wltm_align_internal_cycle(int channel, int rank, int module, int wid
  *
  * JESD79-5A 4.21
  */
-static int write_leveling(training_ctx_t *ctx, int channel, int rank, int module) {
+static int write_leveling(training_ctx_t *const ctx , int channel, int rank, int module) {
     enter_wltm(channel, rank);
 
     printf("WL m:%2d\n", module);
@@ -1377,7 +1377,7 @@ static int write_leveling(training_ctx_t *ctx, int channel, int rank, int module
     return transition_cycle;
 }
 
-static void setup_serial_write_data(training_ctx_t *ctx, int cnt_seed, int channel, int module, int print) {
+static void setup_serial_write_data(training_ctx_t *const ctx , int cnt_seed, int channel, int module, int print) {
     int it;
     uint8_t temp;
     uint16_t wrdata;
@@ -1399,7 +1399,7 @@ static void setup_serial_write_data(training_ctx_t *ctx, int cnt_seed, int chann
         printf("\n");
 }
 
-static int compare_serial_write_data(training_ctx_t *ctx, int cnt_seed, int channel, int module, int print) {
+static int compare_serial_write_data(training_ctx_t *const ctx , int cnt_seed, int channel, int module, int print) {
     int phase;
     uint8_t temp;
     uint16_t rddata;
@@ -1422,7 +1422,7 @@ static int compare_serial_write_data(training_ctx_t *ctx, int cnt_seed, int chan
     return works;
 }
 
-static int write_serial_check(training_ctx_t *ctx, int channel, int rank, int module) {
+static int write_serial_check(training_ctx_t *const ctx , int channel, int rank, int module) {
     int cnt_seed, it;
     int works = 1;
     for (cnt_seed = 0; cnt_seed < serial_count; ++cnt_seed) {
@@ -1447,7 +1447,7 @@ static int write_serial_check(training_ctx_t *ctx, int channel, int rank, int mo
     return works;
 }
 
-static void setup_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module, int print) {
+static void setup_lfsr_write_data(training_ctx_t *const ctx , int seed, int channel, int module, int print) {
     int it;
     uint8_t lfsr;
     uint16_t wrdata;
@@ -1468,7 +1468,7 @@ static void setup_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, in
         printf("\n");
 }
 
-static int compare_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module, int print) {
+static int compare_lfsr_write_data(training_ctx_t *const ctx , int seed, int channel, int module, int print) {
     int it;
     int works = 1;
     uint8_t lfsr;
@@ -1491,7 +1491,7 @@ static int compare_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, i
     return works;
 }
 
-static int write_lfsr_check(training_ctx_t *ctx, int channel, int rank, int module) {
+static int write_lfsr_check(training_ctx_t *const ctx , int channel, int rank, int module) {
     int cnt_seed, it;
     int works = 1;
     int seed;
@@ -1521,7 +1521,7 @@ static int write_lfsr_check(training_ctx_t *ctx, int channel, int rank, int modu
     return works;
 }
 
-static int compare_dm_lfsr_write_data(training_ctx_t *ctx, int seed, int channel, int module, int byte) {
+static int compare_dm_lfsr_write_data(training_ctx_t *const ctx , int seed, int channel, int module, int byte) {
     int it;
     int works = 1;
     uint8_t lfsr;
@@ -1544,7 +1544,7 @@ static int compare_dm_lfsr_write_data(training_ctx_t *ctx, int seed, int channel
     return works;
 }
 
-static int write_dm_lfsr_check(training_ctx_t *ctx, int channel, int rank, int module, int byte, int mr5) {
+static int write_dm_lfsr_check(training_ctx_t *const ctx , int channel, int rank, int module, int byte, int mr5) {
     int cnt_seed, it;
     int works = 1;
     int seed;
@@ -1642,7 +1642,7 @@ static eye_t write_data_scan(training_ctx_t *const ctx , int channel, int rank, 
     return eye;
 }
 
-void sdram_ddr5_write_training(training_ctx_t *ctx) {
+void sdram_ddr5_write_training(training_ctx_t *const ctx ) {
     int channel, rank, module, byte;
     int write_strobe_cycle[SDRAM_PHY_MODULES/CHANNELS];
     int delay, it, works;
