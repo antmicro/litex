@@ -1375,6 +1375,8 @@ static void setup_serial_write_data(training_ctx_t *ctx, int cnt_seed, int chann
     int it;
     uint8_t temp;
     uint16_t wrdata;
+    if(print)
+        printf("wrdata:");
     for (it =0; it <8; ++it) {
         wrdata = 0;
         for (temp = 0; temp < ctx->die_width; ++temp) {
@@ -1384,7 +1386,7 @@ static void setup_serial_write_data(training_ctx_t *ctx, int cnt_seed, int chann
             wrdata |= ((serial[cnt_seed]>>(2*it+1))&1) << (temp + ctx->die_width);
         }
         if(print)
-            printf("wrdata:%04"PRIx16"|", wrdata);
+            printf("%04"PRIx16"|", wrdata);
         set_data_module_phase(channel, module, ctx->die_width, it, wrdata);
     }
     if(print)
@@ -1392,20 +1394,22 @@ static void setup_serial_write_data(training_ctx_t *ctx, int cnt_seed, int chann
 }
 
 static int compare_serial_write_data(training_ctx_t *ctx, int cnt_seed, int channel, int module, int print) {
-    int it;
+    int phase;
     uint8_t temp;
     uint16_t rddata;
     int works = 1;
-    for (it =0; it <8 && works; ++it) {
-        rddata = get_data_module_phase(channel, module, ctx->die_width, it);
+    if(print)
+        printf("rddata:");
+    for (phase = 0; phase < 8 && works; ++phase) {
+        rddata = get_data_module_phase(channel, module, ctx->die_width, phase);
         if(print)
-            printf("rddata:%04"PRIx16"|", rddata);
+            printf("%04"PRIx16"|", rddata);
         for (temp = 0; temp < ctx->die_width; ++temp)
-            works &= !!(((rddata>>temp)&1) == ((serial[cnt_seed]>>(2*it))&1));
+            works &= !!(((rddata>>temp)&1) == ((serial[cnt_seed]>>(2*phase))&1));
         if (!works)
             break;
         for (temp = 0; temp < ctx->die_width; ++temp)
-            works &= !!(((rddata>>(temp + ctx->die_width))&1) == ((serial[cnt_seed]>>(2*it+1))&1));
+            works &= !!(((rddata>>(temp + ctx->die_width))&1) == ((serial[cnt_seed]>>(2*phase+1))&1));
     }
     if(print)
         printf("\n");
