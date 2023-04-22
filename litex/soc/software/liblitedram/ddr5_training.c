@@ -1849,6 +1849,91 @@ static uint8_t read_module_channels(uint8_t spd) {
     return module_channels;
 }
 
+static uint8_t read_module_enabled_clock(uint8_t spd) {
+    uint8_t buf;
+
+    // Module channels count is stored in SPD[248]
+    //     [0]: QACK: 0 enable/1 disable
+    //     [1]: QBCK: 0 enable/1 disable
+    //     [2]: QCCK: 0 enable/1 disable
+    //     [3]: QDCK: 0 enable/1 disable
+    //     [5]:  BCK: 0 enable/1 disable (LRDIMM)
+
+    if (!sdram_read_spd(spd, 248, &buf, 1, false)) {
+        printf("Couldn't read module clock enables from the SPD, defaulting to x%d.\n", 0);
+        return 0;
+    }
+
+    return buf & 0x2f;
+}
+
+static uint8_t read_module_enabled_ca(uint8_t spd) {
+    uint8_t buf;
+
+    // Module channels count is stored in SPD[249]
+    //     [0]:    QACA: 0 enable/1 disable
+    //     [1]:    QBCA: 0 enable/1 disable
+    //     [2]:  DCS1_n: 0 enable/1 disable
+    //     [3]:   BCS_n: 0 enable/1 disable
+    //     [4]:  QxCA13: 0 enable/1 disable
+    //     [5]: QACSx_n: 0 enable/1 disable
+    //     [6]: QBCSx_n: 0 enable/1 disable
+
+    if (!sdram_read_spd(spd, 249, &buf, 1, false)) {
+        printf("Couldn't read module CA enables from the SPD, defaulting to x%d.\n", 0);
+        return 0;
+    }
+
+    return buf & 0x7f;
+}
+
+static uint8_t read_module_qck_setup(uint8_t spd) {
+    uint8_t buf;
+
+    // Module channels count is stored in SPD[250]
+    // [1:0]: QACK: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
+    // [3:2]: QBCK: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
+    // [5:4]: QCCK: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
+    // [7:6]: QDCK: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
+
+    if (!sdram_read_spd(spd, 250, &buf, 1, false)) {
+        printf("Couldn't read module QCK setup from the SPD, defaulting to x%d.\n", 0);
+        return 0;
+    }
+
+    return buf & 0xff;
+}
+
+static uint8_t read_module_qca_qcs_setup(uint8_t spd) {
+    uint8_t buf;
+
+    // Module channels count is stored in SPD[252]
+    // [1:0]: QxCA: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
+    // [5:4]: QxCS: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
+
+    if (!sdram_read_spd(spd, 252, &buf, 1, false)) {
+        printf("Couldn't read module QCA/QCS setup from the SPD, defaulting to x%d.\n", 0);
+        return 0;
+    }
+
+    return buf & 0x33;
+}
+
+static uint8_t read_module_slew_rates(uint8_t spd) {
+    uint8_t buf;
+
+    // Module channels count is stored in SPD[252]
+    // [1:0]: QxCK: 00 12-20 V/ns/ 01 14-27 V/ns /10 RES /11 RES
+    // [3:2]: QxCA: 00   4-7 V/ns/ 01  6-10 V/ns /10 2.7-4.5 V/ns /11 RES
+    // [5:4]: QxCS: 00   4-7 V/ns/ 01  6-10 V/ns /10 2.7-4.5 V/ns /11 RES
+
+    if (!sdram_read_spd(spd, 254, &buf, 1, false)) {
+        printf("Couldn't read module slew rates from the SPD, defaulting to x%d.\n", 0);
+        return 0;
+    }
+
+    return buf & 0x3f;
+}
 #endif // defined(CONFIG_HAS_I2C)
 
 training_ctx_t host_dram_ctx;
@@ -1875,6 +1960,14 @@ static void rcd_init(training_ctx_t *const ctx ) {
     reset_sequence(ctx->ranks);
 
     // FIXME: this function should initialize all RCDs
+    rcd_set_enables_and_slew_rates(
+        0,
+        read_module_enabled_clock(0),
+        read_module_enabled_ca(0),
+        read_module_qck_setup(0),
+        read_module_qca_qcs_setup(0),
+        read_module_slew_rates(0)
+    );
     rcd_set_dca_rate(0, 0, ctx->rate);
     if (ctx->rate != DDR)
         ctx->ca.check = dca_check_if_works_sdr;
