@@ -1820,26 +1820,26 @@ static enum module_type read_module_type(uint8_t spd) {
     return module_type & 0x0f;
 }
 
-static uint8_t read_module_width(uint8_t spd) {
-    uint8_t buf;
-
-    // Module width is stored in SPD[6][7:5]
-    //     000: x4
-    //     001: x8
-    //     010: x16
-    //     011: x32
-
-    if (!sdram_read_spd(spd, 6, &buf, 1, false)) {
-        printf("Couldn't read module width from the SPD, defaulting to x%d.\n", SDRAM_PHY_DQ_DQS_RATIO);
-        return SDRAM_PHY_DQ_DQS_RATIO;
-    }
-
-    // minimal supported is x4
-    uint8_t shift = (buf & 0xe0) >> 5;
-    uint8_t module_width = 4 << shift;
-
-    return module_width;
-}
+//static uint8_t read_module_width(uint8_t spd) {
+//    uint8_t buf;
+//
+//    // Module width is stored in SPD[6][7:5]
+//    //     000: x4
+//    //     001: x8
+//    //     010: x16
+//    //     011: x32
+//
+//    if (!sdram_read_spd(spd, 6, &buf, 1, false)) {
+//        printf("Couldn't read module width from the SPD, defaulting to x%d.\n", SDRAM_PHY_DQ_DQS_RATIO);
+//        return SDRAM_PHY_DQ_DQS_RATIO;
+//    }
+//
+//    // minimal supported is x4
+//    uint8_t shift = (buf & 0xe0) >> 5;
+//    uint8_t module_width = 4 << shift;
+//
+//    return module_width;
+//}
 
 static uint8_t read_module_ranks(uint8_t spd) {
     uint8_t buf;
@@ -1873,7 +1873,7 @@ static uint8_t read_module_channels(uint8_t spd) {
     //     01: 2
 
     if (!sdram_read_spd(spd, 235, &buf, 1, false)) {
-        printf("Couldn't read module ranks from the SPD, defaulting to x%d.\n", CHANNELS);
+        printf("Couldn't read module channels from the SPD, defaulting to x%d.\n", CHANNELS);
         return CHANNELS;
     }
 
