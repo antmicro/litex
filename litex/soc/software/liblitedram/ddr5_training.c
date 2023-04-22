@@ -2058,10 +2058,8 @@ void sdram_ddr5_flow(void) {
         sdram_ddr5_cs_ca_training(base_ctx, -1);
     }
 
-    single_cycle_MPC = 1<<4;
     for (int channel = 0; channel < base_ctx->channels; channel++) {
         for (int rank = 0; rank < base_ctx->ranks; rank++) {
-            send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
             if (base_ctx->CS_CA_successful && base_ctx->rate == DDR) {
                 disable_dram_2n_mode(channel, rank);
             }
@@ -2075,6 +2073,11 @@ void sdram_ddr5_flow(void) {
         printf("1N mode setup\n");
         init_sequence_1n(base_ctx->ranks);
     }
+
+    single_cycle_MPC = 1<<4;
+    for (int channel = 0; channel < base_ctx->channels; channel++)
+        for (int rank = 0; rank < base_ctx->ranks; rank++)
+            send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
 
     for (int rank = 0; rank < base_ctx->ranks; ++rank)
         dram_enumerate(base_ctx, rank);
