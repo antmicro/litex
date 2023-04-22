@@ -1373,14 +1373,84 @@ uint8_t recover_mrr_value(int channel, int module, int width) {
     return ret;
 }
 
-void setup_enumerate(int channel, int rank, int module, int width) {
+void check_enumerate(int channel, int rank, int module, int width, int verbose) {
+    int module_;
+    int good = 1;
+    send_mrw(channel, rank, MODULE_BROADCAST, 26, 0xFF);
+    send_mrw(channel, rank, MODULE_BROADCAST, 27, 0xFF);
+    send_mrw(channel, rank, MODULE_BROADCAST, 28, 0x00);
+    send_mrw(channel, rank, MODULE_BROADCAST, 29, 0x00);
+    if (module != -1) {
+        send_mrw(channel, rank, module, 26, 0x00);
+        send_mrw(channel, rank, module, 27, 0x00);
+    }
+
+    send_mrw(channel, rank, MODULE_BROADCAST, 25, 0x08);
+
+    cmd_injector(channel, 0xf, 0, 0, 0, 0, 1, 0);
+    store_continuous(channel);
+    cdelay(50);
+    send_mrr(channel, rank, 31);
+    cdelay(1000);
+    if (module != -1)
+        setup_capture(channel, 0);
+    else
+        setup_capture(channel, 3);
+    cdelay(1000);
+    start_capture(channel);
+    cdelay(10000);
+    stop_capture(channel);
+
+    send_mrw(channel, rank, MODULE_BROADCAST, 25, 0x00);
+    cdelay(1000);
+    send_mrw(channel, rank, MODULE_BROADCAST, 25, 0x00);
+
+    printf("\t");
+    if (!verbose) {
+        if (module != -1) {
+            for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++)
+                good &= !capture_and_reduce_module(channel, module, width, module_ != module);
+            printf("%s\n", good ? "pass" : "fail");
+        }
+        else
+            printf("%s\n", !!capture_and_reduce_result(channel, 1) ? "pass" : "fail");
+    } else {
+        uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
+        int i;
+#ifdef SDRAM_PHY_SUBCHANNELS
+        if (channel) {
+            csr_rd_buf_uint8(CSR_SDRAM_DFII_B_CMDINJECTOR_RESULT_ARRAY_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+        } else {
+            csr_rd_buf_uint8(CSR_SDRAM_DFII_A_CMDINJECTOR_RESULT_ARRAY_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+        }
+#else
+        csr_rd_buf_uint8(CSR_SDRAM_DFII_CMDINJECTOR_RESULT_ARRAY_ADDR, data, DFII_CMDINJECTOR_DATA_BYTES);
+#endif
+        for (i = 0; i < DFII_CMDINJECTOR_DATA_BYTES; ++i)
+            printf("%02"PRIx8, data[i]);
+        printf("\n");
+    }
+}
+
+void setup_enumerate(int channel, int rank, int module, int width, int verbose) {
     int module_, i;
+    char *pattern = width == 8 ? "%04"PRIx16 : "%02"PRIx16;
     for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
         for (i = 0; i < 8; ++i)
             set_data_module_phase(channel, module_, width, i, 0xffff);
     }
     for (i = 0; i < 8; ++i)
         set_data_module_phase(channel, module, width, i, 0);
+    if(verbose) {
+        printf("Channel: %d, rank: %d\n", channel, rank);
+        for(i = 0; i < 8; ++i) {
+            printf("Phase:%d|", i);
+            for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
+                printf(pattern, get_wdata_module_phase(channel, module_, width, i));
+            }
+            printf("\n");
+        }
+    }
     cdelay(500);
     send_mpc(channel, rank, (0x60 | (module & 0xf)), 1);
     for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
