@@ -1407,7 +1407,8 @@ void send_mrw(int channel, int rank, int module, int reg, int value) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 0, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(50);
+    cdelay(150);
+    cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
     send_mpc(channel, rank, 0x7f, 0);
 }
 
@@ -1426,7 +1427,8 @@ void send_mrr(int channel, int rank, int reg) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
     issue_single(channel);
-    cdelay(100);
+    cdelay(150);
+    cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
     setup_rddata_cnt(channel, 0);
 }
 
@@ -1444,7 +1446,7 @@ void send_wleveling_write(int channel, int rank) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 0, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(50);
+    cdelay(150);
 }
 
 void send_precharge(int channel, int rank) {
@@ -1577,12 +1579,9 @@ void send_read(int channel, int rank) {
 }
 
 void prep_nop(int channel, int rank) {
-    cmd_injector(channel, 1<<0, 3, 0x3FFF, 0, 0, 1, 1);
-    if (N2_mode)
-        cmd_injector(channel, 1<<1, 0, 0x3FFF, 0, 0, 1, 1);
-    else
-        cmd_injector(channel, 1<<1, 0, 0, 0, 0, 1, 1);
-    cmd_injector(channel, 1<<2, 0, 0, 0, 0, 1, 1);
+    cmd_injector(channel, 1<<0, 0, 0x3FFF, 0, 0, 1, 1);
+    cmd_injector(channel, 1<<1, 3, 0x3FFF, 0, 0, 1, 1);
+    cmd_injector(channel, 1<<2, 0, 0x3FFF, 0, 0, 1, 1);
     cmd_injector(channel, 1<<3, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<4, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<5, 0, 0, 0, 0, 1, 1);
@@ -1678,6 +1677,7 @@ void exit_catm(int channel, int rank) {
     cmd_injector(channel, 0xff, 1<<rank, 0x1f, 0, 0, 0, 1);
     issue_single(channel);
     cdelay(50);
+    cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
 }
 
 
