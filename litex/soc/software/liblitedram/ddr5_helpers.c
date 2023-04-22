@@ -1362,13 +1362,14 @@ static void long_mpc(int channel, int rank, int cmd, int wrdata_active) {
     cmd_injector(channel, 0xf,  0,       0xf | (cmd<<5), wrdata_active, 0, 0, 0);
     store_continuous(channel);
     cdelay(50);
-    cmd_injector(channel, 0xff, 1<<rank, 0xf | (cmd<<5), wrdata_active, 0, 0, 1);
+    cmd_injector(channel, 0xff, 0,       0xf | (cmd<<5), wrdata_active, 0, 0, 1);
+    cmd_injector(channel, 0x3f, 1<<rank, 0xf | (cmd<<5), wrdata_active, 0, 0, 1);
     issue_single(channel);
-    cdelay(50);
-    cmd_injector(channel, 0xff, 0,       0,              0, 0, 0, 1);
-    cmd_injector(channel, 0xf,  0,       0,              0, 0, 0, 0);
-    store_continuous(channel);
     cdelay(250);
+    cmd_injector(channel, 0xff, 0,       0,              wrdata_active, 0, 0, 1);
+    cmd_injector(channel, 0xf,  0,       0,              wrdata_active, 0, 0, 0);
+    store_continuous(channel);
+    cdelay(50);
 }
 
 static void short_mpc(int channel, int rank, int cmd, int wrdata_active) {
@@ -1378,11 +1379,11 @@ static void short_mpc(int channel, int rank, int cmd, int wrdata_active) {
     cmd_injector(channel, 0xff, 0,       0,              wrdata_active, 0, 0, 1);
     cmd_injector(channel, 0x1,  1<<rank, 0xf | (cmd<<5), wrdata_active, 0, 0, 1);
     issue_single(channel);
-    cdelay(50);
-    cmd_injector(channel, 0xff, 0,       0,              0, 0, 0, 1);
-    cmd_injector(channel, 0xf,  0,       0,              0, 0, 0, 0);
-    store_continuous(channel);
     cdelay(250);
+    cmd_injector(channel, 0xff, 0,       0,              wrdata_active, 0, 0, 1);
+    cmd_injector(channel, 0xf,  0,       0,              wrdata_active, 0, 0, 0);
+    store_continuous(channel);
+    cdelay(50);
 }
 
 void send_mpc(int channel, int rank, int cmd, int wrdata_active) {
