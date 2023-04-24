@@ -202,8 +202,8 @@ typedef struct {
 
 void sdram_ddr5_module_enumerate(int rank, int width, int channels);
 void sdram_ddr5_cs_ca_training(training_ctx_t *ctx, int channel);
-void sdram_ddr5_read_training(training_ctx_t *ctx);
-void sdram_ddr5_write_training(training_ctx_t *ctx);
+bool sdram_ddr5_read_training(training_ctx_t *ctx);
+bool sdram_ddr5_write_training(training_ctx_t *ctx);
 
 extern training_ctx_t host_dram_ctx;
 #if defined(CONFIG_HAS_I2C)

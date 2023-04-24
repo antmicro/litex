@@ -137,9 +137,11 @@ static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t ra
     }
     ctx->cs.rst_dly(channel, rank, 0);
 
-    if (*right == UNSET_DELAY)
-        *right = eye.start;
-    *left = eye.end;
+    if (eye.state == AFTER) {
+        if (*right == UNSET_DELAY)
+            *right = eye.start;
+        *left = eye.end;
+    }
 }
 
 static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *success) {
@@ -281,9 +283,11 @@ static void CA_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, in
     }
     ctx->ca.rst_dly(channel, rank, address);
 
-    if (*right == UNSET_DELAY)
-        *right = eye.start;
-    *left = eye.end;
+    if (eye.state == AFTER) {
+        if (*right == UNSET_DELAY)
+            *right = eye.start;
+        *left = eye.end;
+    }
 }
 
 static void CA_training(training_ctx_t *const ctx , int32_t channel, uint8_t *success) {
@@ -617,15 +621,23 @@ void sdram_ddr5_cs_ca_training(training_ctx_t *const ctx , int channel) {
     for (; _channel < _max_channel; ++_channel) {
         printf("Subchannel:%c CS training\n", (char)('A'+_channel));
         CS_training(ctx, _channel, &CS_success);
+        ctx->CS_CA_successful &= CS_success;
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+        if (!ctx->CS_CA_successful)
+            return;
+#endif // KEEP_GOING_ON_DRAM_ERROR
         printf("CA training\n");
         CA_check_lines(ctx, _channel);
         CA_training(ctx, _channel, &CA_success);
+        ctx->CS_CA_successful &= CA_success;
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+        if (!ctx->CS_CA_successful)
+            return;
+#endif // KEEP_GOING_ON_DRAM_ERROR
     }
 
     ctx->CS_CA_successful &= (CS_success & CA_success);
-    if (!(CS_success & CA_success) && ctx->training_type != RCD_DRAM) {
-        enable_dfi_2n_mode();
-    } else {
+    if (ctx->CS_CA_successful) {
         CK_CS_CA_finalize_timings(ctx, channel);
     }
 }
@@ -669,36 +681,38 @@ void sdram_ddr5_module_enumerate(int rank, int width, int channels) {
     enumerated = 1;
 }
 
-static void sdram_ddr5_check_enumerate(int rank, int width, int channels) {
+static bool sdram_ddr5_check_enumerate(int rank, int width, int channels) {
     int channel, module;
+    bool ok = true;
     if (!enumerated)
-        return;
+        return false;
     printf("Checking rank:%2d\n", rank);
     for (channel = 0; channel < channels; channel++) {
         printf("\tChecking subchannel:%c\n", (char)('A'+channel));
         send_mrw(channel, rank, MODULE_BROADCAST, 2, 1|use_internal_write_timing|single_cycle_MPC);
         printf("\tBase line:");
 #ifndef CA_INFO_DDR5
-        check_enumerate(channel, rank, -1, width, 0);
+        ok &= check_enumerate(channel, rank, -1, width, 0);
 #else
-        check_enumerate(channel, rank, -1, width, 1);
+        ok &= check_enumerate(channel, rank, -1, width, 1);
 #endif // CA_INFO_DDR5
         for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
             printf("\t\tmodule:%2d", module);
 #ifndef CA_INFO_DDR5
-            check_enumerate(channel, rank, module, width, 0);
+            ok &= check_enumerate(channel, rank, module, width, 0);
 #else
-            check_enumerate(channel, rank, module, width, 1);
+            ok &= check_enumerate(channel, rank, module, width, 1);
 #endif // CA_INFO_DDR5
         }
         send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
         cdelay(100);
     }
+    return ok;
 }
 
-static void dram_enumerate(training_ctx_t *const ctx , int rank) {
+static bool dram_enumerate(training_ctx_t *const ctx , int rank) {
     sdram_ddr5_module_enumerate(rank, ctx->die_width, ctx->channels);
-    sdram_ddr5_check_enumerate(rank, ctx->die_width, ctx->channels);
+    return sdram_ddr5_check_enumerate(rank, ctx->die_width, ctx->channels);
 }
 
 static const uint8_t seeds0[] = {
@@ -912,7 +926,7 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
  * It finds the first eye of working delays and selects its center
  * to configure the read cycle and DQ delays.
  */
-static void read_training_data_scan(int channel, int rank, int module, int width, int max_delay_taps, int preamble_cycle) {
+static bool read_training_data_scan(int channel, int rank, int module, int width, int max_delay_taps, int preamble_cycle) {
     eye_t eye = DEFAULT_EYE;
 
     int rd_cycle_dly, idly;
@@ -960,6 +974,14 @@ static void read_training_data_scan(int channel, int rank, int module, int width
         printf("|\n");
         rd_inc(channel, module, width);
     }
+    if (eye.state != AFTER) {
+        printf("Read training data scan failed for: "
+               "channel:%c rank:%d module:%d\n", 'A'+channel, rank, module);
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+        return false;
+#endif // KEEP_GOING_ON_DRAM_ERROR
+        return true;
+    }
 
     int eye_width = eye.end - eye.start;
     eye.center = eye.start + (eye_width / 2);
@@ -984,6 +1006,7 @@ static void read_training_data_scan(int channel, int rank, int module, int width
 
     if (_read_verbosity)
         printf("Final DQ dly:%"PRIu16"\n", get_rd_dq_dly(channel, module, width));
+    return true;
 }
 
 /**
@@ -1016,6 +1039,73 @@ static int simple_read_check(int channel, int rank, int module, int width) {
     return works;
 }
 
+static bool rank_read_training(int channel, int rank, int die_width, int max_taps) {
+    int module;
+    bool good = true;
+    // Enter Read Preamble Training Mode
+    enter_rptm(channel, rank);
+
+    for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+        printf("Training module%2d\n", module);
+
+        // Find cycle in which read preamble starts
+        int preamble_cycle = find_read_preamble_cycle(
+            channel, rank, module, die_width, max_taps);
+
+        if (preamble_cycle == -1) {
+            printf("Failed to find read preamble for module %2d\n", module);
+            good &= false;
+            continue;;
+        }
+        printf("Read preamble starts in cycle:%2d\n", preamble_cycle);
+
+        if (!read_training_data_scan(
+            channel, rank, module, die_width, max_taps, preamble_cycle)) {
+            good &= false;
+        }
+    }
+
+    // Exit Read Preamble Training Mode
+    exit_rptm(channel, rank);
+    return good;
+}
+
+static bool rank_read_check(
+    int channel, int rank, int die_width, bool read_back_check) {
+
+    int module;
+    bool good = true;
+    for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+        // Read the serial number
+        printf(
+            "Channel:%c rank:%2d module:%2d serial number: 0x%010"PRIX64"\n",
+            (char)('A'+channel),
+            rank,
+            module,
+            read_serial_number(channel, rank, module, die_width)
+        );
+    }
+
+    for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+        if (read_back_check) {
+            if (!simple_read_check(channel, rank, module, die_width)) {
+                if (_read_verbosity)
+                    printf("Simple read check failure!\n");
+                good &= false;
+                continue;
+            }
+        }
+    }
+
+    if (_read_verbosity > 1) {
+        for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
+            printf("Channel:%c rank:%d module:%d\n", (char)('A'+channel), rank, module);
+            read_registers(channel, rank, module, die_width);
+        }
+    }
+    return good;
+}
+
 /**
  * sdram_ddr5_read_training
  *
@@ -1026,61 +1116,33 @@ static int simple_read_check(int channel, int rank, int module, int width) {
  * 2. With the preamble cycle, find the best read DQ delay
  * 3. Perform a simple read check
  */
-void sdram_ddr5_read_training(training_ctx_t *const ctx ) {
-    int channel, rank, module;
+bool sdram_ddr5_read_training(training_ctx_t *const ctx) {
+    int channel, rank;
+    bool good = true;
     for (channel = 0; channel < ctx->channels; channel++) {
         printf("Subchannel:%c Read training\n", (char)('A'+channel));
         for (rank = 0; rank < ctx->ranks; rank++) {
             printf("Training rank%2d\n", rank);
-
-            // Enter Read Preamble Training Mode
-            enter_rptm(channel, rank);
-
-            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
-                printf("Training module%2d\n", module);
-
-                // Find cycle in which read preamble starts
-                int preamble_cycle = find_read_preamble_cycle(
-                    channel, rank, module, ctx->die_width, ctx->max_delay_taps);
-
-                if (preamble_cycle == -1) {
-                    printf("Failed to find read preamble for module %2d\n", module);
-                    continue;
-                }
-                printf("Read preamble starts in cycle:%2d\n", preamble_cycle);
-
-                read_training_data_scan(
-                    channel, rank, module, ctx->die_width, ctx->max_delay_taps, preamble_cycle);
-            }
-
-            // Exit Read Preamble Training Mode
-            exit_rptm(channel, rank);
-
+            good &= rank_read_training(channel, rank,
+                ctx->die_width, ctx->max_delay_taps);
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+            if (!good)
+                return good;
+#endif // KEEP_GOING_ON_DRAM_ERROR
             // We must perform read checks below after exiting RPTM
-            for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
-                // Read the serial number
-                printf(
-                    "Channel:%c rank:%2d module:%2d serial number: 0x%010"PRIX64"\n",
-                    (char)('A'+channel),
-                    rank,
-                    module,
-                    read_serial_number(channel, rank, module, ctx->die_width)
-                );
-
-                if (_read_verbosity) {
-                    if (ctx->training_type == HOST_DRAM && !ctx->RDIMM) {
-                        if (!simple_read_check(channel, rank, module, ctx->die_width)) {
-                            printf("Simple read check failure!\n");
-                            continue;
-                        }
-                    }
-
-                    printf("Channel:%c rank:%d module:%d\n", (char)('A'+channel), rank, module);
-                    read_registers(channel, rank, module, ctx->die_width);
-                }
-            }
+            good &= rank_read_check(channel, rank,
+                ctx->die_width,
+                ctx->training_type == HOST_DRAM && !ctx->RDIMM);
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+            if (!good)
+                return good;
+#endif // KEEP_GOING_ON_DRAM_ERROR
         }
     }
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+    return good;
+#endif // KEEP_GOING_ON_DRAM_ERROR
+    return true;
 }
 
 #ifdef WRITE_DEEP_DEBUG_DDR5
@@ -1641,14 +1703,164 @@ static eye_t write_data_scan(training_ctx_t *const ctx , int channel, int rank, 
     return eye;
 }
 
-void sdram_ddr5_write_training(training_ctx_t *const ctx ) {
-    int channel, rank, module, byte;
-    int write_strobe_cycle[SDRAM_PHY_MODULES/CHANNELS];
-    int delay, it, works;
-    int middle_cycle, middle_delay; // Middle between first and last working
-    uint8_t mr5;
+static int moduel_dq_vref_scan(training_ctx_t *const ctx, int channel, int rank, int module, int wl_cycle) {
     int eye_width_range [2][SDRAM_PHY_DELAYS];
-    int best_vref;
+    int vref, _width;
+    int best_vref = -1;
+
+    for(_width = 0; _width < SDRAM_PHY_DELAYS; ++_width) {
+        eye_width_range[0][_width] = -1;
+        eye_width_range[1][_width] = -1;
+    }
+
+    for(vref = 0x32; vref < 0x46; ++vref) { // FIXME: check over whole DQ VREF space, but keep performance
+        if (_write_verbosity)
+            printf("Vref:%2X", vref);
+        send_mrw(channel, rank, module, 10, vref);
+        busy_wait(1);
+        if (_write_verbosity)
+            printf("\n");
+        eye_t eye = write_data_scan(ctx, channel, rank, module, wl_cycle, _write_verbosity);
+        if (_write_verbosity)
+            printf("|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
+                eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
+                eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
+        eye.center = eye.end - eye.start;
+
+        if (_write_verbosity)
+            printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n", eye.center,
+                ((eye.start + eye.end)/2)/ctx->max_delay_taps,
+                ((eye.start + eye.end)/2)%ctx->max_delay_taps);
+
+        for(_width = 0; _width < eye.center; ++_width) {
+            if (eye_width_range[0][_width] == -1)
+                eye_width_range[0][_width] = vref;
+            eye_width_range[1][_width] = vref + 1;
+        }
+    }
+
+    for (_width = 0; _width < SDRAM_PHY_DELAYS; ++_width) {
+        if (eye_width_range[0][_width] != -1)
+            best_vref = (eye_width_range[0][_width] + eye_width_range[1][_width]) / 2;
+    }
+    printf("m%2d|Best Vref:%2x\n", module, best_vref);
+    if (best_vref > -1) {
+        send_mrw(channel, rank, module, 10, best_vref);
+        busy_wait(1);
+    }
+    send_mrr(channel, rank, 10);
+    if (_write_verbosity)
+        printf("MR10:%02"PRIx8"\n", recover_mrr_value(channel, module, ctx->die_width));
+    return best_vref;
+}
+
+static bool moduel_dm_scan(training_ctx_t *const ctx, int channel, int rank, int module, int mr5) {
+    int delay, works, byte, middle_delay;
+    bool good = true;
+    printf("DM scan\nm:%2d DM|", module);
+    odly_dm_rst(channel, module, ctx->die_width);
+    eye_t eye_dm = DEFAULT_EYE;
+    for(delay = 0; delay < ctx->max_delay_taps && eye_dm.state != AFTER; ++delay) {
+        if (_write_verbosity > 2)
+            printf("DM dly:%"PRIu16"\n", get_wr_dm_dly(channel, module, ctx->die_width));
+
+        works = 1;
+        for (byte = 0; byte < 16 && works; ++byte) {
+            write_dm_lfsr_check(ctx, channel, rank, module, byte, mr5);
+        }
+        printf("%d", works);
+        if (_write_verbosity > 2)
+            printf("\n");
+
+        if (works && eye_dm.state == BEFORE) {
+            eye_dm.start = delay;
+            eye_dm.state  = INSIDE;
+        }
+        if (!works && eye_dm.state == INSIDE) {
+            eye_dm.end = delay;
+            eye_dm.state  = AFTER;
+        } else if (delay == ctx->max_delay_taps-1 && eye_dm.state == INSIDE) {
+            eye_dm.end = delay + 1;
+            eye_dm.state = AFTER;
+        }
+        odly_dm_inc(channel, module, ctx->die_width);
+    }
+    good &= eye_dm.state == AFTER;
+
+    printf("|\n");
+    printf("m%2d|DM start delay:%2d; delay:%2d|",
+        module, eye_dm.start, eye_dm.start);
+    eye_dm.center = eye_dm.end - eye_dm.start;
+    middle_delay = (eye_dm.start + eye_dm.end)/2;
+    printf("eye_width:%2d; eye center: delay:%2d\n",
+            eye_dm.center, middle_delay);
+
+    // Setting read delay to eye center
+    odly_dm_rst(channel, module, ctx->die_width);
+    for (delay = 0; delay < middle_delay; ++delay) {
+        odly_dm_inc(channel, module, ctx->die_width);
+    }
+    return good;
+}
+
+static int module_vref_scan(training_ctx_t *const ctx, int channel, int rank, int module, int wl_cycle) {
+    int best_vref, middle_cycle, middle_delay, it;
+    uint8_t mr5 = 0;
+    send_mrr(channel, rank, 5);
+    mr5 = recover_mrr_value(channel, module, ctx->die_width);
+
+    if (_write_verbosity) {
+        printf("m%2d|\n", module);
+        printf("MR5:%02"PRIx8"\n", mr5);
+    }
+
+    send_mrw(channel, rank, module, 5, mr5 & 0xDF); // Disable DM
+
+    wr_dq_rst(channel, module, ctx->die_width);
+    odly_dq_rst(channel, module, ctx->die_width);
+    best_vref = moduel_dq_vref_scan(ctx, channel, rank, module, wl_cycle);
+
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+    if (best_vref == -1)
+        return best_vref;
+#endif // KEEP_GOING_ON_DRAM_ERROR
+
+    // Setting read delay to eye center
+    wr_dq_rst(channel, module, ctx->die_width);
+    odly_dq_rst(channel, module, ctx->die_width);
+    eye_t eye = write_data_scan(ctx, channel, rank, module, wl_cycle, 1);
+    middle_cycle = ((eye.start + eye.end)/2)/ctx->max_delay_taps;
+    middle_delay = ((eye.start + eye.end)/2)%ctx->max_delay_taps;
+    eye.center = eye.end - eye.start;
+    printf("m%2d|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
+        module,
+        eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
+        eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
+    printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
+        eye.center, middle_cycle, middle_delay);
+
+    wr_dq_rst(channel, module, ctx->die_width);
+    odly_dq_rst(channel, module, ctx->die_width);
+    if (eye.state == AFTER)
+        for (it = 0; it < middle_cycle; ++it) {
+            wr_dq_inc(channel, module, ctx->die_width);
+        }
+    if (eye.state == AFTER)
+    for (it = 0; it < middle_delay; ++it) {
+        odly_dq_inc(channel, module, ctx->die_width);
+    }
+    // DM training
+    if ((mr5 & 0x20) && ctx->die_width > 4) // DM was enabled
+        if (!moduel_dm_scan(ctx, channel, rank, module, mr5))
+            return -1;
+
+    return best_vref;
+}
+
+bool sdram_ddr5_write_training(training_ctx_t *const ctx ) {
+    int channel, rank, module;
+    int write_strobe_cycle[SDRAM_PHY_MODULES/CHANNELS];
+    bool good = true;
 
     for (channel = 0; channel < ctx->channels; channel++) {
         printf("Subchannel:%c Write leveling\n", (char)('A'+channel));
@@ -1658,140 +1870,37 @@ void sdram_ddr5_write_training(training_ctx_t *const ctx ) {
             enter_wltm(channel, rank);
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                 write_strobe_cycle[module] = write_leveling(ctx, channel, rank, module);
+                good &= write_strobe_cycle[module] != -1;
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+                if (!good)
+                    break;
+#endif // KEEP_GOING_ON_DRAM_ERROR
             }
             exit_wltm(channel, rank);
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+            if (!good)
+                return good;
+#endif // KEEP_GOING_ON_DRAM_ERROR
 
-            if (_write_verbosity > 0)
+            if (_write_verbosity > 1)
                 for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
                     read_registers(channel, rank, module, ctx->die_width);
                 }
 
             printf("DQ write training\n");
-            mr5 = 0;
             for (module = 0; module < SDRAM_PHY_MODULES/CHANNELS; module++) {
-                best_vref = -1;
-                send_mrr(channel, rank, 5);
-                mr5 = recover_mrr_value(channel, module, ctx->die_width);
-                printf("m%2d|\n", module);
-                printf("MR5:%02"PRIx8"\n", mr5);
-                send_mrw(channel, rank, module, 5, mr5 & 0xDF); // Disable DM
-
-                wr_dq_rst(channel, module, ctx->die_width);
-                odly_dq_rst(channel, module, ctx->die_width);
-                for(int _width = 0; _width < SDRAM_PHY_DELAYS; ++_width) {
-                    eye_width_range[0][_width] = -1;
-                    eye_width_range[1][_width] = -1;
-                }
-
-                for(int vref = 0x32; vref < 0x46; ++vref) { // FIXME: check over whole DQ VREF space, but keep performance
-                    if (_write_verbosity)
-                        printf("Vref:%2X", vref);
-                    send_mrw(channel, rank, module, 10, vref);
-                    busy_wait(1);
-                    if (_write_verbosity)
-                        printf("\n");
-                    eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], _write_verbosity);
-                    if (_write_verbosity)
-                        printf("|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
-                            eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
-                            eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
-                    eye.center = eye.end - eye.start;
-                    middle_cycle = ((eye.start + eye.end)/2)/ctx->max_delay_taps;
-                    middle_delay = ((eye.start + eye.end)/2)%ctx->max_delay_taps;
-                    if (_write_verbosity)
-                        printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
-                            eye.center, middle_cycle, middle_delay);
-                    for(int _width = 0; _width < eye.center; ++_width) {
-                        if (eye_width_range[0][_width] == -1)
-                            eye_width_range[0][_width] = vref;
-                        eye_width_range[1][_width] = vref + 1;
-                    }
-                }
-
-                // Setting read delay to eye center
-                wr_dq_rst(channel, module, ctx->die_width);
-                odly_dq_rst(channel, module, ctx->die_width);
-                for (int _width = 0; _width < SDRAM_PHY_DELAYS; ++_width) {
-                    if (eye_width_range[0][_width] != -1)
-                        best_vref = (eye_width_range[0][_width] + eye_width_range[1][_width]) / 2;
-                }
-                printf("m%2d|Best Vref:%2x\n", module, best_vref);
-                if (best_vref > -1) {
-                    send_mrw(channel, rank, module, 10, best_vref);
-                    busy_wait(1);
-                }
-                send_mrr(channel, rank, 10);
-                printf("MR10:%02"PRIx8"\n", recover_mrr_value(channel, module, ctx->die_width));
-
-                eye_t eye = write_data_scan(ctx, channel, rank, module, write_strobe_cycle[module], 1);
-                middle_cycle = ((eye.start + eye.end)/2)/ctx->max_delay_taps;
-                middle_delay = ((eye.start + eye.end)/2)%ctx->max_delay_taps;
-                eye.center = eye.end - eye.start;
-                printf("m%2d|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
-                    module,
-                    eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
-                    eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
-                printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
-                    eye.center, middle_cycle, middle_delay);
-
-                wr_dq_rst(channel, module, ctx->die_width);
-                odly_dq_rst(channel, module, ctx->die_width);
-                if (eye.state == AFTER)
-                    for (it = 0; it < middle_cycle; ++it) {
-                        wr_dq_inc(channel, module, ctx->die_width);
-                    }
-                if (eye.state == AFTER)
-                    for (it = 0; it < middle_delay; ++it) {
-                        odly_dq_inc(channel, module, ctx->die_width);
-                    }
-
-                // DM training
-                if ((mr5 & 0x20) && ctx->die_width > 4) { // DM was enabled
-                    printf("DM scan\nm:%2d DM|", module);
-                    odly_dm_rst(channel, module, ctx->die_width);
-                    eye_t eye_dm = DEFAULT_EYE;
-                    for(delay = 0; delay < ctx->max_delay_taps; ++delay) {
-                        if (_write_verbosity > 2)
-                            printf("DM dly:%"PRIu16"\n", get_wr_dm_dly(channel, module, ctx->die_width));
-
-                        works = 1;
-                        for (byte = 0; byte < 16 && works; ++byte) {
-                            write_dm_lfsr_check(ctx, channel, rank, module, byte, mr5);
-                        }
-                        printf("%d", works);
-                        if (_write_verbosity > 2)
-                            printf("\n");
-
-                        if (works && eye_dm.state == BEFORE) {
-                            eye_dm.start = delay;
-                            eye_dm.state  = INSIDE;
-                        }
-                        if (!works && eye_dm.state == INSIDE) {
-                            eye_dm.end = delay;
-                            eye_dm.state  = AFTER;
-                        } else if (delay == ctx->max_delay_taps-1 && eye_dm.state == INSIDE) {
-                            eye_dm.end = delay + 1;
-                            eye_dm.state  = AFTER;
-                        }
-                        odly_dm_inc(channel, module, ctx->die_width);
-                    }
-                    printf("|\n");
-                    printf("m%2d|DM start delay:%2d; delay:%2d|",
-                        module, eye_dm.start, eye_dm.start);
-                    eye_dm.center = eye_dm.end - eye_dm.start;
-                    middle_delay = (eye_dm.start + eye_dm.end)/2;
-                    printf("eye_width:%2d; eye center: delay:%2d\n",
-                        eye_dm.center, middle_delay);
-
-                    // Setting read delay to eye center
-                    odly_dm_rst(channel, module, ctx->die_width);
-                    for (it = 0; it < middle_delay; ++it) {
-                        odly_dm_inc(channel, module, ctx->die_width);
-                    }
-                }
+                good &= (module_vref_scan(ctx, channel, rank, module, write_strobe_cycle[module]) != -1);
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+                if (!good)
+                    return good;
+#endif // KEEP_GOING_ON_DRAM_ERROR
             }
         }
     }
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+    return good;
+#endif // KEEP_GOING_ON_DRAM_ERROR
+    return true;
 }
 
 /**
@@ -2007,6 +2116,8 @@ static void rcd_init(training_ctx_t *const ctx ) {
     i2c_write(0x48, 0x32, &cmd, 1, 1); // FIXME: this should be sent to all PMICs
     cdelay(10000000);
 
+    rcd_set_enables_and_slew_rates(
+        0, 0, 0, 0, 0, 0);
     reset_sequence(ctx->ranks);
 
     rcd_set_dca_rate(0, 0, ctx->rate);
@@ -2028,6 +2139,10 @@ static void rcd_init(training_ctx_t *const ctx ) {
         rcd_clear_qrst(channel, 0); // FIXME: this should clear QRST for all RCDs
 
     sdram_ddr5_cs_ca_training(ctx, -1);
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+    if(!ctx->CS_CA_successful)
+        return;
+#endif // KEEP_GOING_ON_DRAM_ERROR
     busy_wait(6);
 
     // FIXME: this function should initialize all RCDs
@@ -2103,6 +2218,10 @@ void sdram_ddr5_flow(void) {
         base_ctx = &rcd_dram_ctx;
         base_ctx->rate = host_rcd_ctx.rate;
         base_ctx->CS_CA_successful &= host_rcd_ctx.CS_CA_successful;
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+        if(!base_ctx->CS_CA_successful)
+            return;
+#endif // KEEP_GOING_ON_DRAM_ERROR
     } else {
         reset_sequence(base_ctx->ranks);
     }
@@ -2127,6 +2246,10 @@ void sdram_ddr5_flow(void) {
             setup_dram_mrs_sequence(rank);
         sdram_ddr5_cs_ca_training(base_ctx, -1);
     }
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+    if(!base_ctx->CS_CA_successful)
+        return;
+#endif // KEEP_GOING_ON_DRAM_ERROR
 
     for (int channel = 0; channel < base_ctx->channels; channel++) {
         for (int rank = 0; rank < base_ctx->ranks; rank++) {
@@ -2149,8 +2272,13 @@ void sdram_ddr5_flow(void) {
         for (int rank = 0; rank < base_ctx->ranks; rank++)
             send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
 
-    for (int rank = 0; rank < base_ctx->ranks; ++rank)
-        dram_enumerate(base_ctx, rank);
+    for (int rank = 0; rank < base_ctx->ranks; ++rank) {
+        if(dram_enumerate(base_ctx, rank))
+            continue;
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+        return;
+#endif // KEEP_GOING_ON_DRAM_ERROR
+    }
 
 #if defined(CONFIG_HAS_I2C)
     if (is_rdimm) {
@@ -2160,8 +2288,16 @@ void sdram_ddr5_flow(void) {
     }
 #endif // defined(CONFIG_HAS_I2C)
 
-    sdram_ddr5_read_training(base_ctx);
-    sdram_ddr5_write_training(base_ctx);
+    if (!sdram_ddr5_read_training(base_ctx)) {
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+        return;
+#endif // KEEP_GOING_ON_DRAM_ERROR
+    }
+    if (!sdram_ddr5_write_training(base_ctx)) {
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+        return;
+#endif // KEEP_GOING_ON_DRAM_ERROR
+    }
 }
 
 #endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)

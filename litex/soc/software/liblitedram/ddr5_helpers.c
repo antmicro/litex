@@ -1373,7 +1373,7 @@ uint8_t recover_mrr_value(int channel, int module, int width) {
     return ret;
 }
 
-void check_enumerate(int channel, int rank, int module, int width, int verbose) {
+bool check_enumerate(int channel, int rank, int module, int width, int verbose) {
     int module_;
     int good = 1;
     send_mrw(channel, rank, MODULE_BROADCAST, 26, 0xFF);
@@ -1430,6 +1430,7 @@ void check_enumerate(int channel, int rank, int module, int width, int verbose) 
             printf("%02"PRIx8, data[i]);
         printf("\n");
     }
+    return good;
 }
 
 void setup_enumerate(int channel, int rank, int module, int width, int verbose) {
