@@ -1683,7 +1683,7 @@ void sdram_ddr5_write_training(training_ctx_t *const ctx ) {
                     eye_width_range[1][_width] = -1;
                 }
 
-                for(int vref = 0; vref < 0x7e; ++vref) {
+                for(int vref = 0x32; vref < 0x46; ++vref) { // FIXME: check over whole DQ VREF space, but keep performance
                     if (_write_verbosity)
                         printf("Vref:%2X", vref);
                     send_mrw(channel, rank, module, 10, vref);
