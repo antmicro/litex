@@ -2009,15 +2009,6 @@ static void rcd_init(training_ctx_t *const ctx ) {
 
     reset_sequence(ctx->ranks);
 
-    // FIXME: this function should initialize all RCDs
-    rcd_set_enables_and_slew_rates(
-        0,
-        read_module_enabled_clock(0),
-        read_module_enabled_ca(0),
-        read_module_qck_setup(0),
-        read_module_qca_qcs_setup(0),
-        read_module_slew_rates(0)
-    );
     rcd_set_dca_rate(0, 0, ctx->rate);
     if (ctx->rate != DDR)
         ctx->ca.check = dca_check_if_works_sdr;
@@ -2037,6 +2028,17 @@ static void rcd_init(training_ctx_t *const ctx ) {
         rcd_clear_qrst(channel, 0); // FIXME: this should clear QRST for all RCDs
 
     sdram_ddr5_cs_ca_training(ctx, -1);
+    busy_wait(6);
+
+    // FIXME: this function should initialize all RCDs
+    rcd_set_enables_and_slew_rates(
+        0,
+        read_module_enabled_clock(0),
+        read_module_enabled_ca(0),
+        read_module_qck_setup(0),
+        read_module_qca_qcs_setup(0),
+        read_module_slew_rates(0)
+    );
     busy_wait(6);
 
     rcd_forward_all_dram_cmds(0, 0, true); // FIXME: this should forward for all RCDs
