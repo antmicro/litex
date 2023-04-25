@@ -286,16 +286,16 @@ void reset_all_phy_regs(int channels, int ranks, int addresses, int modules, int
 
 void enable_phy(void) {
     ddrphy_CSRModule_enable_fifos_write(0);
-    cdelay(5000);
+    busy_wait_us(50);
     clear_phy_fifos(0);
     clear_phy_fifos(1);
-    cdelay(5000);
+    busy_wait_us(50);
     ddrphy_CSRModule_rst_write(1);
-    cdelay(5000);
+    busy_wait_us(50);
     ddrphy_CSRModule_rst_write(0);
-    cdelay(5000);
+    busy_wait_us(50);
     ddrphy_CSRModule_enable_fifos_write(1);
-    cdelay(5000);
+    busy_wait_us(50);
 }
 
 void setup_capture(int channel, int setup) {
@@ -410,27 +410,27 @@ uint32_t capture_and_reduce_module(int channel, int module, int width, int opera
 
 int or_sample(int channel) {
     setup_capture(channel, 0);
-    cdelay(1000);
+    busy_wait_us(1);
     start_capture(channel);
-    cdelay(10000);
+    busy_wait_us(5);
     stop_capture(channel);
     return !!capture_and_reduce_result(channel, 0);
 }
 
 int and_sample(int channel) {
     setup_capture(channel, 3);
-    cdelay(1000);
+    busy_wait_us(1);
     start_capture(channel);
-    cdelay(10000);
+    busy_wait_us(5);
     stop_capture(channel);
     return !!capture_and_reduce_result(channel, 1);
 }
 
 int wleveling_sample(int channel, int module, int width) {
     setup_capture(channel, 3);
-    cdelay(1000);
+    busy_wait_us(1);
     start_capture(channel);
-    cdelay(10000);
+    busy_wait_us(5);
     stop_capture(channel);
     return !!capture_and_reduce_module(channel, module, width, 1);
 }
@@ -483,7 +483,7 @@ static void phy_select(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dly_sel_write(mask<<select);
 #endif
-    cdelay(100);
+    busy_wait_us(1);
 }
 
 static void phy_deselect(int channel, int select, int width) {
@@ -496,7 +496,7 @@ static void phy_deselect(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dly_sel_write(0);
 #endif
-    cdelay(100);
+    busy_wait_us(1);
 }
 
 static void phy_dq_select(int channel, int select, int width) {
@@ -510,7 +510,7 @@ static void phy_dq_select(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dq_dly_sel_write(1<<select);
 #endif
-    cdelay(100);
+    busy_wait_us(1);
 #endif // SDRAM_DELAY_PER_DQ
 }
 
@@ -525,7 +525,7 @@ static void phy_dq_deselect(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dq_dly_sel_write(0);
 #endif
-    cdelay(100);
+    busy_wait_us(1);
 #endif // SDRAM_DELAY_PER_DQ
 }
 
@@ -1389,20 +1389,20 @@ bool check_enumerate(int channel, int rank, int module, int width, int verbose) 
 
     cmd_injector(channel, 0xf, 0, 0, 0, 0, 1, 0);
     store_continuous(channel);
-    cdelay(50);
+    busy_wait_us(1);
     send_mrr(channel, rank, 31);
-    cdelay(1000);
+    busy_wait_us(1);
     if (module != -1)
         setup_capture(channel, 0);
     else
         setup_capture(channel, 3);
-    cdelay(1000);
+    busy_wait_us(1);
     start_capture(channel);
-    cdelay(10000);
+    busy_wait_us(1);
     stop_capture(channel);
 
     send_mrw(channel, rank, MODULE_BROADCAST, 25, 0x00);
-    cdelay(1000);
+    busy_wait_us(1);
     send_mrw(channel, rank, MODULE_BROADCAST, 25, 0x00);
 
     printf("\t");
@@ -1452,7 +1452,7 @@ void setup_enumerate(int channel, int rank, int module, int width, int verbose) 
             printf("\n");
         }
     }
-    cdelay(500);
+    busy_wait_us(1);
     send_mpc(channel, rank, (0x60 | (module & 0xf)), 1);
     for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
         for (i = 0; i < 8; ++i)
@@ -1463,29 +1463,29 @@ void setup_enumerate(int channel, int rank, int module, int width, int verbose) 
 static void long_mpc(int channel, int rank, int cmd, int wrdata_active) {
     cmd_injector(channel, 0xf,  0,       0xf | (cmd<<5), wrdata_active, 0, 0, 0);
     store_continuous(channel);
-    cdelay(50);
+    busy_wait_us(1);
     cmd_injector(channel, 0xff, 0,       0xf | (cmd<<5), wrdata_active, 0, 0, 1);
     cmd_injector(channel, 0x3f, 1<<rank, 0xf | (cmd<<5), wrdata_active, 0, 0, 1);
     issue_single(channel);
-    cdelay(250);
+    busy_wait_us(1);
     cmd_injector(channel, 0xff, 0,       0,              wrdata_active, 0, 0, 1);
     cmd_injector(channel, 0xf,  0,       0,              wrdata_active, 0, 0, 0);
     store_continuous(channel);
-    cdelay(50);
+    busy_wait_us(1);
 }
 
 static void short_mpc(int channel, int rank, int cmd, int wrdata_active) {
     cmd_injector(channel, 0xf,  0,       0,              wrdata_active, 0, 0, 0);
     store_continuous(channel);
-    cdelay(50);
+    busy_wait_us(1);
     cmd_injector(channel, 0xff, 0,       0,              wrdata_active, 0, 0, 1);
     cmd_injector(channel, 0x1,  1<<rank, 0xf | (cmd<<5), wrdata_active, 0, 0, 1);
     issue_single(channel);
-    cdelay(250);
+    busy_wait_us(1);
     cmd_injector(channel, 0xff, 0,       0,              wrdata_active, 0, 0, 1);
     cmd_injector(channel, 0xf,  0,       0,              wrdata_active, 0, 0, 0);
     store_continuous(channel);
-    cdelay(50);
+    busy_wait_us(1);
 }
 
 void send_mpc(int channel, int rank, int cmd, int wrdata_active) {
@@ -1508,7 +1508,7 @@ void send_mrw_rcd(int channel, int rank, int reg, int value) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 0, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(150);
+    busy_wait_us(1);
     cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
 }
 
@@ -1526,7 +1526,7 @@ void send_mrw(int channel, int rank, int module, int reg, int value) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 0, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(150);
+    busy_wait_us(5);
     cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
     send_mpc(channel, rank, 0x7f, 0);
 }
@@ -1546,7 +1546,7 @@ void send_mrr(int channel, int rank, int reg) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
     issue_single(channel);
-    cdelay(150);
+    busy_wait_us(5);
     cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
     setup_rddata_cnt(channel, 0);
 }
@@ -1565,7 +1565,7 @@ void send_wleveling_write(int channel, int rank) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 0, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(150);
+    busy_wait_us(5);
 }
 
 void send_precharge(int channel, int rank) {
@@ -1576,7 +1576,7 @@ void send_precharge(int channel, int rank) {
     if (N2_mode)
         cmd_injector(channel, 1<<1, 0, pre, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(500);
+    busy_wait_us(1);
 }
 
 void send_activate(int channel, int rank) {
@@ -1595,7 +1595,7 @@ void send_activate(int channel, int rank) {
     cmd_injector(channel, 1<<2, 0, act_2, 0, 0, 0, 1);
     cmd_injector(channel, 1<<3, 0, act_2, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(500);
+    busy_wait_us(1);
 }
 
 void send_write(int channel, int rank) {
@@ -1619,7 +1619,7 @@ void send_write(int channel, int rank) {
     cmd_injector(channel, 1<<6, 0, 0, 1, 0, 0, 1);
     cmd_injector(channel, 1<<7, 0, 0, 1, 0, 0, 1);
     issue_single(channel);
-    cdelay(50);
+    busy_wait_us(1);
 }
 
 void send_write_byte(int channel, int rank, int module, int byte) {
@@ -1666,7 +1666,7 @@ void send_write_byte(int channel, int rank, int module, int byte) {
     }
     cmd_injector(channel, 1<<transfer, cmd_r, cmd, 1, mask, 0, 1);
     issue_single(channel);
-    cdelay(50);
+    busy_wait_us(1);
 }
 
 void send_read(int channel, int rank) {
@@ -1693,7 +1693,7 @@ void send_read(int channel, int rank) {
     cmd_injector(channel, 1<<6, 0, 0, 0, 0, 1, 1);
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 1, 1);
     issue_single(channel);
-    cdelay(100);
+    busy_wait_us(5);
     setup_rddata_cnt(channel, 0);
 }
 
@@ -1722,7 +1722,7 @@ void force_issue_single(void) {
 #else
     sdram_dfii_cmdinjector_single_shot_write(0);
 #endif
-    cdelay(100);
+    busy_wait_us(1);
 }
 
 /**
@@ -1751,7 +1751,7 @@ static void cs_sample_prep(int channel, int rank, int address, int shift_0101) {
     cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 1, 0);
     cmd_injector(channel, 0x5<<(!!shift_0101), 1<<rank, 0x1f, 0, 0, 1, 0);
     store_continuous(channel);
-    cdelay(50);
+    busy_wait_us(1);
 }
 
 /**
@@ -1795,7 +1795,7 @@ void exit_catm(int channel, int rank) {
     store_continuous(channel);
     cmd_injector(channel, 0xff, 1<<rank, 0x1f, 0, 0, 0, 1);
     issue_single(channel);
-    cdelay(50);
+    busy_wait_us(1);
     cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
 }
 
@@ -1810,7 +1810,7 @@ static void ca_sample_prep(int channel, int rank, int address, int l2h, int phas
         cmd_injector(channel, 0x1<<phase_shift, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
     }
     store_continuous(channel);
-    cdelay(100);
+    busy_wait_us(1);
 }
 
 /**
@@ -1863,7 +1863,7 @@ void enter_write_leveling(int channel) {
 #else
     ddrphy_CSRModule_wlevel_en_write(1);
 #endif
-    cdelay(100);
+    busy_wait_us(1);
 }
 
 int wr_dqs_check_if_works(int channel, int rank, int module, int width) {
@@ -1916,7 +1916,7 @@ void clear_phy_fifos(int channel) {
 #else
     ddrphy_CSRModule_discard_rd_fifo_write(1);
 #endif
-    cdelay(1000);
+    busy_wait(5);
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         ddrphy_CSRModule_B_discard_rd_fifo_write(0);
@@ -1964,7 +1964,7 @@ void rcd_set_dca_rate(int channel, int rank, enum dca_rate rate) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, &rw_data[0], 1, false);
-    cdelay(2000);
+    busy_wait_us(10);
 
     if (!ok)
         printf("There was a problem with setting DCA rate in the RCD\n");
@@ -1994,7 +1994,7 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
         coarse = 0x0f;
 
         ok &= sdram_rcd_write(rcd, 0, 0, 0, 5, &coarse, 1, false);
-        cdelay(2000);
+        busy_wait_us(10);
 
         if (!ok)
             printf("There was a problem with enabling PLL bypass mode in the RCD\n");
@@ -2047,9 +2047,9 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 5, &coarse, 1, false);
-    cdelay(2000);
+    busy_wait_us(10);
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 6, &fine, 1, false);
-    cdelay(2000);
+    busy_wait_us(10);
 
     if (!ok)
         printf("There was a problem with setting DIMM speed in the RCD\n");
@@ -2065,7 +2065,7 @@ void rcd_set_dimm_operating_speed_band(int channel, int rank, int target_speed) 
         rw_data[1] |= 1<<7;
 
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, rw_data, 4, false);
-    cdelay(2000);
+    busy_wait_us(10);
 
     if (!ok)
         printf("There was a problem with setting DIMM band in the RCD\n");
@@ -2081,7 +2081,7 @@ void rcd_set_termination_and_vref(int rank) {
     rw_data[0] = 0;
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0x10, rw_data, 4, false);
-    cdelay(2000);
+    busy_wait_us(10);
     if (!ok)
         printf("There was a problem with setting IBT in the RCD\n");
 
@@ -2095,7 +2095,7 @@ void rcd_set_termination_and_vref(int rank) {
         rw_data[3] = 0x2d;
         // write the settings back
         ok &= sdram_rcd_write(rcd, 0, i, 0, 0x40, rw_data, 4, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with setting channel's:%c Vref 40-43 in the RCD\n", 'A'+i);
 
@@ -2107,7 +2107,7 @@ void rcd_set_termination_and_vref(int rank) {
         rw_data[3] = 0x2d;
         // write the settings back
         ok &= sdram_rcd_write(rcd, 0, i, 0, 0x44, rw_data, 4, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with setting channel's:%c Vref 44-47 in the RCD\n", 'A'+i);
 
@@ -2117,7 +2117,7 @@ void rcd_set_termination_and_vref(int rank) {
         rw_data[1] = 0x2d;
         // write the settings back
         ok &= sdram_rcd_write(rcd, 0, i, 0, 0x48, rw_data, 4, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with setting channel's:%c Vref 48-49 in the RCD\n", 'A'+i);
     }
@@ -2138,7 +2138,7 @@ void rcd_set_enables_and_slew_rates(
         rw_data[2] = qckh;
         // write the settings back
         ok &= sdram_rcd_write(rcd, 0, i, 0, 0x08, rw_data, 4, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with setting channel's:%c "
                    "Clock Driver enable, QCA/CS enable or "
@@ -2150,7 +2150,7 @@ void rcd_set_enables_and_slew_rates(
         rw_data[2] = slew;
         // write the settings back
         ok &= sdram_rcd_write(rcd, 0, i, 0, 0x0C, rw_data, 4, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with setting channel's:%c "
                    "QCK/QCA/QCS drivers slew rate or "
@@ -2173,7 +2173,7 @@ void rcd_set_qrst(int channel, int rank) {
     uint8_t cmd = 5 + (2 * channel);
 
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, &cmd, 1, false);
-    cdelay(2000);
+    busy_wait_us(10);
 
     if (!ok)
         printf("There was a problem with setting DRAM reset for channel %c\n", 'A'+channel);
@@ -2193,7 +2193,7 @@ void rcd_clear_qrst(int channel, int rank) {
     uint8_t cmd = 6 + (2 * channel);
 
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, &cmd, 1, false);
-    cdelay(2000);
+    busy_wait_us(10);
 
     if (!ok)
         printf("There was a problem with clearing DRAM reset for channel %c\n", 'A'+channel);
@@ -2225,7 +2225,7 @@ void rcd_forward_all_dram_cmds(int channel, int rank, bool forward) {
 
     if (!ok)
         printf("There was a problem with changing CMD blocking in the RCD\n");
-    cdelay(2000);
+    busy_wait_us(10);
 }
 
 /**
@@ -2250,7 +2250,7 @@ void rcd_release_qcs(int channel, int rank, bool sideband) {
         // to the RW04 register (JESD82-511 8.6.5)
         uint8_t cmd = 14 + channel;
         ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, &cmd, 1, false);
-        cdelay(2000);
+        busy_wait_us(10);
 
         if (!ok)
             printf("There was a problem with releasing the QCS for channel %c\n", 'A'+channel);
@@ -2258,9 +2258,9 @@ void rcd_release_qcs(int channel, int rank, bool sideband) {
         cmd_injector(channel, 0xff,       0,    0, 0, 0, 0, 1);
         cmd_injector(channel, 0x01, 1<<rank, 0x1f, 0, 0, 0, 1);
         issue_single(channel);
-        cdelay(10);
+        busy_wait_us(1);
     }
-    cdelay(2000);
+    busy_wait_us(10);
 }
 
 void enter_ca_pass(int rcd) {
@@ -2277,7 +2277,7 @@ void enter_ca_pass(int rcd) {
 
     if (!ok)
         printf("There was a problem with entering CA pass Through in the RCD\n");
-    cdelay(2000);
+    busy_wait_us(10);
 }
 
 void exit_ca_pass(int rcd) {
@@ -2294,7 +2294,7 @@ void exit_ca_pass(int rcd) {
 
     if (!ok)
         printf("There was a problem with exiting CA pass Through in the RCD\n");
-    cdelay(2000);
+    busy_wait_us(10);
 }
 
 void select_ca_pass(int rank) {
@@ -2313,7 +2313,7 @@ void select_ca_pass(int rank) {
 
     if (!ok)
         printf("There was a problem with selecting rank for CA pass Through in the RCD\n");
-    cdelay(2000);
+    busy_wait_us(10);
 }
 
 /*-----------------------------------------------------------------------*/
@@ -2348,7 +2348,7 @@ void enter_dcstm(int channel, int rank) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
-    cdelay(2000);
+    busy_wait_us(10);
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
     for (int i=0; i<4; ++i) {
         ok &= (w_data[i] == r_data[i]);
@@ -2356,7 +2356,7 @@ void enter_dcstm(int channel, int rank) {
 
     if (!ok) {
         printf("There was a problem with entering Host->RCD CS training (DCSTM)\n");
-        cdelay(1000000);
+        busy_wait(10);
     }
 }
 
@@ -2385,7 +2385,7 @@ void exit_dcstm(int channel, int rank) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
-    cdelay(2000);
+    busy_wait_us(10);
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
     for (int i=0; i<4; ++i) {
         ok &= (w_data[i] == r_data[i]);
@@ -2393,7 +2393,7 @@ void exit_dcstm(int channel, int rank) {
 
     if (!ok) {
         printf("There was a problem with exiting Host->RCD CS training (DCSTM)\n");
-        cdelay(1000000);
+        busy_wait(10);
     }
 }
 
@@ -2411,9 +2411,9 @@ int dcs_check_if_works(int channel, int rank, int address, int shift_0101) {
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    cdelay(500);
+    busy_wait_us(1);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    cdelay(5000);
+    busy_wait_us(10);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     return !ddrphy_CSRModule_alert_read();
 }
@@ -2435,7 +2435,7 @@ void qck_inc(int channel, int rank, int address) {
 
     for (int i = 0; i< 4; ++i) {
         ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with incrementing Q%cCK output delay\n", 'A' + i);
         rw_number++;
@@ -2451,7 +2451,7 @@ void qck_rst(int channel, int rank, int address) {
 
     for (int i = 0; i< 4; ++i) {
         ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-        cdelay(100);
+        busy_wait_us(1);
         if (!ok)
             printf("There was a problem with incrementing Q%cCK output delay\n", 'A' + i);
         rw_number++;
@@ -2481,7 +2481,7 @@ void qcs_inc(int channel, int rank, int address) {
 
     for (int i = 0; i < 2; ++i) {
         ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with incrementing Q%cCS%c_n output delay\n", 'A' + i, '0' + (rank & 1));
         rw_number += 2;
@@ -2504,7 +2504,7 @@ void qcs_rst(int channel, int rank, int address) {
 
     for (int i = 0; i < 2; ++i) {
         ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with resetting Q%cCS%c_n output delay\n", 'A' + i, '0' + (rank & 1));
         rw_number += 2;
@@ -2540,7 +2540,7 @@ void enter_qcstm(int channel, int rank) {
     // write RW03 setting back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 3, &rw_data[3], 1, false);
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
-    cdelay(2000);
+    busy_wait_us(10);
     if (!ok)
         printf("There was a problem with entering RCD->DRAM CS training (QCSTM)\n");
 }
@@ -2567,7 +2567,7 @@ void exit_qcstm(int channel, int rank) {
 
     // write RW03 setting back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 3, &rw_data[3], 1, false);
-    cdelay(2000);
+    busy_wait_us(10);
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CS training (QCSTM)\n");
 
@@ -2580,7 +2580,7 @@ void exit_qcstm(int channel, int rank) {
 static void qcs_sample_prep(int channel) {
     cmd_injector(channel, 0xf, 0, 0, 0, 0, 1, 0);
     store_continuous(channel);
-    cdelay(50);
+    busy_wait_us(1);
 }
 
 int qcs_check_if_works(int channel, int rank, int address, int shift_0101) {
@@ -2597,12 +2597,12 @@ int qcs_check_if_works(int channel, int rank, int address, int shift_0101) {
     uint8_t rw_value = delay | (1 << 7); // enable delays
 
     ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-    cdelay(2000);
+    busy_wait_us(10);
     if (!ok)
         printf("There was a problem with shifting CS Q%cCS%c_n output delay\n", 'A', '0' + (rank & 1));
     rw_number += 2;
     ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-    cdelay(2000);
+    busy_wait_us(10);
     if (!ok)
         printf("There was a problem with shifting CS Q%cCS%c_n output delay\n", 'B', '0' + (rank & 1));
 
@@ -2642,7 +2642,7 @@ void enter_dcatm(int channel, int rank) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
-    cdelay(2000);
+    busy_wait_us(10);
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
     for (int i=0; i<4; ++i) {
         ok &= (w_data[i] == r_data[i]);
@@ -2650,7 +2650,7 @@ void enter_dcatm(int channel, int rank) {
 
     if (!ok) {
         printf("There was a problem with entering Host->RCD CA training (DCATM)\n");
-        cdelay(1000000);
+        busy_wait(10);
     }
 }
 
@@ -2676,7 +2676,7 @@ void exit_dcatm(int channel, int rank) {
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
-    cdelay(2000);
+    busy_wait_us(10);
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
     for (int i=0; i<4; ++i) {
         ok &= (w_data[i] == r_data[i]);
@@ -2684,7 +2684,7 @@ void exit_dcatm(int channel, int rank) {
 
     if (!ok) {
         printf("There was a problem with exiting Host->RCD CA training (DCATM)\n");
-        cdelay(1000000);
+        busy_wait(10);
     }
 }
 
@@ -2729,7 +2729,7 @@ static void dca_sample_prep(int channel, int rank, int address, int l2h, int pha
         cmd_injector(channel, 0x1<<phase_shift, 1<<rank, default_state, 0, 0, 1, 0);
     }
     store_continuous(channel);
-    cdelay(50);
+    busy_wait_us(1);
 }
 
 static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) {
@@ -2747,7 +2747,7 @@ static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) 
 
     // write the settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, w_data, 4, false);
-    cdelay(2000);
+    busy_wait_us(10);
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, r_data, false);
     for (int i=0; i<4; ++i) {
         ok &= (w_data[i] == r_data[i]);
@@ -2755,7 +2755,7 @@ static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) 
 
     if (!ok) {
         printf("There was a problem with changing DCA XOR sampling edge\n");
-        cdelay(1000000);
+        busy_wait(10);
     }
 }
 
@@ -2796,9 +2796,9 @@ int dca_check_if_works_ddr(int channel, int rank, int address, int phase_shift) 
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
         ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-        cdelay(100);
+        busy_wait_us(1);
         ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-        cdelay(1000);
+        busy_wait_us(5);
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ok &= ddrphy_CSRModule_alert_read();
 
@@ -2806,9 +2806,9 @@ int dca_check_if_works_ddr(int channel, int rank, int address, int phase_shift) 
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
         ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-        cdelay(100);
+        busy_wait_us(1);
         ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-        cdelay(1000);
+        busy_wait_us(5);
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ok &= ddrphy_CSRModule_alert_read();
 
@@ -2819,9 +2819,9 @@ int dca_check_if_works_ddr(int channel, int rank, int address, int phase_shift) 
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
         ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-        cdelay(100);
+        busy_wait_us(1);
         ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-        cdelay(1000);
+        busy_wait_us(5);
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ok &= ddrphy_CSRModule_alert_read();
 
@@ -2829,9 +2829,9 @@ int dca_check_if_works_ddr(int channel, int rank, int address, int phase_shift) 
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
         ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-        cdelay(100);
+        busy_wait_us(1);
         ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-        cdelay(1000);
+        busy_wait_us(5);
         ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
         ok &= !ddrphy_CSRModule_alert_read();
     }
@@ -2850,9 +2850,9 @@ int dca_check_if_works_sdr(int channel, int rank, int address, int phase_shift) 
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    cdelay(100);
+    busy_wait_us(1);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    cdelay(1000);
+    busy_wait_us(5);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ok &= ddrphy_CSRModule_alert_read();
 
@@ -2862,9 +2862,9 @@ int dca_check_if_works_sdr(int channel, int rank, int address, int phase_shift) 
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    cdelay(100);
+    busy_wait_us(1);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    cdelay(1000);
+    busy_wait_us(5);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ok &= !ddrphy_CSRModule_alert_read();
     dca_training_xor_sampling_edge(channel, rank, 0); // restore default values
@@ -2898,7 +2898,7 @@ void qca_inc(int channel, int rank, int address) {
 
     for (int i = 0; i < 2; ++i) {
         ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with incrementing Q%cCA output delay\n", 'A' + i);
         rw_number += 1;
@@ -2921,7 +2921,7 @@ void qca_rst(int channel, int rank, int address) {
 
     for (int i = 0; i < 2; ++i) {
         ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-        cdelay(2000);
+        busy_wait_us(10);
         if (!ok)
             printf("There was a problem with resetting Q%cCA output delay\n", 'A' + channel);
         rw_number += 1;
@@ -2967,7 +2967,7 @@ void enter_qcatm(int channel, int rank) {
 
     // write RW00 and RW01 settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 2, false);
-    cdelay(2000);
+    busy_wait_us(10);
 
     if (!ok)
         printf("There was a problem with entering RCD->DRAM CA training (QCATM)\n");
@@ -2999,7 +2999,7 @@ void exit_qcatm(int channel, int rank) {
 
     // write RW00 and RW01 settings back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 0, rw_data, 2, false);
-    cdelay(2000);
+    busy_wait_us(10);
 
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CA training (QCATM)\n");

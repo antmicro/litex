@@ -674,9 +674,9 @@ void sdram_ddr5_module_enumerate(int rank, int width, int channels) {
         }
         // Exit PDA Enumerate Programming Mode
         send_mpc(channel, rank, 0xA, 1);
-        cdelay(100);
+        busy_wait_us(1);
         send_mpc(channel, rank, 0xA, 0);
-        cdelay(100);
+        busy_wait_us(1);
     }
     enumerated = 1;
 }
@@ -705,7 +705,7 @@ static bool sdram_ddr5_check_enumerate(int rank, int width, int channels) {
 #endif // CA_INFO_DDR5
         }
         send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
-        cdelay(100);
+        busy_wait_us(1);
     }
     return ok;
 }
@@ -1473,10 +1473,8 @@ static int compare_serial_write_data(training_ctx_t *const ctx , int cnt_seed, i
             printf("%04"PRIx16"|", rddata);
         for (temp = 0; temp < ctx->die_width; ++temp)
             works &= !!(((rddata>>temp)&1) == ((serial[cnt_seed]>>(2*phase))&1));
-        if (!works)
-            break;
         for (temp = 0; temp < ctx->die_width; ++temp)
-            works &= !!(((rddata>>(temp + ctx->die_width))&1) == ((serial[cnt_seed]>>(2*phase+1))&1));
+            works &= !!(((rddata>>(temp + ctx->die_width)) & 1) == ((serial[cnt_seed]>>(2*phase+1)) & 1));
     }
     if(print)
         printf("\n");
@@ -1717,7 +1715,7 @@ static int moduel_dq_vref_scan(training_ctx_t *const ctx, int channel, int rank,
         if (_write_verbosity)
             printf("Vref:%2X", vref);
         send_mrw(channel, rank, module, 10, vref);
-        busy_wait(1);
+        busy_wait_us(1);
         if (_write_verbosity)
             printf("\n");
         eye_t eye = write_data_scan(ctx, channel, rank, module, wl_cycle, _write_verbosity);
@@ -1746,7 +1744,7 @@ static int moduel_dq_vref_scan(training_ctx_t *const ctx, int channel, int rank,
     printf("m%2d|Best Vref:%2x\n", module, best_vref);
     if (best_vref > -1) {
         send_mrw(channel, rank, module, 10, best_vref);
-        busy_wait(1);
+        busy_wait_us(1);
     }
     send_mrr(channel, rank, 10);
     if (_write_verbosity)
@@ -2114,7 +2112,7 @@ static void rcd_init(training_ctx_t *const ctx ) {
     // Issue a VR_ENABLE command to the PMIC
     uint8_t cmd = 0xa0;
     i2c_write(0x48, 0x32, &cmd, 1, 1); // FIXME: this should be sent to all PMICs
-    cdelay(10000000);
+    busy_wait(50);
 
     rcd_set_enables_and_slew_rates(
         0, 0, 0, 0, 0, 0);
