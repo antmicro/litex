@@ -60,7 +60,8 @@ uint32_t capture_and_reduce_result(int channel, int operation);
 uint32_t capture_and_reduce_module(int channel, int module, int width, int operation);
 int or_sample(int channel);
 int and_sample(int channel);
-int wleveling_sample(int channel, int module, int width);
+int or_sample_module(int channel, int module, int width);
+int and_sample_module(int channel, int module, int width);
 
 void read_registers(int channel, int rank, int module, int width);
 
@@ -144,11 +145,11 @@ void force_issue_single(void);
 
 void enter_cstm(int channel, int rank);
 void exit_cstm(int channel, int rank);
-int cs_check_if_works(int channel, int rank, int address, int shift_0101);
+uint32_t cs_check_if_works(int channel, int rank, int address, int shift_0101, int modules, int width);
 
 void enter_catm(int channel, int rank);
 void exit_catm(int channel, int rank);
-int ca_check_if_works(int channel, int rank, int address, int cs_dly);
+int ca_check_if_works(int channel, int rank, int address, int shift_back);
 
 void enter_write_leveling(int channel);
 void exit_write_leveling(int channel);
@@ -182,7 +183,7 @@ void select_ca_pass(int rank);
 
 void enter_dcstm(int channel, int rank);
 void exit_dcstm(int channel, int rank);
-int dcs_check_if_works(int channel, int rank, int address, int shift_0101);
+uint32_t dcs_check_if_works(int channel, int rank, int address, int shift_0101, int modules, int width);
 
 void qck_inc(int channel, int rank, int address);
 void qck_rst(int channel, int rank, int address);
@@ -191,18 +192,18 @@ void qcs_inc(int channel, int rank, int address);
 void qcs_rst(int channel, int rank, int address);
 void enter_qcstm(int channel, int rank);
 void exit_qcstm(int channel, int rank);
-int qcs_check_if_works(int channel, int rank, int address, int shift_0101);
+uint32_t qcs_check_if_works(int channel, int rank, int address, int shift_0101, int modules, int width);
 
 void enter_dcatm(int channel, int rank);
 void exit_dcatm(int channel, int rank);
-int dca_check_if_works_ddr(int channel, int rank, int address, int cs_dly);
-int dca_check_if_works_sdr(int channel, int rank, int address, int cs_dly);
+int dca_check_if_works_ddr(int channel, int rank, int address, int shift_back);
+int dca_check_if_works_sdr(int channel, int rank, int address, int shift_back);
 
 void qca_inc(int channel, int rank, int address);
 void qca_rst(int channel, int rank, int address);
 void enter_qcatm(int channel, int rank);
 void exit_qcatm(int channel, int rank);
-int qca_check_if_works(int channel, int rank, int _address, int phase_shift);
+int qca_check_if_works(int channel, int rank, int _address, int shift_back);
 #else
 
 void enter_ca_pass(int rank);

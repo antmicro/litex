@@ -24,7 +24,8 @@
 typedef void (*action_callback_t)(int channel, int rank, int address);
 typedef void (*training_mode_callback_t)(int channel, int rank);
 
-typedef int (*delay_checker_t)(int channel, int rank, int address, int offset);
+typedef uint32_t (*delay_checker_cs_t)(int channel, int rank, int address, int shift_0101, int modules, int width);
+typedef int (*delay_checker_ca_t)(int channel, int rank, int address, int shift_back);
 
 typedef struct {
     struct {
@@ -42,7 +43,7 @@ typedef struct {
         action_callback_t rst_dly;
         action_callback_t inc_dly;
 
-        delay_checker_t check;
+        delay_checker_cs_t check;
     } cs;
     struct {
         int line_count;
@@ -58,7 +59,7 @@ typedef struct {
         action_callback_t rst_dly;
         action_callback_t inc_dly;
 
-        delay_checker_t check;
+        delay_checker_ca_t check;
 
         int (*has_line13)(int32_t channel);
     } ca;
@@ -81,6 +82,7 @@ typedef struct {
     int all_ca_count;
     int die_width;
     int max_delay_taps;
+    int modules;
     bool CS_CA_successful;
     bool RDIMM;
 } training_ctx_t;
@@ -123,6 +125,7 @@ typedef struct {
     .rate = DDR,                              \
     .CS_CA_successful = true,                 \
     .max_delay_taps = SDRAM_PHY_DELAYS,       \
+    .modules = SDRAM_PHY_MODULES/CHANNELS,    \
     .RDIMM = false,                           \
 }
 
@@ -163,6 +166,7 @@ typedef struct {
     .rate = DDR,                             \
     .CS_CA_successful = true,                \
     .max_delay_taps = SDRAM_PHY_DELAYS,      \
+    .modules = 1,                            \
     .RDIMM = true,                           \
 }
 
@@ -196,11 +200,11 @@ typedef struct {
     .rate = DDR,                            \
     .CS_CA_successful = true,               \
     .max_delay_taps = 64,                   \
+    .modules = SDRAM_PHY_MODULES/CHANNELS,  \
     .RDIMM = true,                          \
 }
 
 
-void sdram_ddr5_module_enumerate(int rank, int width, int channels);
 void sdram_ddr5_cs_ca_training(training_ctx_t *ctx, int channel);
 bool sdram_ddr5_read_training(training_ctx_t *ctx);
 bool sdram_ddr5_write_training(training_ctx_t *ctx);

@@ -426,7 +426,16 @@ int and_sample(int channel) {
     return !!capture_and_reduce_result(channel, 1);
 }
 
-int wleveling_sample(int channel, int module, int width) {
+int or_sample_module(int channel, int module, int width) {
+    setup_capture(channel, 0);
+    busy_wait_us(1);
+    start_capture(channel);
+    busy_wait_us(5);
+    stop_capture(channel);
+    return !capture_and_reduce_module(channel, module, width, 0);
+}
+
+int and_sample_module(int channel, int module, int width) {
     setup_capture(channel, 3);
     busy_wait_us(1);
     start_capture(channel);
@@ -1763,9 +1772,12 @@ static void cs_sample_prep(int channel, int rank, int address, int shift_0101) {
  * the OR operation and check if all were 0s.
  * JESD79-5A 4.20
  */
-int cs_check_if_works(int channel, int rank, int address, int shift_0101) {
+uint32_t cs_check_if_works(int channel, int rank, int address, int shift_0101, int modules, int width) {
+    uint32_t works = 0;
     cs_sample_prep(channel, rank, address, shift_0101);
-    return !or_sample(channel);
+    for (int module = 0; module < modules; ++module)
+        works |= or_sample_module(channel, module, width) << module;
+    return works;
 }
 
 /**
@@ -1839,15 +1851,15 @@ static void ca_sample_prep(int channel, int rank, int address, int l2h, int phas
  * just as good when going low->high and high->low.
  * JESD79-5A 4.19
  */
-int ca_check_if_works(int channel, int rank, int address, int phase_shift) {
+int ca_check_if_works(int channel, int rank, int address, int shift_back) {
     int ok;
 
     // Test change from low to high
-    ca_sample_prep(channel, rank, address, 1, phase_shift);
+    ca_sample_prep(channel, rank, address, 1, shift_back);
     ok = and_sample(channel);
 
     // Test change from high to low
-    ca_sample_prep(channel, rank, address, 0, phase_shift);
+    ca_sample_prep(channel, rank, address, 0, shift_back);
     ok &= !or_sample(channel);
 
     return ok;
@@ -1868,7 +1880,7 @@ void enter_write_leveling(int channel) {
 
 int wr_dqs_check_if_works(int channel, int rank, int module, int width) {
     send_wleveling_write(channel, rank);
-    return wleveling_sample(channel, module, width);
+    return and_sample_module(channel, module, width);
 }
 
 void wleveling_scan(int channel, int rank, int module, int width, int max_delay, eye_t *eye) {
@@ -2316,6 +2328,28 @@ void select_ca_pass(int rank) {
     busy_wait_us(10);
 }
 
+static int alert_or_reduce(void) {
+    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+    ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
+    ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
+    busy_wait_us(1);
+    ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
+    busy_wait_us(10);
+    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+    return !ddrphy_CSRModule_alert_read();
+}
+
+static int alert_and_reduce(void) {
+    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+    ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
+    ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
+    busy_wait_us(1);
+    ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
+    busy_wait_us(10);
+    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
+    return !!ddrphy_CSRModule_alert_read();
+}
+
 /*-----------------------------------------------------------------------*/
 /* Host->RCD CS Training (DCSTM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
@@ -2406,16 +2440,9 @@ void exit_dcstm(int channel, int rank) {
  * the OR operation and check if all were 0s.
  * JESD82-511 5.1.1
  */
-int dcs_check_if_works(int channel, int rank, int address, int shift_0101) {
+uint32_t dcs_check_if_works(int channel, int rank, int address, int shift_0101, int modules, int width) {
     cs_sample_prep(channel, rank, address, shift_0101);
-    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-    ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
-    ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    busy_wait_us(1);
-    ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    busy_wait_us(10);
-    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-    return !ddrphy_CSRModule_alert_read();
+    return alert_or_reduce();
 }
 
 /*-----------------------------------------------------------------------*/
@@ -2583,7 +2610,8 @@ static void qcs_sample_prep(int channel) {
     busy_wait_us(1);
 }
 
-int qcs_check_if_works(int channel, int rank, int address, int shift_0101) {
+uint32_t qcs_check_if_works(int channel, int rank, int address, int shift_0101, int modules, int width) {
+    int works = 0;
     bool ok = true;
 
     uint8_t rcd = get_rcd_id(rank);
@@ -2607,7 +2635,10 @@ int qcs_check_if_works(int channel, int rank, int address, int shift_0101) {
         printf("There was a problem with shifting CS Q%cCS%c_n output delay\n", 'B', '0' + (rank & 1));
 
     qcs_sample_prep(channel);
-    return !or_sample(channel);
+    for (int module = 0; module < modules; ++module) {
+        works |= or_sample_module(channel, module, width) << module;
+    }
+    return works;
 }
 
 /*-----------------------------------------------------------------------*/
@@ -2711,7 +2742,7 @@ void exit_dcatm(int channel, int rank) {
  *  CA[x+7] |  1 1 1 1  1 1 1 1 |
  * DCA[x]   | 11110111 11110111 |
  */
-static void dca_sample_prep(int channel, int rank, int address, int l2h, int phase_shift) {
+static void dca_sample_prep(int channel, int rank, int address, int l2h, int shift_back) {
     int address_other_half = (address + 7) % 14;
 
     // state where all CA bits have the same value
@@ -2722,11 +2753,11 @@ static void dca_sample_prep(int channel, int rank, int address, int l2h, int pha
 
     cmd_injector(    channel, 0xf,              0,       default_state, 0, 0, 1, 0);
 
-    if (phase_shift == 0) {
-        cmd_injector(channel, 0x1,              1<<rank, negated_state, 0, 0, 1, 0);
-    } else {
+    if (shift_back) {
         cmd_injector(channel, 0x1,              0,       negated_state, 0, 0, 1, 0);
-        cmd_injector(channel, 0x1<<phase_shift, 1<<rank, default_state, 0, 0, 1, 0);
+        cmd_injector(channel, 0x1<<shift_back,  1<<rank, default_state, 0, 0, 1, 0);
+    } else {
+        cmd_injector(channel, 0x1,              1<<rank, negated_state, 0, 0, 1, 0);
     }
     store_continuous(channel);
     busy_wait_us(1);
@@ -2785,90 +2816,42 @@ static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) 
  * just as good when going low->high and high->low.
  * JESD82-511 5.2.1
  */
-int dca_check_if_works_ddr(int channel, int rank, int address, int phase_shift) {
+int dca_check_if_works_ddr(int channel, int rank, int address, int shift_back) {
     int ok = 1;
 
     for(int edge=0; edge<2; ++edge) {
         // Test change from low to high
-        dca_sample_prep(channel, rank, address + edge*7, 1, phase_shift);
-
+        dca_sample_prep(channel, rank, address + edge*7, 1, shift_back);
         dca_training_xor_sampling_edge(channel, rank, 0);
-        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-        ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
-        ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-        busy_wait_us(1);
-        ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-        busy_wait_us(5);
-        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-        ok &= ddrphy_CSRModule_alert_read();
-
+        ok &= alert_and_reduce();
         dca_training_xor_sampling_edge(channel, rank, 1<<edge);
-        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-        ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
-        ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-        busy_wait_us(1);
-        ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-        busy_wait_us(5);
-        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-        ok &= ddrphy_CSRModule_alert_read();
+        ok &= alert_and_reduce();
 
         // Test change from high to low
-        dca_sample_prep(channel, rank, address + edge*7, 0, phase_shift);
-
+        dca_sample_prep(channel, rank, address + edge*7, 0, shift_back);
         dca_training_xor_sampling_edge(channel, rank, 0);
-        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-        ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
-        ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-        busy_wait_us(1);
-        ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-        busy_wait_us(5);
-        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-        ok &= ddrphy_CSRModule_alert_read();
-
+        ok &= alert_and_reduce();
         dca_training_xor_sampling_edge(channel, rank, 1<<edge);
-        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-        ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
-        ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-        busy_wait_us(1);
-        ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-        busy_wait_us(5);
-        ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-        ok &= !ddrphy_CSRModule_alert_read();
+        ok &= alert_or_reduce();
     }
     dca_training_xor_sampling_edge(channel, rank, 0); // restore default values
 
     return ok;
 }
 
-int dca_check_if_works_sdr(int channel, int rank, int address, int phase_shift) {
+int dca_check_if_works_sdr(int channel, int rank, int address, int shift_back) {
     int ok = 1;
 
     dca_training_xor_sampling_edge(channel, rank, 1);
     // Test change from low to high
-    ca_sample_prep(channel, rank, address, 1, phase_shift);
-
-    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-    ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
-    ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    busy_wait_us(1);
-    ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    busy_wait_us(5);
-    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-    ok &= ddrphy_CSRModule_alert_read();
+    ca_sample_prep(channel, rank, address, 1, shift_back);
+    ok &= alert_and_reduce();
 
     // Test change from high to low
-    ca_sample_prep(channel, rank, address, 0, phase_shift);
+    ca_sample_prep(channel, rank, address, 0, shift_back);
+    ok &= !alert_or_reduce();
 
-    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-    ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
-    ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    busy_wait_us(1);
-    ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
-    busy_wait_us(5);
-    ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
-    ok &= !ddrphy_CSRModule_alert_read();
     dca_training_xor_sampling_edge(channel, rank, 0); // restore default values
-
     return ok;
 }
 
@@ -3010,7 +2993,7 @@ void exit_qcatm(int channel, int rank) {
     exit_ca_pass(rank);
 }
 
-int qca_check_if_works(int channel, int rank, int _address, int phase_shift) {
+int qca_check_if_works(int channel, int rank, int _address, int shift_back) {
     int ok = 1;
     if (qca_address_lines == 0) {
         qca_address_lines = 13;
@@ -3022,7 +3005,7 @@ int qca_check_if_works(int channel, int rank, int _address, int phase_shift) {
     }
 
     for (int address = 0; address < qca_address_lines; ++address) {
-        ok &= ca_check_if_works(channel, rank, address, phase_shift);
+        ok &= ca_check_if_works(channel, rank, address, shift_back);
     }
     return ok;
 }
