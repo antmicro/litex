@@ -16,6 +16,7 @@
 //#define CA_DEBUG_DDR5
 //#define READ_INFO_DDR5
 //#define READ_DEBUG_DDR5
+//#define READ_DEEP_DEBUG_DDR5
 //#define WRITE_INFO_DDR5
 //#define WRITE_DEBUG_DDR5
 //#define WRITE_DEEP_DEBUG_DDR5
@@ -598,7 +599,9 @@ static const uint16_t serial[] = {
     0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000};
 static const int serial_count = sizeof(serial) / sizeof(serial[0]);
 
-#ifdef READ_DEBUG_DDR5
+#ifdef READ_DEEP_DEBUG_DDR5
+static int _read_verbosity = 3;
+#elif defined(READ_DEBUG_DDR5)
 static int _read_verbosity = 2;
 #elif defined(READ_INFO_DDR5)
 static int _read_verbosity = 1;
@@ -742,7 +745,7 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
     for (rd_cycle_dly = 0; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye.state != AFTER; rd_cycle_dly ++) {
         if (_read_verbosity)
             printf("%2d|", rd_cycle_dly);
-        if (_read_verbosity > 1)
+        if (_read_verbosity > 2)
             printf("\nPreamble CK dly:%"PRIu16, get_rd_preamble_ck_dly(channel, module, width));
 
         idly_rst(channel, module, width);
@@ -750,11 +753,11 @@ static int find_read_preamble_cycle(int channel, int rank, int module, int width
             send_mrr(channel, rank, 31);
             preamble = captured_preamble(channel, module, width);
 
-            if (_read_verbosity > 1)
+            if (_read_verbosity > 2)
                 printf("\nDQS dly:%"PRIu16"|", get_rd_dqs_dly(channel, module, width));
             if (_read_verbosity)
                 printf("%01x", preamble);
-            if (_read_verbosity > 1)
+            if (_read_verbosity > 2)
                 printf("\n");
 
             // Should be 1tCK preamble 0b10 (JESD79-5A 4.18.3),
@@ -804,13 +807,13 @@ static bool read_training_data_scan(int channel, int rank, int module, int width
 
     for (rd_cycle_dly = preamble_cycle; rd_cycle_dly < MAX_READ_CYCLE_DELAY && eye.state != AFTER; rd_cycle_dly++) {
         printf("%2d|", rd_cycle_dly);
-        if (_read_verbosity > 1)
+        if (_read_verbosity > 2)
             printf("\nDQ CK dly:%"PRIu16, get_rd_dq_ck_dly(channel, module, width));
 
         idly_rst(channel, module, width);
         for(idly = 0; idly < max_delay_taps; idly++){
 
-            if (_read_verbosity > 1)
+            if (_read_verbosity > 2)
                 printf("\nDQ dly:%"PRIu16"|", get_rd_dq_dly(channel, module, width));
 
             works = rd_cycle_dly_idly_check_if_works(channel, rank, module, width);
@@ -824,7 +827,7 @@ static bool read_training_data_scan(int channel, int rank, int module, int width
                 eye.state = AFTER;
             }
 
-            if (_read_verbosity > 1)
+            if (_read_verbosity > 2)
                 printf("\n");
 
             idly_inc(channel, module, width);
