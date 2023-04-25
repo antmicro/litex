@@ -2445,22 +2445,16 @@ void qck_inc(int channel, int rank, int address) {
 void qck_rst(int channel, int rank, int address) {
     bool ok = true;
     uint8_t rcd = get_rcd_id(rank);
-    uint8_t rw_data[5];
-    uint8_t delay;
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x10, rw_data, false);
-    delay = rw_data[2] & 0x3f;
 
-    while (delay-->0) {
-        uint8_t rw_number = 0x12;
-        uint8_t rw_value = delay | (1 << 7); // enable delays
+    uint8_t rw_number = 0x12;
+    uint8_t rw_value = 0 | (1 << 7); // enable delays
 
-        for (int i = 0; i< 4; ++i) {
-            ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
-            cdelay(100);
-            if (!ok)
-                printf("There was a problem with incrementing Q%cCK output delay\n", 'A' + i);
-            rw_number++;
-        }
+    for (int i = 0; i< 4; ++i) {
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+        cdelay(100);
+        if (!ok)
+            printf("There was a problem with incrementing Q%cCK output delay\n", 'A' + i);
+        rw_number++;
     }
 }
 
