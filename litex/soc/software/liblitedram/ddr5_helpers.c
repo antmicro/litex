@@ -898,6 +898,94 @@ static int read_captured_preamble_internal(int channel) {
 #endif
 }
 
+#ifndef SDRAM_PHY_SUBCHANNELS
+#define DQ_REMAP_DATA_BYTES (SDRAM_PHY_DFI_DATABITS/4)
+#else
+#define DQ_REMAP_DATA_BYTES (SDRAM_PHY_DFI_DATABITS/2)
+#endif
+
+static int get_dq_remapping(int channel, int line) {
+    uint8_t data[DQ_REMAP_DATA_BYTES];
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (channel) {
+        csr_rd_buf_uint8(CSR_MAIN_B_DQ_REMAPPING_ADDR, data, DQ_REMAP_DATA_BYTES);
+    } else {
+        csr_rd_buf_uint8(CSR_MAIN_A_DQ_REMAPPING_ADDR, data, DQ_REMAP_DATA_BYTES);
+    }
+#else
+    csr_rd_buf_uint8(CSR_MAIN_DQ_REMAPPING_ADDR, data, DQ_REMAP_DATA_BYTES);
+#endif
+    return data[line];
+}
+
+static void set_dq_remapping(int channel, int line, int mapping) {
+    uint8_t data[DQ_REMAP_DATA_BYTES];
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (channel) {
+        csr_rd_buf_uint8(CSR_MAIN_B_DQ_REMAPPING_ADDR, data, DQ_REMAP_DATA_BYTES);
+    } else {
+        csr_rd_buf_uint8(CSR_MAIN_A_DQ_REMAPPING_ADDR, data, DQ_REMAP_DATA_BYTES);
+    }
+#else
+    csr_rd_buf_uint8(CSR_MAIN_DQ_REMAPPING_ADDR, data, DQ_REMAP_DATA_BYTES);
+#endif
+    data[line] = mapping;
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (channel) {
+        csr_wr_buf_uint8(CSR_MAIN_B_DQ_REMAPPING_ADDR, data, DQ_REMAP_DATA_BYTES);
+    } else {
+        csr_wr_buf_uint8(CSR_MAIN_A_DQ_REMAPPING_ADDR, data, DQ_REMAP_DATA_BYTES);
+    }
+#else
+    csr_wr_buf_uint8(CSR_MAIN_DQ_REMAPPING_ADDR, data, DQ_REMAP_DATA_BYTES);
+#endif
+}
+
+void get_dimm_dq_remapping(int channel, int modules, int width) {
+    int it, module, line;
+    uint16_t temp;
+    for (it = 0; it < width; ++it) {
+        send_mrw(channel, 0, MODULE_BROADCAST, 26, 0xFF);
+        send_mrw(channel, 0, MODULE_BROADCAST, 27, 0xFF);
+        send_mrw(channel, 0, MODULE_BROADCAST, 28, 1 << it);
+        send_mrw(channel, 0, MODULE_BROADCAST, 29, (it&8) << (it&7));
+        send_mrw(channel, 0, MODULE_BROADCAST, 25, 0x08);
+
+        cmd_injector(channel, 0xf, 0, 0, 0, 0, 1, 0);
+        store_continuous(channel);
+        busy_wait_us(1);
+        send_mrr(channel, 0, 31);
+        busy_wait_us(1);
+        setup_capture(channel, 3);
+        busy_wait_us(1);
+        start_capture(channel);
+        busy_wait_us(1);
+        stop_capture(channel);
+
+        send_mrw(channel, 0, MODULE_BROADCAST, 25, 0x00);
+        busy_wait_us(1);
+        send_mrw(channel, 0, MODULE_BROADCAST, 25, 0x00);
+        for (module = 0; module < modules; ++module) {
+            temp = get_data_module_phase(channel, module, width, 0);
+            for (line = 0; line < width; ++line) {
+                if (!(temp & (1<<line)))
+                    set_dq_remapping(channel, module*width+it, line);
+            }
+        }
+    }
+}
+
+static uint16_t permute(int channel, int rank, int module, int width, const uint16_t old_value) {
+    int it, mapping;
+    uint16_t ret_val = 0;
+    for (it = 0; it < width; ++it) {
+        mapping = get_dq_remapping(channel, (module*width+it)^(rank&1));
+        ret_val |= ((old_value >> it) & 1) << mapping;
+        ret_val |= ((old_value >> (width + it)) & 1) << (mapping + width);
+    }
+    return ret_val;
+}
+
 uint8_t lfsr_next(uint8_t input) {
     uint8_t temp = 0;
     temp |= ((input)    &1) << 7;
@@ -911,7 +999,7 @@ uint8_t lfsr_next(uint8_t input) {
     return temp;
 }
 
-int compare_serial(int channel, int module, int width, uint16_t data, int inv, int print) {
+int compare_serial(int channel, int rank, int module, int width, uint16_t data, int inv, int print) {
     uint16_t module_data;
     uint16_t expected_data[8];
     uint16_t phase, _temp, _mask, _error;
@@ -926,7 +1014,7 @@ int compare_serial(int channel, int module, int width, uint16_t data, int inv, i
         data >>= 1;
         _temp |= (((((data & 1) << width) - (data & 1)) ^ (inv & _mask)) << width);
         data >>= 1;
-        expected_data[phase] = _temp;
+        expected_data[phase] = permute(channel, rank, module, width, _temp);
         if (print)
             printf("%04"PRIx16"|", expected_data[phase]);
     }
@@ -954,7 +1042,7 @@ int compare_serial(int channel, int module, int width, uint16_t data, int inv, i
     return 1;
 }
 
-int compare(int channel, int module, int width, int data0, int data1, int inv, int select, int print) {
+int compare(int channel, int rank, int module, int width, int data0, int data1, int inv, int select, int print) {
     uint16_t expected_data[8];
     uint16_t module_data;
     uint16_t phase, _temp, _mask,_error;
@@ -984,7 +1072,7 @@ int compare(int channel, int module, int width, int data0, int data1, int inv, i
         lfsr1 = lfsr_next(lfsr1);
         _temp ^= ((inv & _mask) << width);
 
-        expected_data[phase] = _temp;
+        expected_data[phase] = permute(channel, rank, module, width, _temp);
         if (print)
             printf("%04"PRIx16"|", expected_data[phase]);
     }
@@ -1371,13 +1459,14 @@ int captured_preamble(int channel, int module, int width) {
 }
 
 uint8_t recover_mrr_value(int channel, int module, int width) {
-    uint16_t temp;
+    uint16_t temp, dq_0;
     uint8_t ret, i;
     ret = 0;
+    dq_0 = get_dq_remapping(channel, module*width);
     for (i = 4; i < 8; ++i){
         temp = get_data_module_phase(channel, module, width, i);
-        ret |= ((temp&1) << ((i-4)*2));
-        ret |= (((temp >> width) & 1) << ((i-4)*2 + 1));
+        ret |= (((temp >> dq_0) & 1) << ((i-4)*2));
+        ret |= ((((temp >> dq_0) >> width) & 1) << ((i-4)*2 + 1));
     }
     return ret;
 }

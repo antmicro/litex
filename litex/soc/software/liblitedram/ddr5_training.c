@@ -693,9 +693,9 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module, i
         send_mrw(channel, rank, module, 27, serial[seed]>>8);
         for (int i = 0 ; i < 16 && works; ++i) {
             send_mrr(channel, rank, 31);
-            works &= compare_serial(channel, module, width, serial[seed], 0xA5, 0);
+            works &= compare_serial(channel, rank, module, width, serial[seed], 0xA5, 0);
             if (!works && _read_verbosity > 1) {
-                compare_serial(channel, module, width, serial[seed], 0xA5, 1);
+                compare_serial(channel, rank, module, width, serial[seed], 0xA5, 1);
             }
         }
     }
@@ -711,9 +711,9 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module, i
             send_mrw(channel, rank, module, 26, seeds0[seed]);
             send_mrw(channel, rank, module, 27, seeds1[seed]);
             send_mrr(channel, rank, 31);
-            works &= compare(channel, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33, 0);
+            works &= compare(channel, rank, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33, 0);
             if (!works && _read_verbosity > 1)
-                compare(channel, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33, 1);
+                compare(channel, rank, module, width, seeds0[seed], seeds1[seed], 0xA5, 0x33, 1);
         }
     }
     if (!works)
@@ -982,6 +982,7 @@ bool sdram_ddr5_read_training(training_ctx_t *const ctx) {
     int channel, rank;
     bool good = true;
     for (channel = 0; channel < ctx->channels; channel++) {
+        get_dimm_dq_remapping(channel, ctx->modules, ctx->die_width);
         printf("Subchannel:%c Read training\n", (char)('A'+channel));
         for (rank = 0; rank < ctx->ranks; rank++) {
             printf("Training rank%2d\n", rank);

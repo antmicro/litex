@@ -88,10 +88,11 @@ uint16_t get_ca_dly(int channel, int rank, int address);
 void par_rst(int channel, int rank, int address);
 void par_inc(int channel, int rank, int address);
 
+void get_dimm_dq_remapping(int channel, int modules, int width);
 uint8_t lfsr_next(uint8_t input);
-int compare_serial(int channel, int module, int width,
+int compare_serial(int channel, int rank, int module, int width,
                    uint16_t data, int inv, int print);
-int compare(int channel, int module, int width,
+int compare(int channel, int rank, int module, int width,
             int data0, int data1,
             int inv, int select, int print);
 
