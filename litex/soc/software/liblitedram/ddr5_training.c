@@ -2058,15 +2058,17 @@ void sdram_ddr5_flow(void) {
 #else
     is_rdimm = read_module_type(0) == RDIMM;
 #endif // DDR5_RDIMM_SIM
-    int die_width = 4; //FIXME: change to SPD value when PHY works read_module_width(0); // FIXME: handle multiple sticks and SPDs
+    // FIXME: handle multiple sticks and SPDs
+    int die_width = SDRAM_PHY_DQ_DQS_RATIO; //FIXME: change to SPD value when PHY works `read_module_width(0);`
+    if (is_rdimm) {
+        die_width = 4;
+        base_ctx = &host_rcd_ctx;
+    }
     host_dram_ctx.die_width = die_width;
     host_rcd_ctx.die_width = die_width;
     rcd_dram_ctx.die_width = die_width;
     rcd_dram_ctx.ranks     = read_module_ranks(0); // FIXME: handle multiple sticks and SPDs
     rcd_dram_ctx.channels  = read_module_channels(0); // FIXME: handle multiple sticks and SPDs
-    if (is_rdimm) {
-        base_ctx = &host_rcd_ctx;
-    }
 #endif // defined(CONFIG_HAS_I2C)
 
     reset_all_phy_regs(host_dram_ctx.channels, host_dram_ctx.ranks,

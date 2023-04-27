@@ -898,7 +898,7 @@ static int read_captured_preamble_internal(int channel) {
 #endif
 }
 
-#ifndef SDRAM_PHY_SUBCHANNELS
+#ifdef SDRAM_PHY_SUBCHANNELS
 #define DQ_REMAP_DATA_BYTES (SDRAM_PHY_DFI_DATABITS/4)
 #else
 #define DQ_REMAP_DATA_BYTES (SDRAM_PHY_DFI_DATABITS/2)
