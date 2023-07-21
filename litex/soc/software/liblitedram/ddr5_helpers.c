@@ -2162,7 +2162,7 @@ void rcd_set_dimm_operating_speed_band(int channel, int rank, int target_speed) 
     uint8_t rw_data[5];
 
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 4, rw_data, false);
-    if (target_speed <= 1400)
+    if (target_speed <= 2800)
         rw_data[1] |= 1<<7;
 
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 4, rw_data, 4, false);
@@ -2639,10 +2639,10 @@ void enter_qcstm(int channel, int rank) {
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
 
-    enter_ca_pass(rank);
+    printf("enter:%d\n", rank);
+    enter_ca_pass(rcd);
     select_ca_pass(rank);
     enter_cstm(channel, rank);
-    exit_ca_pass(rank);
 
     // we need to modify RW03
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
@@ -2651,11 +2651,10 @@ void enter_qcstm(int channel, int rank) {
     // QCSTM enable: RW03[0]
     // QCSTM rank selection: RW03[1]
     rw_data[3] &= ~(0b11); // clear setting bits
-    rw_data[3] |= 0b1 | ((rank & 1) << 1); // set new bits
+    // rw_data[3] |= 0b1 | ((rank & 1) << 1); // set new bits
 
     // write RW03 setting back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 3, &rw_data[3], 1, false);
-    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
     busy_wait_us(10);
     if (!ok)
         printf("There was a problem with entering RCD->DRAM CS training (QCSTM)\n");
@@ -2679,7 +2678,7 @@ void exit_qcstm(int channel, int rank) {
     // in RW03 we disable CS training mode
     // QCSTM enable: RW03[0]
     // QCSTM rank selection: RW03[1]
-    rw_data[3] &= ~3; // clear lowest 2 bits
+    rw_data[3] &= ~(0b11); // clear setting bits
 
     // write RW03 setting back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 3, &rw_data[3], 1, false);
@@ -2687,14 +2686,15 @@ void exit_qcstm(int channel, int rank) {
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CS training (QCSTM)\n");
 
-    enter_ca_pass(rank);
+    printf("exit:%d\n", rank);
     select_ca_pass(rank);
     exit_cstm(channel, rank);
-    exit_ca_pass(rank);
+    exit_ca_pass(rcd);
 }
 
-static void qcs_sample_prep(int channel) {
-    cmd_injector(channel, 0xf, 0, 0, 0, 0, 1, 0);
+static void qcs_sample_prep(int channel, int rank) {
+    cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 1, 0);
+    cmd_injector(channel, 0x5, 1<<rank, 0x1f, 0, 0, 1, 0);
     store_continuous(channel);
     busy_wait_us(1);
 }
@@ -2723,7 +2723,7 @@ uint32_t qcs_check_if_works(int channel, int rank, int address, int shift_0101, 
     if (!ok)
         printf("There was a problem with shifting CS Q%cCS%c_n output delay\n", 'B', '0' + (rank & 1));
 
-    qcs_sample_prep(channel);
+    qcs_sample_prep(channel, rank);
     for (int module = 0; module < modules; ++module) {
         works |= or_sample_module(channel, module, width) << module;
     }

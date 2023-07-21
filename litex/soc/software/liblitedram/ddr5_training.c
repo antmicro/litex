@@ -1984,10 +1984,10 @@ static void rcd_init(training_ctx_t *const ctx ) {
     rcd_set_dca_rate(0, 0, ctx->rate);
     if (ctx->rate != DDR)
         ctx->ca.check = dca_check_if_works_sdr;
-    rcd_set_dimm_operating_speed(0, 0, 2000);
+    rcd_set_dimm_operating_speed(0, 0, 2801);
     rcd_set_termination_and_vref(0);
     reset_sequence(ctx->ranks);
-    rcd_set_dimm_operating_speed_band(0, 0, 2000);
+    rcd_set_dimm_operating_speed_band(0, 0, 2801);
     busy_wait_us(50);
     rcd_forward_all_dram_cmds(0, 0, false); // FIXME: this should forward for all RCDs
 
@@ -2009,6 +2009,16 @@ static void rcd_init(training_ctx_t *const ctx ) {
     );
     busy_wait(6);
 
+    for (int channel = 0; channel < ctx->channels; ++channel)
+        prep_nop(channel, 0);
+
+    force_issue_single();
+    busy_wait_us(500);
+
+    for (int channel = 0; channel < ctx->channels; channel++)
+        rcd_clear_qrst(channel, 0); // FIXME: this should clear QRST for all RCDs
+    busy_wait(1);
+
     for (int channel = 0; channel < ctx->channels; channel++) {
         rcd_set_qrst(channel, 0); // FIXME: this should set QRST for all RCDs
     }
@@ -2016,20 +2026,14 @@ static void rcd_init(training_ctx_t *const ctx ) {
 
     for (int channel = 0; channel < ctx->channels; channel++)
         rcd_clear_qrst(channel, 0); // FIXME: this should clear QRST for all RCDs
-
-    rcd_forward_all_dram_cmds(0, 0, true); // FIXME: this should forward for all RCDs
     busy_wait(6);
 
     for (int channel = 0; channel < ctx->channels; channel++) {
         rcd_release_qcs(channel, 0, true); // FIXME: this should set QRST for all RCDs
     }
-    busy_wait(6);
 
-    for (int channel = 0; channel < ctx->channels; ++channel)
-        prep_nop(channel, 0);
+    busy_wait(2);
 
-    force_issue_single();
-    busy_wait_us(500);
 }
 #endif // defined(CONFIG_HAS_I2C)
 
@@ -2097,6 +2101,8 @@ void sdram_ddr5_flow(void) {
     dram_start_sequence(base_ctx->ranks);
 
     if (is_rdimm) {
+        single_cycle_MPC = 0;
+        rcd_forward_all_dram_cmds(0, 0, true); // FIXME: this should forward for all RCDs
         enter_ca_pass(0); // FIXME: handle multiple RCDs
         for (int rank = 0; rank < base_ctx->ranks; ++rank) {
             select_ca_pass(rank);
