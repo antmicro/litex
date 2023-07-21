@@ -282,4 +282,11 @@ bool i2c_poll(unsigned char slave_addr)
     return result;
 }
 
+void ddr5_i2c_reset(void)
+{
+	i2c_oe_scl_sda(1, 0, 1);
+	busy_wait(60);
+	i2c_oe_scl_sda(0, 1, 1);
+}
+
 #endif /* CONFIG_HAS_I2C */

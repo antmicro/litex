@@ -41,6 +41,7 @@ struct i2c_dev *get_i2c_devs(void);
 int get_i2c_devs_count(void);
 void set_i2c_active_dev(int dev);
 int get_i2c_active_dev(void);
+void ddr5_i2c_reset(void);
 
 #ifdef __cplusplus
 }

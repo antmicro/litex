@@ -2053,6 +2053,7 @@ void sdram_ddr5_flow(void) {
 
     bool is_rdimm = false;
 #if defined(CONFIG_HAS_I2C)
+    ddr5_i2c_reset();
 #ifdef DDR5_RDIMM_SIM
     is_rdimm = true;
 #else
