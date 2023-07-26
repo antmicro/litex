@@ -2137,6 +2137,13 @@ void sdram_ddr5_flow(void) {
         printf("1N mode setup\n");
         init_sequence_1n(base_ctx->ranks);
     }
+    if (base_ctx->ranks > 1) {
+        for (int channel = 0; channel < base_ctx->channels; channel++)
+            for (int rank = 1; rank < base_ctx->ranks; rank++) {
+                send_mrw(channel, rank, MODULE_BROADCAST, 35, (0 << 3) | 0);
+                send_mpc(channel, rank, 0x58, 0);
+            }
+    }
 
     single_cycle_MPC = 1<<4;
     for (int channel = 0; channel < base_ctx->channels; channel++)
@@ -2158,6 +2165,8 @@ void sdram_ddr5_flow(void) {
         host_dram_ctx.RDIMM = rcd_dram_ctx.RDIMM;
     }
 #endif // defined(CONFIG_HAS_I2C)
+
+    base_ctx->ranks = 1; //FIXME: when PHY works with multiple ranks
 
     if (!sdram_ddr5_read_training(base_ctx)) {
 #ifndef KEEP_GOING_ON_DRAM_ERROR

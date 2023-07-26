@@ -1902,7 +1902,7 @@ void exit_catm(int channel, int rank) {
 
 
 static void ca_sample_prep(int channel, int rank, int address, int l2h, int phase_shift) {
-    cmd_injector(    channel, 0xf,              0,       (!l2h)<<address, 0, 0, 1, 0);
+    cmd_injector(channel, 0xf,              0,       (!l2h)<<address, 0, 0, 1, 0);
 
     if (phase_shift == 0) {
         cmd_injector(channel, 0x1,              1<<rank,    l2h<<address, 0, 0, 1, 0);
@@ -2589,8 +2589,10 @@ void qcs_inc(int channel, int rank, int address) {
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
     uint8_t delay;
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x14, rw_data, false);
-    delay = (rw_data[3] + 1) & 0x3f;
+    uint8_t rw_number_base = (rank & 1) ? 0x18 : 0x14;
+    uint8_t rw_idx = (rank & 1) ? 0 : 3;
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, rw_number_base, rw_data, false);
+    delay = (rw_data[rw_idx] + 1) & 0x3f;
 
     uint8_t rw_number = 0x17 + (rank & 1);
     uint8_t rw_value = delay | (1 << 7); // enable delays
@@ -2639,7 +2641,6 @@ void enter_qcstm(int channel, int rank) {
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
 
-    printf("enter:%d\n", rank);
     enter_ca_pass(rcd);
     select_ca_pass(rank);
     enter_cstm(channel, rank);
@@ -2686,7 +2687,6 @@ void exit_qcstm(int channel, int rank) {
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CS training (QCSTM)\n");
 
-    printf("exit:%d\n", rank);
     select_ca_pass(rank);
     exit_cstm(channel, rank);
     exit_ca_pass(rcd);
@@ -2706,8 +2706,10 @@ uint32_t qcs_check_if_works(int channel, int rank, int address, int shift_0101, 
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
     uint8_t delay;
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x14, rw_data, false);
-    delay = rw_data[3] & 0x3f;
+    uint8_t rw_number_base = (rank & 1) ? 0x18 : 0x14;
+    uint8_t rw_idx = (rank & 1) ? 0 : 3;
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, rw_number_base, rw_data, false);
+    delay = rw_data[rw_idx] & 0x3f;
     delay |= shift_0101 << 6;
 
     uint8_t rw_number = 0x17 + (rank & 1);
@@ -3014,10 +3016,10 @@ void enter_qcatm(int channel, int rank) {
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
 
-    enter_ca_pass(rank);
+    enter_ca_pass(rcd);
     select_ca_pass(rank);
     enter_catm(channel, rank);
-    exit_ca_pass(rank);
+    exit_ca_pass(rcd);
 
     // we need to modify RW00, RW01
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
@@ -3076,14 +3078,14 @@ void exit_qcatm(int channel, int rank) {
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CA training (QCATM)\n");
 
-    enter_ca_pass(rank);
+    enter_ca_pass(rcd);
     select_ca_pass(rank);
     exit_catm(channel, rank);
-    exit_ca_pass(rank);
+    exit_ca_pass(rcd);
 }
 
 int qca_check_if_works(int channel, int rank, int _address, int shift_back) {
-    int ok = 1;
+    int ok = 1, res;
     if (qca_address_lines == 0) {
         qca_address_lines = 13;
         cmd_injector(channel, 0xf, 0, 1<<13, 0, 0, 1, 0);
@@ -3094,7 +3096,8 @@ int qca_check_if_works(int channel, int rank, int _address, int shift_back) {
     }
 
     for (int address = 0; address < qca_address_lines; ++address) {
-        ok &= ca_check_if_works(channel, rank, address, shift_back);
+        res = ca_check_if_works(channel, rank, address, shift_back);
+        ok &= res;
     }
     return ok;
 }
