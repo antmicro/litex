@@ -54,6 +54,16 @@
 
 static int32_t helper_arr[2*MAX(64, SDRAM_PHY_DELAYS)];
 static int32_t helper_arr_it;
+static int32_t helper_modules_without_shift;
+static int32_t helper_modules_seen;
+
+static void full_clear_helper_arr(void) {
+    helper_arr_it = 0;
+    helper_modules_without_shift = 0;
+    helper_modules_seen = 0;
+    for (int i = 0; i < sizeof(helper_arr)/sizeof(int); ++i)
+        helper_arr[i] = 0;
+}
 
 static void clear_helper_arr(void) {
     helper_arr_it = 0;
@@ -69,30 +79,55 @@ static int reduce_cs(uint32_t cs, int modules) {
     return !!ok;
 }
 
-static void find_eye_in_helper_arr(int *left, int *right, int mid) {
-    int it = 0;
-    while (helper_arr[mid - it]) ++it;
-    if (helper_arr[mid]) *right = - (it - 1);
-    for (it = 0; it < mid; ++it) {
-        if (helper_arr[mid + it] && *right == UNSET_DELAY)
+
+// -1 starts with `1`, 0 doesn't have `1`, 1 in all other cases
+static int one_in_helper_arr(int max) {
+    if (helper_arr[0]) return -1;
+    for (int it = 1; it < max; ++it) {
+       if (helper_arr[it]) return 1;
+    }
+    return 0;
+}
+
+static void find_eye_in_helper_arr(int *left, int *right, int max) {
+    for (int it = 0; it < 2* max; ++it) {
+        if (helper_arr[it] && *right == UNSET_DELAY)
             *right = it;
-        if (!helper_arr[mid + it] && *right != UNSET_DELAY) {
+        if (!helper_arr[it] && *right != UNSET_DELAY) {
             *left = it;
             return;
         }
     }
-    if (helper_arr[2*mid - 1])
-        *left = it;
+    if (helper_arr[2*max - 1])
+        *left = 2 * max;
 }
 
 static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int32_t rank,
     int shift_0101) {
     int csdly;
-    uint32_t works;
+    uint32_t works, works_, helper;
 
     for (csdly = 0; csdly < ctx->max_delay_taps; csdly++) {
-        works  = ctx->cs.check(channel, rank, 0, shift_0101, ctx->modules, ctx->die_width);
-        works |= ctx->cs.check(channel, rank, 0, !shift_0101, ctx->modules, ctx->die_width);
+        works = works_ = 0;
+        works = ctx->cs.check(channel, rank, 0, shift_0101, ctx->modules, ctx->die_width);
+        helper = works & helper_modules_without_shift;
+        works = helper == helper_modules_without_shift ? works : 0;
+        // helper = set of modules that work without shift and aren't in helper_modules_without_shift
+        helper = works & ~helper_modules_without_shift;
+        // check that helper set is in ~seen set
+        works =  (helper & ~helper_modules_seen) == helper ? works : 0;
+        // extend set of working modules without shift
+        helper_modules_without_shift |= works;
+        // extend set of seen modules
+        helper_modules_seen |= works;
+        if (ctx->training_type != HOST_RCD) {
+            works_ = ctx->cs.check(channel, rank, 0, !shift_0101, ctx->modules, ctx->die_width);
+            helper = works_ & ~helper_modules_without_shift;
+            // check that works_ is not part of helper_modules_without_shift set
+            works_ = helper == works_ ? works_ : 0;
+            helper_modules_seen |= works_;
+        }
+        works = works & works_ ? 0 : works | works_;
         printf("%d", reduce_cs(works, ctx->modules));
         helper_arr[helper_arr_it++] = reduce_cs(works, ctx->modules);
         ctx->cs.inc_dly(channel, rank, 0);
@@ -100,18 +135,36 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
     ctx->cs.rst_dly(channel, rank, 0);
 }
 
-static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank) {
-    clear_helper_arr();
+static int CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank) {
+    int shift = 1;
+    full_clear_helper_arr();
     ctx->cs.rst_dly(channel, rank, 0);
 
     // Enter CS training
     printf("Rank: %2"PRId32"\t|", rank);
     ctx->cs.enter_training_mode(channel, rank);
-    CS_scan_single(ctx, channel, rank, 1);
-    // Reset CS_n training states
-    printf("|");
+    printf("\nInitial scan|");
     CS_scan_single(ctx, channel, rank, 0);
-    printf("|\n");
+    switch (one_in_helper_arr(ctx->max_delay_taps)) {
+        case -1:
+            clear_helper_arr();
+            printf("\nshift 0101|");
+            CS_scan_single(ctx, channel, rank, 1);
+            shift = !shift;
+        case 1:
+            printf("|");
+            CS_scan_single(ctx, channel, rank, shift);
+            printf("|\n");
+        break;
+        case 0:
+            full_clear_helper_arr();
+            printf("\nChange polarization|");
+            CS_scan_single(ctx, channel, rank, 1);
+            printf("|");
+            CS_scan_single(ctx, channel, rank, 0);
+            printf("|\n");
+        break;
+    };
     // Exit CS training
     ctx->cs.exit_training_mode(channel, rank);
 }
@@ -130,6 +183,10 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
             printf("CS:%2d Eye width:0 Failed\n", _rank);
             *success = 0;
             return;
+        }
+        if (right_side >= ctx->max_delay_taps) {
+            right_side -= ctx->max_delay_taps;
+            left_side -= ctx->max_delay_taps;
         }
 
         // Set up coarse delay adjustment until we get CA results
@@ -235,6 +292,10 @@ static void CA_training(training_ctx_t *const ctx , int32_t channel, uint8_t *su
                 printf("CA line:%2"PRId32" Eye width:0 Failed\n", address);
                 *success = 0;
                 return;
+            }
+            if (right_side >= ctx->max_delay_taps) {
+                right_side -= ctx->max_delay_taps;
+                left_side -= ctx->max_delay_taps;
             }
 
             if (right_side > ctx->ca.delays[channel][address][0])
@@ -1954,6 +2015,26 @@ static uint8_t read_module_slew_rates(uint8_t spd) {
 
     return buf & 0x3f;
 }
+
+static uint16_t read_module_rcd(uint8_t spd) {
+    uint8_t buf[2];
+
+    // Module channels count is stored in SPD[240:241]
+
+    if (!sdram_read_spd(spd, 240, &buf[0], 1, false)) {
+        printf("Couldn't read module slew rates from the SPD, defaulting to x%d.\n", 0);
+        return 0;
+    }
+    if (!sdram_read_spd(spd, 241, &buf[1], 1, false)) {
+        printf("Couldn't read module slew rates from the SPD, defaulting to x%d.\n", 0);
+        return 0;
+    }
+    uint16_t val;
+    val = *(uint16_t*)buf;
+    printf("RCD manufacturer: %x\n", val);
+
+    return val;
+}
 #endif // defined(CONFIG_HAS_I2C)
 
 training_ctx_t host_dram_ctx;
@@ -1990,6 +2071,13 @@ static void rcd_init(training_ctx_t *const ctx ) {
     rcd_set_dimm_operating_speed_band(0, 0, 2801);
     busy_wait_us(50);
     rcd_forward_all_dram_cmds(0, 0, false); // FIXME: this should forward for all RCDs
+    uint16_t manufacturer = read_module_rcd(0);
+    if (manufacturer == 0x3286) {
+        ctx->ca.check = dca_check_if_works_ddr_MONTAGE_QUIRK;
+    } else if (manufacturer == 0x9D86) {
+        ctx->cs.enter_training_mode = enter_qcstm_RAMBUS_QUIRK;
+        ctx->cs.check = qcs_check_if_works_RAMBUS_QUIRK;
+    }
 
     sdram_ddr5_cs_ca_training(ctx, -1);
 #ifndef KEEP_GOING_ON_DRAM_ERROR
@@ -2137,11 +2225,13 @@ void sdram_ddr5_flow(void) {
         printf("1N mode setup\n");
         init_sequence_1n(base_ctx->ranks);
     }
+    uint8_t reg;
     if (base_ctx->ranks > 1) {
         for (int channel = 0; channel < base_ctx->channels; channel++)
-            for (int rank = 1; rank < base_ctx->ranks; rank++) {
+            for (int rank = 0; rank < base_ctx->ranks; rank++) {
+                send_mrw(channel, rank, MODULE_BROADCAST, 34, (1 << 3) | 0);
                 send_mrw(channel, rank, MODULE_BROADCAST, 35, (0 << 3) | 0);
-                send_mpc(channel, rank, 0x58, 0);
+                send_mrw(channel, rank, MODULE_BROADCAST, 39, (4 << 3) | 4);
             }
     }
 

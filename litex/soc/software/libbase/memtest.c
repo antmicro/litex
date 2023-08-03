@@ -7,7 +7,7 @@
 #include <generated/soc.h>
 #include <generated/csr.h>
 
-//#define MEMTEST_BUS_DEBUG
+#define MEMTEST_BUS_DEBUG
 //#define MEMTEST_DATA_DEBUG
 //#define MEMTEST_ADDR_DEBUG
 

@@ -192,12 +192,15 @@ void qck_rst(int channel, int rank, int address);
 void qcs_inc(int channel, int rank, int address);
 void qcs_rst(int channel, int rank, int address);
 void enter_qcstm(int channel, int rank);
+void enter_qcstm_RAMBUS_QUIRK(int channel, int rank);
 void exit_qcstm(int channel, int rank);
 uint32_t qcs_check_if_works(int channel, int rank, int address, int shift_0101, int modules, int width);
+uint32_t qcs_check_if_works_RAMBUS_QUIRK(int channel, int rank, int address, int shift_0101, int modules, int width);
 
 void enter_dcatm(int channel, int rank);
 void exit_dcatm(int channel, int rank);
 int dca_check_if_works_ddr(int channel, int rank, int address, int shift_back);
+int dca_check_if_works_ddr_MONTAGE_QUIRK(int channel, int rank, int address, int shift_back);
 int dca_check_if_works_sdr(int channel, int rank, int address, int shift_back);
 
 void qca_inc(int channel, int rank, int address);

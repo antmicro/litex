@@ -2421,7 +2421,7 @@ static int alert_or_reduce(void) {
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    busy_wait_us(1);
+    busy_wait_us(10);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
     busy_wait_us(10);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
@@ -2432,7 +2432,7 @@ static int alert_and_reduce(void) {
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    busy_wait_us(1);
+    busy_wait_us(10);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
     busy_wait_us(10);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
@@ -2644,6 +2644,7 @@ void enter_qcstm(int channel, int rank) {
     enter_ca_pass(rcd);
     select_ca_pass(rank);
     enter_cstm(channel, rank);
+    exit_ca_pass(rcd);
 
     // we need to modify RW03
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
@@ -2652,7 +2653,33 @@ void enter_qcstm(int channel, int rank) {
     // QCSTM enable: RW03[0]
     // QCSTM rank selection: RW03[1]
     rw_data[3] &= ~(0b11); // clear setting bits
-    // rw_data[3] |= 0b1 | ((rank & 1) << 1); // set new bits
+    rw_data[3] |= 0b1 | ((rank & 1) << 1); // set new bits
+
+    // write RW03 setting back
+    ok &= sdram_rcd_write(rcd, 0, 0, 0, 3, &rw_data[3], 1, false);
+    busy_wait_us(10);
+    if (!ok)
+        printf("There was a problem with entering RCD->DRAM CS training (QCSTM)\n");
+}
+
+void enter_qcstm_RAMBUS_QUIRK(int channel, int rank) {
+    bool ok = true;
+
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[5];
+
+    enter_ca_pass(rcd);
+    select_ca_pass(rank);
+    enter_cstm(channel, rank);
+    exit_ca_pass(rcd);
+
+    // we need to modify RW03
+    ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, rw_data, false);
+
+    // in RW03 we select CS training mode
+    // QCSTM enable: RW03[0]
+    // QCSTM rank selection: RW03[1]
+    rw_data[3] &= ~(0b11); // clear setting bits
 
     // write RW03 setting back
     ok &= sdram_rcd_write(rcd, 0, 0, 0, 3, &rw_data[3], 1, false);
@@ -2687,14 +2714,14 @@ void exit_qcstm(int channel, int rank) {
     if (!ok)
         printf("There was a problem with exiting RCD->DRAM CS training (QCSTM)\n");
 
+    enter_ca_pass(rcd);
     select_ca_pass(rank);
     exit_cstm(channel, rank);
     exit_ca_pass(rcd);
 }
 
-static void qcs_sample_prep(int channel, int rank) {
-    cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 1, 0);
-    cmd_injector(channel, 0x5, 1<<rank, 0x1f, 0, 0, 1, 0);
+static void qcs_sample_prep(int channel) {
+    cmd_injector(channel, 0xf, 0, 0, 0, 0, 1, 0);
     store_continuous(channel);
     busy_wait_us(1);
 }
@@ -2725,7 +2752,47 @@ uint32_t qcs_check_if_works(int channel, int rank, int address, int shift_0101, 
     if (!ok)
         printf("There was a problem with shifting CS Q%cCS%c_n output delay\n", 'B', '0' + (rank & 1));
 
-    qcs_sample_prep(channel, rank);
+    qcs_sample_prep(channel);
+    for (int module = 0; module < modules; ++module) {
+        works |= or_sample_module(channel, module, width) << module;
+    }
+    return works;
+}
+
+static void qcs_sample_prep_RAMBUS_QUIRK(int channel, int rank) {
+    cmd_injector(channel, 0xf, 0, 0x1f, 0, 0, 1, 0);
+    cmd_injector(channel, 0x5, 1<<rank, 0x1f, 0, 0, 1, 0);
+    store_continuous(channel);
+    busy_wait_us(1);
+}
+
+uint32_t qcs_check_if_works_RAMBUS_QUIRK(int channel, int rank, int address, int shift_0101, int modules, int width) {
+    int works = 0;
+    bool ok = true;
+
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[5];
+    uint8_t delay;
+    uint8_t rw_number_base = (rank & 1) ? 0x18 : 0x14;
+    uint8_t rw_idx = (rank & 1) ? 0 : 3;
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, rw_number_base, rw_data, false);
+    delay = rw_data[rw_idx] & 0x3f;
+    delay |= shift_0101 << 6;
+
+    uint8_t rw_number = 0x17 + (rank & 1);
+    uint8_t rw_value = delay | (1 << 7); // enable delays
+
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+    busy_wait_us(10);
+    if (!ok)
+        printf("There was a problem with shifting CS Q%cCS%c_n output delay\n", 'A', '0' + (rank & 1));
+    rw_number += 2;
+    ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+    busy_wait_us(10);
+    if (!ok)
+        printf("There was a problem with shifting CS Q%cCS%c_n output delay\n", 'B', '0' + (rank & 1));
+
+    qcs_sample_prep_RAMBUS_QUIRK(channel, rank);
     for (int module = 0; module < modules; ++module) {
         works |= or_sample_module(channel, module, width) << module;
     }
@@ -2909,21 +2976,54 @@ static void dca_training_xor_sampling_edge(int channel, int rank, uint8_t edge) 
  */
 int dca_check_if_works_ddr(int channel, int rank, int address, int shift_back) {
     int ok = 1;
+    int temp;
 
     for(int edge=0; edge<2; ++edge) {
         // Test change from low to high
         dca_sample_prep(channel, rank, address + edge*7, 1, shift_back);
         dca_training_xor_sampling_edge(channel, rank, 0);
-        ok &= alert_and_reduce();
+        temp = alert_and_reduce();
+        ok &= temp;
         dca_training_xor_sampling_edge(channel, rank, 1<<edge);
-        ok &= alert_and_reduce();
+        temp = alert_and_reduce();
+        ok &= temp;
 
         // Test change from high to low
         dca_sample_prep(channel, rank, address + edge*7, 0, shift_back);
         dca_training_xor_sampling_edge(channel, rank, 0);
-        ok &= alert_and_reduce();
+        temp = alert_and_reduce();
+        ok &= temp;
         dca_training_xor_sampling_edge(channel, rank, 1<<edge);
-        ok &= alert_or_reduce();
+        temp = alert_or_reduce();
+        ok &= temp;
+    }
+    dca_training_xor_sampling_edge(channel, rank, 0); // restore default values
+
+    return ok;
+}
+
+int dca_check_if_works_ddr_MONTAGE_QUIRK(int channel, int rank, int address, int shift_back) {
+    int ok = 1;
+    int temp;
+
+    for(int edge=0; edge<2; ++edge) {
+        // Test change from low to high
+        dca_sample_prep(channel, rank, address + edge*7, 1, shift_back);
+        dca_training_xor_sampling_edge(channel, rank, 0);
+        temp = alert_and_reduce();
+        ok &= temp;
+        dca_training_xor_sampling_edge(channel, rank, 1<<(edge^1));
+        temp = alert_and_reduce();
+        ok &= temp;
+
+        // Test change from high to low
+        dca_sample_prep(channel, rank, address + edge*7, 0, shift_back);
+        dca_training_xor_sampling_edge(channel, rank, 0);
+        temp = alert_and_reduce();
+        ok &= temp;
+        dca_training_xor_sampling_edge(channel, rank, 1<<(edge^1));
+        temp = alert_or_reduce();
+        ok &= temp;
     }
     dca_training_xor_sampling_edge(channel, rank, 0); // restore default values
 
