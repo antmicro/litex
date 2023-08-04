@@ -85,6 +85,7 @@ typedef struct {
     int modules;
     bool CS_CA_successful;
     bool RDIMM;
+    uint16_t manufacturer;
 } training_ctx_t;
 
 // So far, all PHYs have support for single delay far all ranks,
@@ -127,6 +128,7 @@ typedef struct {
     .max_delay_taps = SDRAM_PHY_DELAYS,       \
     .modules = SDRAM_PHY_MODULES/CHANNELS,    \
     .RDIMM = false,                           \
+    .manufacturer = 0,                        \
 }
 
 // die_width must be populated from SPD
@@ -168,6 +170,7 @@ typedef struct {
     .max_delay_taps = SDRAM_PHY_DELAYS,      \
     .modules = 1,                            \
     .RDIMM = true,                           \
+    .manufacturer = 0,                       \
 }
 
 #define DEFAULT_RCD_DRAM {                  \
@@ -202,6 +205,7 @@ typedef struct {
     .max_delay_taps = 64,                   \
     .modules = SDRAM_PHY_MODULES/CHANNELS,  \
     .RDIMM = true,                          \
+    .manufacturer = 0,                      \
 }
 
 

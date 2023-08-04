@@ -184,7 +184,7 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
             *success = 0;
             return;
         }
-        if (right_side >= ctx->max_delay_taps) {
+        if ((right_side + left_side) / 2 >= ctx->max_delay_taps) {
             right_side -= ctx->max_delay_taps;
             left_side -= ctx->max_delay_taps;
         }
@@ -293,7 +293,7 @@ static void CA_training(training_ctx_t *const ctx , int32_t channel, uint8_t *su
                 *success = 0;
                 return;
             }
-            if (right_side >= ctx->max_delay_taps) {
+            if ((right_side + left_side) / 2 >= ctx->max_delay_taps) {
                 right_side -= ctx->max_delay_taps;
                 left_side -= ctx->max_delay_taps;
             }
@@ -2071,12 +2071,9 @@ static void rcd_init(training_ctx_t *const ctx ) {
     rcd_set_dimm_operating_speed_band(0, 0, 2801);
     busy_wait_us(50);
     rcd_forward_all_dram_cmds(0, 0, false); // FIXME: this should forward for all RCDs
-    uint16_t manufacturer = read_module_rcd(0);
-    if (manufacturer == 0x3286) {
+    ctx->manufacturer = read_module_rcd(0);
+    if (ctx->manufacturer == 0x3286) {
         ctx->ca.check = dca_check_if_works_ddr_MONTAGE_QUIRK;
-    } else if (manufacturer == 0x9D86) {
-        ctx->cs.enter_training_mode = enter_qcstm_RAMBUS_QUIRK;
-        ctx->cs.check = qcs_check_if_works_RAMBUS_QUIRK;
     }
 
     sdram_ddr5_cs_ca_training(ctx, -1);
@@ -2175,10 +2172,15 @@ void sdram_ddr5_flow(void) {
         base_ctx = &rcd_dram_ctx;
         base_ctx->rate = host_rcd_ctx.rate;
         base_ctx->CS_CA_successful &= host_rcd_ctx.CS_CA_successful;
+        base_ctx->manufacturer = host_rcd_ctx.manufacturer;
 #ifndef KEEP_GOING_ON_DRAM_ERROR
         if(!base_ctx->CS_CA_successful)
             return;
 #endif // KEEP_GOING_ON_DRAM_ERROR
+        if (base_ctx->manufacturer == 0x9D86) {
+            base_ctx->cs.enter_training_mode = enter_qcstm_RAMBUS_QUIRK;
+            base_ctx->cs.check = qcs_check_if_works_RAMBUS_QUIRK;
+        }
     } else {
         reset_sequence(base_ctx->ranks);
     }
