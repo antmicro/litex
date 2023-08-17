@@ -781,7 +781,8 @@ class SoCController(LiteXModule):
             self._reset = CSRStorage(fields=[
                 CSRField("soc_rst", size=1, offset=0, pulse=True, description="""Write `1` to this register to reset the full SoC (Pulse Reset)"""),
                 CSRField("cpu_rst", size=1, offset=1,             description="""Write `1` to this register to reset the CPU(s) of the SoC (Hold Reset)"""),
-            ])
+                ], name="_reset"
+            )
         if with_scratch:
             self._scratch = CSRStorage(32, reset=0x12345678, description="""
                 Use this register as a scratch space to verify that software read/write accesses
