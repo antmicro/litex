@@ -49,7 +49,7 @@ class RemoteClient(EtherboneIPC, CSRBuilder):
             return
         self.socket = socket.create_connection((self.host, self.port), 5.0)
         self.socket.settimeout(5.0)
-        self._receive_server_info()
+#        self._receive_server_info()
 
     def close(self):
         if not hasattr(self, "socket"):

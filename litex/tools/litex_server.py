@@ -108,7 +108,7 @@ class RemoteServer(EtherboneIPC):
     def _serve_thread(self):
         while True:
             client_socket, addr = self.socket.accept()
-            self._send_server_info(client_socket)
+#            self._send_server_info(client_socket)
             print("Connected with " + addr[0] + ":" + str(addr[1]))
             try:
                 # Serve Etherbone reads/writes.
