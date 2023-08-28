@@ -461,9 +461,9 @@ static void netboot_from_json(const char * filename, unsigned int ip, unsigned s
 	uint8_t count;
 
 	/* FIXME: modify/increase if too limiting */
-	char json_buffer[1024];
-	char json_name[32];
-	char json_value[32];
+	char json_buffer[4048];
+	char json_name[64];
+	char json_value[64];
 
 	unsigned long boot_r1 = 0;
 	unsigned long boot_r2 = 0;
