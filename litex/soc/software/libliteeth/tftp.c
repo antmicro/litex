@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include <libbase/progress.h>
+#include <libbase/crc.h>
 
 #include <libliteeth/udp.h>
 #include <libliteeth/tftp.h>
@@ -98,6 +99,7 @@ static void rx_callback(uint32_t src_ip, uint16_t src_port,
 	uint16_t block;
 	int i;
 	int offset;
+	unsigned int crc_recieved, crc_written;
 
 	if(length < 4) return;
 	if(dst_port != PORT_IN) return;
@@ -118,11 +120,19 @@ static void rx_callback(uint32_t src_ip, uint16_t src_port,
 	if(opcode == TFTP_DATA) { /* Data */
 		length -= 4;
 		offset = (block-1)*BLOCK_SIZE;
+
+		crc_recieved = crc32(data + 4, length);
+
 		for(i=0;i<length;i++)
 			dst_buffer[offset+i] = data[i+4];
 		total_length += length;
 		if(length < BLOCK_SIZE)
 			transfer_finished = 1;
+
+		crc_written = crc32(&dst_buffer[offset], length);
+
+		if (crc_recieved != crc_written)
+			printf("\nCHUNKS DIFFER\n From %x to %x. Expected %u got %u \n", offset, offset+length, crc_recieved, crc_written);
 
 		packet_data = udp_get_tx_buffer();
 		length = format_ack(packet_data, block);

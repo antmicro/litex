@@ -112,7 +112,7 @@ class VexRiscvSMP(CPU):
             VexRiscvSMP.with_rvc = True
         if(args.dtlb_size): VexRiscvSMP.dtlb_size = int(args.dtlb_size)
         if(args.itlb_size): VexRiscvSMP.itlb_size = int(args.itlb_size)
-
+        print("Vexriscv SMP args:\n", args)
     # ABI.
     @staticmethod
     def get_abi():

@@ -8,12 +8,12 @@
 #include <generated/csr.h>
 
 #define MEMTEST_BUS_DEBUG
-//#define MEMTEST_DATA_DEBUG
+#define MEMTEST_DATA_DEBUG
 //#define MEMTEST_ADDR_DEBUG
 
 // Limits the number of errors printed, so that we can still access bios console
 #ifndef MEMTEST_DEBUG_MAX_ERRORS
-#define MEMTEST_DEBUG_MAX_ERRORS 400
+#define MEMTEST_DEBUG_MAX_ERRORS 128
 #endif
 // Retry reading when an error occurs. Allows to spot if errors happen during read or write.
 #ifndef MEMTEST_DATA_RETRIES
