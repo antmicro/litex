@@ -333,10 +333,11 @@ const char *filename, char *buffer)
 
 	printf("Copying %s to %p... ", filename, buffer);
 	size = tftp_get(ip, server_port, filename, buffer);
-	crc = crc32(buffer, size);
-	printf("CRC for %s in RAM at %p size %x: %u\n", filename, buffer, size, crc);
-	if(size > 0)
+	if(size > 0) {
+		crc = crc32((unsigned char *)buffer, size);
+		printf("CRC for %s in RAM at %p size %x: %u\n", filename, buffer, size, crc);
 		printf("(%d bytes)", size);
+	}
 	printf("\n");
 	return size;
 }

@@ -99,7 +99,7 @@ static void rx_callback(uint32_t src_ip, uint16_t src_port,
 	uint16_t block;
 	int i;
 	int offset;
-	unsigned int crc_recieved, crc_written;
+	unsigned int crc_recieved = 0, crc_written = 0;
 
 	if(length < 4) return;
 	if(dst_port != PORT_IN) return;
@@ -121,7 +121,8 @@ static void rx_callback(uint32_t src_ip, uint16_t src_port,
 		length -= 4;
 		offset = (block-1)*BLOCK_SIZE;
 
-		crc_recieved = crc32(data + 4, length);
+		if (length > 0)
+			crc_recieved = crc32((unsigned char *)data + 4, length);
 
 		for(i=0;i<length;i++)
 			dst_buffer[offset+i] = data[i+4];
@@ -129,7 +130,8 @@ static void rx_callback(uint32_t src_ip, uint16_t src_port,
 		if(length < BLOCK_SIZE)
 			transfer_finished = 1;
 
-		crc_written = crc32(&dst_buffer[offset], length);
+		if (length > 0)
+			crc_written = crc32((unsigned char *)dst_buffer + offset, length);
 
 		if (crc_recieved != crc_written)
 			printf("\nCHUNKS DIFFER\n From %x to %x. Expected %u got %u \n", offset, offset+length, crc_recieved, crc_written);
