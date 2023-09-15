@@ -467,9 +467,9 @@ void eth_init(void)
 #ifdef CSR_ETHPHY_CRG_RESET_ADDR
 #ifndef ETH_PHY_NO_RESET
 	ethphy_crg_reset_write(1);
-	busy_wait(200);
+//	busy_wait(200);
 	ethphy_crg_reset_write(0);
-	busy_wait(200);
+//	busy_wait(200);
 #endif
 #endif
 }
