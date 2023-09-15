@@ -1208,9 +1208,9 @@ int sdram_init(void) {
 	sdram_software_control_on();
 #if CSR_DDRPHY_RST_ADDR
 	ddrphy_rst_write(1);
-	cdelay(1000);
+	busy_wait_us(10);
 	ddrphy_rst_write(0);
-	cdelay(1000);
+	busy_wait_us(10);
 #endif // CSR_DDRPHY_RST_ADDR
 
 #ifdef CSR_DDRCTRL_BASE

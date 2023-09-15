@@ -498,7 +498,7 @@ static void CK_CS_CA_finalize_timings(training_ctx_t *const ctx , int channel) {
     for (cntdly = 0; cntdly < new_ckdly; ++cntdly) {
         ctx->ck.inc_dly(channel, 0, 0);
     }
-    busy_wait(10);
+    busy_wait_us(10);
 
     // Now that CK is shifted, we can set new delays calculated
     // in `CS_CA_calculate_midpoints` adjusted by the clock offset,
@@ -766,7 +766,11 @@ static int rd_cycle_dly_idly_check_if_works(int channel, int rank, int module, i
 
     // Check if LFSR readout works
     for (seed = 0; seed < seeds_count && works; ++seed) {
+#ifndef DDR5_TRAINING_SIM
         for (int i = 0 ; i < 16 && works; ++i) {
+#else
+        for (int i = 0 ; i < 1 && works; ++i) {
+#endif // DDR5_TRAINING_SIM
             /* Setup MRs */
             send_mrw(channel, rank, module, 25, 1); // select LFSR mode
             send_mrw(channel, rank, module, 26, seeds0[seed]);
@@ -883,7 +887,7 @@ static bool read_training_data_scan(int channel, int rank, int module, int width
             if (works == 3 && eye.state == BEFORE) {
                 eye.start = rd_cycle_dly * max_delay_taps + idly;
                 eye.state = INSIDE;
-            } else if (!works && eye.state == INSIDE) {
+            } else if (works != 3 && eye.state == INSIDE) {
                 eye.end = rd_cycle_dly * max_delay_taps + idly;
                 eye.state = AFTER;
             }
@@ -1139,7 +1143,11 @@ static int wltm_align_external_cycle(int channel, int rank, int module, int widt
 
         // Check multiple times, as we can be on the edge of transition
         // Make sure we aren't in meta stable delay
+#ifndef DDR5_TRAINING_SIM
         for (int i = 0; i < 16; i++) {
+#else
+        for (int i = 0; i < 1; i++) {
+#endif // DDR5_TRAINING_SIM
             int temp = wr_dqs_check_if_works(channel, rank, module, width);
             printf("%d", temp);
             works &= temp;
@@ -1225,7 +1233,11 @@ static void wltm_align_internal_cycle(int channel, int rank, int module, int wid
         works = 1;
         // Check multiple times, as we can be on the edge of transition
         // Make sure we aren't in meta stable delay
+#ifndef DDR5_TRAINING_SIM
         for (int i = 0; i < 16 && works; i++) {
+#else
+        for (int i = 0; i < 1 && works; i++) {
+#endif // DDR5_TRAINING_SIM
             works &= wr_dqs_check_if_works(channel, rank, module, width);
         }
 
@@ -1484,7 +1496,11 @@ static int write_lfsr_check(training_ctx_t *const ctx , int channel, int rank, i
         else
             seed = seeds1[cnt_seed - seeds_count];
 
+#ifndef DDR5_TRAINING_SIM
         for (int i = 0; i < 8; ++i) {
+#else
+        for (int i = 0; i < 1; ++i) {
+#endif // DDR5_TRAINING_SIM
             setup_lfsr_write_data(ctx, seed, channel, module, 0);
             send_write(channel, rank);
             send_read(channel, rank);
@@ -1626,6 +1642,9 @@ static eye_t write_data_scan(training_ctx_t *const ctx , int channel, int rank, 
 }
 
 static int moduel_dq_vref_scan(training_ctx_t *const ctx, int channel, int rank, int module, int wl_cycle) {
+#ifdef DDR5_TRAINING_SIM
+    return 0;
+#endif
     int eye_width_range [2][SDRAM_PHY_DELAYS];
     int vref, _width;
     int best_vref = -1;
@@ -2067,7 +2086,9 @@ static void rcd_init(training_ctx_t *const ctx ) {
         ctx->ca.check = dca_check_if_works_sdr;
     rcd_set_dimm_operating_speed(0, 0, 2801);
     rcd_set_termination_and_vref(0);
+#ifndef SKIP_RESET_SEQUENCE
     reset_sequence(ctx->ranks);
+#endif // SKIP_RESET_SEQUENCE
     rcd_set_dimm_operating_speed_band(0, 0, 2801);
     busy_wait_us(50);
     rcd_forward_all_dram_cmds(0, 0, false); // FIXME: this should forward for all RCDs
@@ -2182,10 +2203,14 @@ void sdram_ddr5_flow(void) {
             base_ctx->cs.check = qcs_check_if_works_RAMBUS_QUIRK;
         }
     } else {
+#ifndef SKIP_RESET_SEQUENCE
         reset_sequence(base_ctx->ranks);
+#endif // SKIP_RESET_SEQUENCE
     }
 #else
+#ifndef SKIP_RESET_SEQUENCE
     reset_sequence(base_ctx->ranks);
+#endif // SKIP_RESET_SEQUENCE
 #endif // defined(CONFIG_HAS_I2C)
 
     dram_start_sequence(base_ctx->ranks);
@@ -2193,20 +2218,32 @@ void sdram_ddr5_flow(void) {
     if (is_rdimm) {
         single_cycle_MPC = 0;
         rcd_forward_all_dram_cmds(0, 0, true); // FIXME: this should forward for all RCDs
+#ifndef SKIP_MRS_SEQUENCE
         enter_ca_pass(0); // FIXME: handle multiple RCDs
         for (int rank = 0; rank < base_ctx->ranks; ++rank) {
             select_ca_pass(rank);
             setup_dram_mrs_sequence(rank);
         }
         exit_ca_pass(0); // FIXME: handle multiple RCDs
+#endif // SKIP_MRS_SEQUENCE
+#ifndef SKIP_CSCA_TRAINING
         for (int channel = 0; channel < base_ctx->channels; ++channel) {
             sdram_ddr5_cs_ca_training(base_ctx, channel);
         }
+#endif // SKIP_CSCA_TRAINING
     } else {
+#ifndef SKIP_MRS_SEQUENCE
         for (int rank = 0; rank < base_ctx->ranks; ++rank)
             setup_dram_mrs_sequence(rank);
+#endif // SKIP_MRS_SEQUENCE
+#ifndef SKIP_CSCA_TRAINING
         sdram_ddr5_cs_ca_training(base_ctx, -1);
+#endif // SKIP_CSCA_TRAINING
     }
+#ifdef SKIP_CSCA_TRAINING
+        disable_dfi_2n_mode();
+#endif // SKIP_CSCA_TRAINING
+
 #ifndef KEEP_GOING_ON_DRAM_ERROR
     if(!base_ctx->CS_CA_successful)
         return;

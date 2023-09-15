@@ -2017,7 +2017,7 @@ void clear_phy_fifos(int channel) {
 #else
     ddrphy_CSRModule_discard_rd_fifo_write(1);
 #endif
-    busy_wait(5);
+    busy_wait_us(5);
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         ddrphy_CSRModule_B_discard_rd_fifo_write(0);
