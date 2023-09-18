@@ -73,9 +73,9 @@ struct arp_frame {
 	unsigned char protosize;
 	unsigned short opcode;
 	unsigned char sender_mac[6];
-	unsigned int sender_ip;
+	uint32_t sender_ip;
 	unsigned char target_mac[6];
-	unsigned int target_ip;
+	uint32_t target_ip;
 	unsigned char padding[18];
 } __attribute__((packed));
 
@@ -93,13 +93,13 @@ struct ip_header {
 	unsigned char ttl;
 	unsigned char proto;
 	unsigned short checksum;
-	unsigned int src_ip;
-	unsigned int dst_ip;
+	uint32_t src_ip;
+	uint32_t dst_ip;
 } __attribute__((packed));
 
 struct udp_header {
-	unsigned short src_port;
-	unsigned short dst_port;
+	uint16_t src_port;
+	uint16_t dst_port;
 	unsigned short length;
 	unsigned short checksum;
 } __attribute__((packed));
@@ -138,7 +138,7 @@ static void send_packet(void)
 
 	/* fill txbuffer */
 #ifndef HW_PREAMBLE_CRC
-	unsigned int crc;
+	uint32_t crc;
 	crc = crc32(&txbuffer->raw[8], txlen-8);
 	txbuffer->raw[txlen  ] = (crc & 0xff);
 	txbuffer->raw[txlen+1] = (crc & 0xff00) >> 8;
@@ -166,9 +166,9 @@ static void send_packet(void)
 }
 
 static unsigned char my_mac[6];
-static unsigned int my_ip;
+static uint32_t my_ip;
 
-void udp_set_ip(unsigned int ip)
+void udp_set_ip(uint32_t ip)
 {
 	my_ip = ip;
 }
@@ -182,7 +182,7 @@ void udp_set_mac(const unsigned char *macaddr)
 
 /* ARP cache - one entry only */
 static unsigned char cached_mac[6];
-static unsigned int cached_ip;
+static uint32_t cached_ip;
 
 static void process_arp(void)
 {
@@ -231,7 +231,7 @@ static void process_arp(void)
 
 static const unsigned char broadcast[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-int udp_arp_resolve(unsigned int ip)
+int udp_arp_resolve(uint32_t ip)
 {
 	struct arp_frame *arp;
 	int i;
@@ -308,14 +308,14 @@ void *udp_get_tx_buffer(void)
 }
 
 struct pseudo_header {
-	unsigned int src_ip;
-	unsigned int dst_ip;
+	uint32_t src_ip;
+	uint32_t dst_ip;
 	unsigned char zero;
 	unsigned char proto;
 	unsigned short length;
 } __attribute__((packed));
 
-int udp_send(unsigned short src_port, unsigned short dst_port, unsigned int length)
+int udp_send(uint16_t src_port, uint16_t dst_port, unsigned int length)
 {
 	struct pseudo_header h;
 	unsigned int r;
@@ -428,7 +428,7 @@ static void process_frame(void)
 	else if(ntohs(rxbuffer->frame.eth_header.ethertype) == ETHERTYPE_IP) process_ip();
 }
 
-void udp_start(const unsigned char *macaddr, unsigned int ip)
+void udp_start(const unsigned char *macaddr, uint32_t ip)
 {
 	int i;
 	ethmac_sram_reader_ev_pending_write(ETHMAC_EV_SRAM_READER);

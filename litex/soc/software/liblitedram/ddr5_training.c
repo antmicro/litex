@@ -135,7 +135,7 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
     ctx->cs.rst_dly(channel, rank, 0);
 }
 
-static int CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank) {
+static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank) {
     int shift = 1;
     full_clear_helper_arr();
     ctx->cs.rst_dly(channel, rank, 0);
