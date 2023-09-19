@@ -498,7 +498,9 @@ static void CK_CS_CA_finalize_timings(training_ctx_t *const ctx , int channel) {
     for (cntdly = 0; cntdly < new_ckdly; ++cntdly) {
         ctx->ck.inc_dly(channel, 0, 0);
     }
-    busy_wait_us(10);
+#ifndef DDR5_TRAINING_SIM
+    busy_wait(10);
+#endif // DDR5_TRAINING_SIM
 
     // Now that CK is shifted, we can set new delays calculated
     // in `CS_CA_calculate_midpoints` adjusted by the clock offset,
@@ -1497,7 +1499,7 @@ static int write_lfsr_check(training_ctx_t *const ctx , int channel, int rank, i
             seed = seeds1[cnt_seed - seeds_count];
 
 #ifndef DDR5_TRAINING_SIM
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < 16; ++i) {
 #else
         for (int i = 0; i < 1; ++i) {
 #endif // DDR5_TRAINING_SIM
@@ -2264,15 +2266,6 @@ void sdram_ddr5_flow(void) {
         printf("1N mode setup\n");
         init_sequence_1n(base_ctx->ranks);
     }
-    uint8_t reg;
-    if (base_ctx->ranks > 1) {
-        for (int channel = 0; channel < base_ctx->channels; channel++)
-            for (int rank = 0; rank < base_ctx->ranks; rank++) {
-                send_mrw(channel, rank, MODULE_BROADCAST, 34, (1 << 3) | 0);
-                send_mrw(channel, rank, MODULE_BROADCAST, 35, (0 << 3) | 0);
-                send_mrw(channel, rank, MODULE_BROADCAST, 39, (4 << 3) | 4);
-            }
-    }
 
     single_cycle_MPC = 1<<4;
     for (int channel = 0; channel < base_ctx->channels; channel++)
@@ -2285,6 +2278,15 @@ void sdram_ddr5_flow(void) {
 #ifndef KEEP_GOING_ON_DRAM_ERROR
         return;
 #endif // KEEP_GOING_ON_DRAM_ERROR
+    }
+
+    // Disable RTT on unused rank
+    if (base_ctx->ranks > 1) {
+        for (int channel = 0; channel < base_ctx->channels; channel++)
+            for (int rank = 1; rank < base_ctx->ranks; rank++) {
+                send_mpc(channel, rank, 0x50, 0);
+                send_mpc(channel, rank, 0x58, 0);
+            }
     }
 
 #if defined(CONFIG_HAS_I2C)
