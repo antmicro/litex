@@ -1550,8 +1550,21 @@ void setup_enumerate(int channel, int rank, int module, int width, int verbose) 
             printf("\n");
         }
     }
+    // Start DQS toggling before Enter PDA Enum MPC
+    cmd_injector(channel, 0xf, 0, 0xf, 1, 0, 0, 0);
+    store_continuous(channel);
+    // Enter PDA Enumerate Programming Mode
+    send_mpc(channel, rank, 0xB, 1);
     busy_wait_us(1);
     send_mpc(channel, rank, (0x60 | (module & 0xf)), 1);
+    busy_wait_us(1);
+    // Exit PDA Enumerate Programming Mode
+    send_mpc(channel, rank, 0xA, 1);
+    busy_wait_us(1);
+    // Stop DQS toggling after Exit PDA Enum MPC
+    cmd_injector(channel, 0xf,  0, 0, 0, 0, 0, 0);
+    store_continuous(channel);
+
     for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
         for (i = 0; i < 8; ++i)
             set_data_module_phase(channel, module_, width, i, 0xffff);
@@ -1607,6 +1620,23 @@ void send_mrw_rcd(int channel, int rank, int reg, int value) {
     cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
     issue_single(channel);
     busy_wait_us(1);
+    cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
+}
+
+void send_mrw_no_mpc(int channel, int rank, int reg, int value) {
+    cmd_injector(channel, 1<<0, 1<<rank, 0x5 | (reg<<5), 0, 0, 0, 1);
+    if (N2_mode)
+        cmd_injector(channel, 1<<1, 0, 0x5 | (reg<<5), 0, 0, 0, 1);
+    else
+        cmd_injector(channel, 1<<1, 0, value, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<2, 0, value, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<3, 0, value, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<4, 0, 0, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<5, 0, 0, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<6, 0, 0, 0, 0, 0, 1);
+    cmd_injector(channel, 1<<7, 0, 0, 0, 0, 0, 1);
+    issue_single(channel);
+    busy_wait_us(5);
     cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
 }
 
@@ -1897,6 +1927,8 @@ void exit_catm(int channel, int rank) {
     cmd_injector(channel, 0xff, 1<<rank, 0x1f, 0, 0, 0, 1);
     issue_single(channel);
     busy_wait_us(1);
+    cmd_injector(channel, 0xf, 0, 0, 0, 0, 0, 0);
+    store_continuous(channel);
     cmd_injector(channel, 0xff, 0, 0, 0, 0, 0, 1);
 }
 

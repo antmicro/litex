@@ -184,7 +184,8 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
             *success = 0;
             return;
         }
-        if ((right_side + left_side) / 2 >= ctx->max_delay_taps) {
+        // When delay is around 0 delay, allow for small negative bias
+        if ((right_side + left_side) / 2 >= ctx->max_delay_taps - (ctx->max_delay_taps/32)) {
             right_side -= ctx->max_delay_taps;
             left_side -= ctx->max_delay_taps;
         }
@@ -293,10 +294,12 @@ static void CA_training(training_ctx_t *const ctx , int32_t channel, uint8_t *su
                 *success = 0;
                 return;
             }
-            if ((right_side + left_side) / 2 >= ctx->max_delay_taps) {
-                right_side -= ctx->max_delay_taps;
-                left_side -= ctx->max_delay_taps;
-            }
+            // First ctx->max_delay_taps taps are in previous cs_n,
+            // so we need to always subtract ctx->max_delay_taps from
+            // answare
+            right_side -= ctx->max_delay_taps;
+            left_side -= ctx->max_delay_taps;
+            printf("CA[%"PRId32"] %d:%d\n", address, right_side, left_side);
 
             if (right_side > ctx->ca.delays[channel][address][0])
                 ctx->ca.delays[channel][address][0] = right_side;
@@ -585,8 +588,6 @@ static void sdram_ddr5_module_enumerate(int rank, int width, int channels, int m
     printf("Enumerating rank:%2d\n", rank);
     for (channel = 0; channel < channels; channel++) {
         printf("\tEnumerating subchannel:%c\n", (char)('A'+channel));
-        // Enter PDA Enumerate Programming Mode
-        send_mpc(channel, rank, 0xB, 1);
         for (module = 0; module < modules; module++) {
             printf("\t\tmodule:%2d\n", module);
 #ifndef CA_INFO_DDR5
@@ -595,11 +596,6 @@ static void sdram_ddr5_module_enumerate(int rank, int width, int channels, int m
             setup_enumerate(channel, rank, module, width, 1);
 #endif // CA_INFO_DDR5
         }
-        // Exit PDA Enumerate Programming Mode
-        send_mpc(channel, rank, 0xA, 1);
-        busy_wait_us(1);
-        send_mpc(channel, rank, 0xA, 0);
-        busy_wait_us(1);
     }
     enumerated = 1;
 }
@@ -2154,6 +2150,7 @@ static void rcd_init(training_ctx_t *const ctx ) {
  * training context.
  */
 void sdram_ddr5_flow(void) {
+    int use_1n_mode = 0;
     single_cycle_MPC = 0;
     use_internal_write_timing = 0;
     enumerated = 0;
@@ -2242,8 +2239,9 @@ void sdram_ddr5_flow(void) {
         sdram_ddr5_cs_ca_training(base_ctx, -1);
 #endif // SKIP_CSCA_TRAINING
     }
+
 #ifdef SKIP_CSCA_TRAINING
-        disable_dfi_2n_mode();
+    disable_dfi_2n_mode();
 #endif // SKIP_CSCA_TRAINING
 
 #ifndef KEEP_GOING_ON_DRAM_ERROR
@@ -2251,11 +2249,32 @@ void sdram_ddr5_flow(void) {
         return;
 #endif // KEEP_GOING_ON_DRAM_ERROR
 
-    for (int channel = 0; channel < base_ctx->channels; channel++) {
+    use_1n_mode = 1<<2;
+    if(is_rdimm) {
+        enter_ca_pass(0);
         for (int rank = 0; rank < base_ctx->ranks; rank++) {
-            if (base_ctx->CS_CA_successful && base_ctx->rate == DDR) {
-                disable_dram_2n_mode(channel, rank);
+            select_ca_pass(rank);
+            for (int channel = 0; channel < base_ctx->channels; channel++) {
+                if (base_ctx->CS_CA_successful && base_ctx->rate == DDR) {
+                    disable_dram_2n_mode(channel, rank);
+                }
             }
+        }
+        exit_ca_pass(0);
+    } else {
+        for (int rank = 0; rank < base_ctx->ranks; rank++) {
+            for (int channel = 0; channel < base_ctx->channels; channel++) {
+                if (base_ctx->CS_CA_successful && base_ctx->rate == DDR) {
+                    disable_dram_2n_mode(channel, rank);
+                }
+            }
+        }
+    }
+
+    single_cycle_MPC = 1<<4;
+    for (int rank = 0; rank < base_ctx->ranks; rank++) {
+        for (int channel = 0; channel < base_ctx->channels; channel++) {
+            send_mrw_no_mpc(channel, rank, 2, 0|use_internal_write_timing|single_cycle_MPC|use_1n_mode);
         }
     }
 
@@ -2267,10 +2286,10 @@ void sdram_ddr5_flow(void) {
         init_sequence_1n(base_ctx->ranks);
     }
 
-    single_cycle_MPC = 1<<4;
+    // Disable DQ RTT during enumerate
     for (int channel = 0; channel < base_ctx->channels; channel++)
         for (int rank = 0; rank < base_ctx->ranks; rank++)
-            send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
+            send_mpc(channel, rank, 0x58, 0);
 
     for (int rank = 0; rank < base_ctx->ranks; ++rank) {
         if(dram_enumerate(base_ctx, rank))
@@ -2279,6 +2298,11 @@ void sdram_ddr5_flow(void) {
         return;
 #endif // KEEP_GOING_ON_DRAM_ERROR
     }
+
+    // Enable DQ RTT after enumerate
+    for (int channel = 0; channel < base_ctx->channels; channel++)
+        for (int rank = 1; rank < base_ctx->ranks; rank++)
+            send_mpc(channel, rank, 0x58, 0x4);
 
     // Disable RTT on unused rank
     if (base_ctx->ranks > 1) {

@@ -133,6 +133,7 @@ void setup_enumerate(int channel, int rank, int module, int width, int verbose);
 bool check_enumerate(int channel, int rank, int module, int width, int verbose);
 void send_mpc(int channel, int rank, int cmd, int wrdata_active);
 void send_mrw_rcd(int channel, int rank, int reg, int value);
+void send_mrw_no_mpc(int channel, int rank, int reg, int value);
 void send_mrw(int channel, int rank, int module, int reg, int value);
 void send_mrr(int channel, int rank, int reg);
 void send_wleveling_write(int channel, int rank);
