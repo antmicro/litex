@@ -86,6 +86,8 @@ typedef struct {
     bool CS_CA_successful;
     bool RDIMM;
     uint16_t manufacturer;
+    uint8_t device_type;
+    uint8_t device_rev;
 } training_ctx_t;
 
 // So far, all PHYs have support for single delay far all ranks,

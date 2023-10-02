@@ -2033,17 +2033,17 @@ static uint8_t read_module_slew_rates(uint8_t spd) {
     return buf & 0x3f;
 }
 
-static uint16_t read_module_rcd(uint8_t spd) {
+static uint16_t read_module_rcd_manufacturer(uint8_t spd) {
     uint8_t buf[2];
 
     // Module channels count is stored in SPD[240:241]
 
     if (!sdram_read_spd(spd, 240, &buf[0], 1, false)) {
-        printf("Couldn't read module slew rates from the SPD, defaulting to x%d.\n", 0);
+        printf("Couldn't read module RCD manufacturer from the SPD, defaulting to x%d.\n", 0);
         return 0;
     }
     if (!sdram_read_spd(spd, 241, &buf[1], 1, false)) {
-        printf("Couldn't read module slew rates from the SPD, defaulting to x%d.\n", 0);
+        printf("Couldn't read module RCD manufacturer from the SPD, defaulting to x%d.\n", 0);
         return 0;
     }
     uint16_t val;
@@ -2051,6 +2051,34 @@ static uint16_t read_module_rcd(uint8_t spd) {
     printf("RCD manufacturer: %x\n", val);
 
     return val;
+}
+
+static uint8_t read_module_rcd_device_type(uint8_t spd) {
+    uint8_t buf;
+
+    // Module channels count is stored in SPD[240:241]
+
+    if (!sdram_read_spd(spd, 242, &buf, 1, false)) {
+        printf("Couldn't read module RCD device type from the SPD, defaulting to x%d.\n", 0);
+        return 0;
+    }
+    printf("RCD type: %x\n", buf);
+
+    return buf;
+}
+
+static uint8_t read_module_rcd_device_rev(uint8_t spd) {
+    uint8_t buf;
+
+    // Module channels count is stored in SPD[240:241]
+
+    if (!sdram_read_spd(spd, 243, &buf, 1, false)) {
+        printf("Couldn't read module RCD device rev from the SPD, defaulting to x%d.\n", 0);
+        return 0;
+    }
+    printf("RCD rev: %x\n", buf);
+
+    return buf;
 }
 #endif // defined(CONFIG_HAS_I2C)
 
@@ -2090,8 +2118,10 @@ static void rcd_init(training_ctx_t *const ctx ) {
     rcd_set_dimm_operating_speed_band(0, 0, 2801);
     busy_wait_us(50);
     rcd_forward_all_dram_cmds(0, 0, false); // FIXME: this should forward for all RCDs
-    ctx->manufacturer = read_module_rcd(0);
-    if (ctx->manufacturer == 0x3286) {
+    ctx->manufacturer = read_module_rcd_manufacturer(0);
+    ctx->device_type  = read_module_rcd_device_type(0);
+    ctx->device_rev   = read_module_rcd_device_rev(0);
+    if (ctx->manufacturer == 0x3286 && ctx->device_type == 0x80) {
         ctx->ca.check = dca_check_if_works_ddr_MONTAGE_QUIRK;
     }
 
