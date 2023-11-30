@@ -9,6 +9,7 @@
 #include <generated/soc.h>
 #include <generated/csr.h>
 #include <generated/mem.h>
+#include <generated/sdram_phy.h>
 #include <libbase/i2c.h>
 
 #include <liblitedram/sdram.h>
@@ -386,6 +387,50 @@ static void sdram_mr_write_handler(int nb_params, char **params)
 	sdram_software_control_off();
 }
 define_command(sdram_mr_write, sdram_mr_write_handler, "Write SDRAM Mode Register", LITEDRAM_CMDS);
+
+#ifdef SDRAM_PHY_DDR5
+/**
+ * Command "sdram_mr_read"
+ *
+ * Read SDRAM Mode Register (only DDR5)
+ *
+ */
+static void sdram_mr_read_handler(int nb_params, char **params)
+{
+	char *c;
+	uint8_t channel;
+	uint8_t device;
+	uint8_t reg;
+
+	if (nb_params < 3) {
+		printf("sdram_mr_read <channel> <device> <reg>");
+		return;
+	}
+
+	channel = strtoul(params[0], &c, 0);
+	if (*c != 0 || channel > 1) {
+		printf("Incorrect channel");
+		return;
+	}
+
+	device = strtoul(params[1], &c, 0);
+	if (*c != 0 || device == 15) {
+		printf("Incorrect device");
+		return;
+	}
+
+	reg = strtoul(params[2], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect reg");
+		return;
+	}
+	sdram_software_control_on();
+	printf("Reading from channel:%d device:%d MR%d\n", channel, device, reg);
+	printf("Value:%02x\n", sdram_mode_register_read(channel, device, reg));
+	sdram_software_control_off();
+}
+define_command(sdram_mr_read, sdram_mr_read_handler, "Read SDRAM Mode Register", LITEDRAM_CMDS);
+#endif // SDRAM_PHY_DDR5
 
 #endif /* CSR_SDRAM_BASE */
 

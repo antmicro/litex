@@ -288,5 +288,39 @@ void ddr5_i2c_reset(void)
 	busy_wait(60);
 	i2c_oe_scl_sda(0, 1, 1);
 }
+#else
+
+void i2c_reset(void) {};
+bool i2c_write(unsigned char slave_addr, unsigned int addr,
+  const unsigned char *data, unsigned int len, unsigned int addr_size) {
+    printf("warning:I2C_write: No I2C defined.\n");
+    printf("warning:I2C_write: slave_addr:%hhx\n addr:%x\n", slave_addr, addr);
+    return false;
+};
+
+bool i2c_read(unsigned char slave_addr, unsigned int addr,
+  unsigned char *data, unsigned int len, bool send_stop, unsigned int addr_size) {
+    printf("warning:I2C_read: No I2C defined.\n");
+    printf("warning:I2C_read: slave_addr:%hhx\n addr:%x\n", slave_addr, addr);
+    return false;
+}
+bool i2c_poll(unsigned char slave_addr) {
+    printf("warning:I2C_poll: No I2C defined.\n");
+    return false;
+};
+int i2c_send_init_cmds(void) {
+    return 0;
+};
+struct i2c_dev *get_i2c_devs(void) {
+    return 0;
+};
+int get_i2c_devs_count(void) {
+    return 0;
+};
+void set_i2c_active_dev(int dev) {};
+int get_i2c_active_dev(void) {
+    return -1;
+};
+void ddr5_i2c_reset(void) {};
 
 #endif /* CONFIG_HAS_I2C */

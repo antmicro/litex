@@ -44,6 +44,10 @@ void sdram_software_control_off(void);
 /* Mode Register                                                         */
 /*-----------------------------------------------------------------------*/
 void sdram_mode_register_write(char reg, int value);
+#ifdef SDRAM_PHY_DDR5
+uint8_t sdram_mode_register_read(int channel, int pda, int reg);
+#endif
+
 
 /*-----------------------------------------------------------------------*/
 /* Write Leveling                                                        */

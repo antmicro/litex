@@ -452,6 +452,20 @@ void read_registers(int channel, int rank, int module, int width) {
     }
 }
 
+/**
+ * ca_check_if_has_line13
+ *
+ * Detect if CA13 is present.
+ * Requires to already be in the CATM.
+ */
+int check_ca_13th_line(int32_t channel, int32_t rank) {
+    cmd_injector(channel, 0xf, 0, 1<<13, 0, 0, 1, 0);
+    cmd_injector(channel, 0x1, 1<<rank, 1<<13, 0, 0, 1, 0);
+    store_continuous(channel);
+
+    return and_sample(channel);
+}
+
 void disable_dfi_2n_mode(void) {
     int value = sdram_dfii_control_read();
     value &= ~DFII_CONTROL_2N_MODE;
@@ -2065,8 +2079,6 @@ void clear_phy_fifos(int channel) {
 /* RCD Training Helpers                                                  */
 /*-----------------------------------------------------------------------*/
 
-#if defined(CONFIG_HAS_I2C)
-
 /**
  * get_rcd_id
  *
@@ -3233,13 +3245,5 @@ int qca_check_if_works(int channel, int rank, int _address, int shift_back) {
     }
     return ok;
 }
-
-#else // defined(CONFIG_HAS_I2C)
-
-void enter_ca_pass(int rank) {};
-void exit_ca_pass(int rank) {};
-void select_ca_pass(int rank) {};
-
-#endif // defined(CONFIG_HAS_I2C)
 
 #endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)

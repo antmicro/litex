@@ -1,6 +1,8 @@
 #include <liblitedram/ddr5_training.h>
 
 #if defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
+#include <liblitedram/ddr5/ddr5_spd_parse.h>
+#include <liblitedram/ddr5/eye_detection_helper.h>
 #include <liblitedram/ddr5_helpers.h>
 
 #include <liblitedram/sdram_rcd.h>
@@ -52,24 +54,8 @@
 //      \______________/‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 //      --------------<============>-------------
 
-static int32_t helper_arr[2*MAX(64, SDRAM_PHY_DELAYS)];
-static int32_t helper_arr_it;
 static int32_t helper_modules_without_shift;
 static int32_t helper_modules_seen;
-
-static void full_clear_helper_arr(void) {
-    helper_arr_it = 0;
-    helper_modules_without_shift = 0;
-    helper_modules_seen = 0;
-    for (int i = 0; i < sizeof(helper_arr)/sizeof(int); ++i)
-        helper_arr[i] = 0;
-}
-
-static void clear_helper_arr(void) {
-    helper_arr_it = 0;
-    for (int i = 0; i < sizeof(helper_arr)/sizeof(int); ++i)
-        helper_arr[i] = 0;
-}
 
 static int reduce_cs(uint32_t cs, int modules) {
     uint32_t ok, module;
@@ -77,29 +63,6 @@ static int reduce_cs(uint32_t cs, int modules) {
     for (module = 0; module < modules; ++module)
         ok &= (cs >> module)&1;
     return !!ok;
-}
-
-
-// -1 starts with `1`, 0 doesn't have `1`, 1 in all other cases
-static int one_in_helper_arr(int max) {
-    if (helper_arr[0]) return -1;
-    for (int it = 1; it < max; ++it) {
-       if (helper_arr[it]) return 1;
-    }
-    return 0;
-}
-
-static void find_eye_in_helper_arr(int *left, int *right, int max) {
-    for (int it = 0; it < 2* max; ++it) {
-        if (helper_arr[it] && *right == UNSET_DELAY)
-            *right = it;
-        if (!helper_arr[it] && *right != UNSET_DELAY) {
-            *left = it;
-            return;
-        }
-    }
-    if (helper_arr[2*max - 1])
-        *left = 2 * max;
 }
 
 static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int32_t rank,
@@ -129,7 +92,7 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
         }
         works = works & works_ ? 0 : works | works_;
         printf("%d", reduce_cs(works, ctx->modules));
-        helper_arr[helper_arr_it++] = reduce_cs(works, ctx->modules);
+        set_helper_arr_value_and_advance(reduce_cs(works, ctx->modules));
         ctx->cs.inc_dly(channel, rank, 0);
     }
     ctx->cs.rst_dly(channel, rank, 0);
@@ -137,7 +100,9 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
 
 static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank) {
     int shift = 1;
-    full_clear_helper_arr();
+    clear_helper_arr();
+    helper_modules_without_shift = 0;
+    helper_modules_seen = 0;
     ctx->cs.rst_dly(channel, rank, 0);
 
     // Enter CS training
@@ -157,7 +122,9 @@ static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t ra
             printf("|\n");
         break;
         case 0:
-            full_clear_helper_arr();
+            clear_helper_arr();
+            helper_modules_without_shift = 0;
+            helper_modules_seen = 0;
             printf("\nChange polarization|");
             CS_scan_single(ctx, channel, rank, 1);
             printf("|");
@@ -228,10 +195,10 @@ static void CA_setup_array(training_ctx_t *const ctx) {
  * Depending on the die density and usage of die stacking,
  * CA13 may be used or not.
  */
-static void CA_check_lines(training_ctx_t *const ctx, int32_t channel) {
+static void CA_check_lines(training_ctx_t *const ctx, int32_t channel, int rank) {
     if (ctx->training_type == HOST_DRAM) {
         ctx->ca.enter_training_mode(channel, 0);
-        if (ctx->ca.has_line13(channel))
+        if (ctx->ca.has_line13(channel, rank))
             ctx->ca.line_count = 14;
         else
             ctx->ca.line_count = 13;
@@ -247,7 +214,7 @@ static void CA_scan_single(training_ctx_t *const ctx, int32_t channel, int32_t r
     for (cadly = 0; cadly < ctx->max_delay_taps; cadly++) {
         works = ctx->ca.check(channel, rank, address, shift_back);
         printf("%d", !!works);
-        helper_arr[helper_arr_it++] = works;
+        set_helper_arr_value_and_advance(works);
         ctx->ca.inc_dly(channel, rank, address);
     }
     ctx->ca.rst_dly(channel, rank, address);
@@ -514,60 +481,71 @@ static void CK_CS_CA_finalize_timings(training_ctx_t *const ctx , int channel) {
     CS_CA_rescan(ctx, new_ckdly, channel);
 }
 
+void sdram_ddr5_ca_cs_prep(training_ctx_t *const ctx) {
+    if (ctx->rate == DDR && ctx->training_type != RCD_DRAM)
+        disable_dfi_2n_mode();
+    CA_setup_array(ctx);
+}
+
 #ifdef SKIP_NO_DELAYS
-void sdram_ddr5_cs_ca_training(training_ctx_t *const ctx , int channel) {
+static bool sdram_ddr5_cs_ca_channel_training(training_ctx_t *const ctx , int channel) {
     printf("CS/CA training impossible\n"
            "Keeping DRAM in 2N mode\n");
+    return false;
 }
 #else
-void sdram_ddr5_cs_ca_training(training_ctx_t *const ctx , int channel) {
+static bool sdram_ddr5_cs_ca_channel_training(training_ctx_t *const ctx , int channel) {
 #ifndef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     printf("WARNING:\n"
            "PHY does not have IO delays on address lines!!!\n"
            "BIOS will try to check if 1N mode is possible, but it may be unstable.\n"
            "Build BIOS with -DSKIP_NO_DELAYS, to skip CS/CA training and force 2N mode.\n");
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-    int32_t _channel, _max_channel;
     uint8_t CS_success, CA_success;
-    if (ctx->rate == DDR && ctx->training_type != RCD_DRAM)
-        disable_dfi_2n_mode();
-
-    _channel = channel;
-    _max_channel = channel + 1;
-    if (channel == -1) {
-        _channel = 0;
-        _max_channel = ctx->channels;
-    }
-
     CS_success = 1;
     CA_success = 1;
-    CA_setup_array(ctx);
-    for (; _channel < _max_channel; ++_channel) {
-        ctx->ck.rst_dly(_channel, 0, 0);
 
-        printf("Subchannel:%c CS training\n", (char)('A'+_channel));
-        CS_training(ctx, _channel, &CS_success);
-        ctx->CS_CA_successful &= CS_success;
+    ctx->ck.rst_dly(channel, 0, 0);
+    printf("Subchannel:%c CS training\n", (char)('A'+channel));
+    CS_training(ctx, channel, &CS_success);
 #ifndef KEEP_GOING_ON_DRAM_ERROR
-        if (!ctx->CS_CA_successful)
-            return;
+    if (!CS_success)
+        return false;
 #endif // KEEP_GOING_ON_DRAM_ERROR
-        printf("CA training\n");
-        CA_check_lines(ctx, _channel);
-        CA_training(ctx, _channel, &CA_success);
-        ctx->CS_CA_successful &= CA_success;
+    printf("CA training\n");
+    CA_check_lines(ctx, channel, 0); //FIXME: Add support for multiple ranks
+    CA_training(ctx, channel, &CA_success);
 #ifndef KEEP_GOING_ON_DRAM_ERROR
-        if (!ctx->CS_CA_successful)
-            return;
+    if (!CA_success) {
+        return false;
 #endif // KEEP_GOING_ON_DRAM_ERROR
     }
 
-    ctx->CS_CA_successful &= (CS_success & CA_success);
-    if (ctx->CS_CA_successful) {
-        CK_CS_CA_finalize_timings(ctx, channel);
-    }
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+    return (CS_success & CA_success);
+#endif // KEEP_GOING_ON_DRAM_ERROR
+    return true;
 }
 #endif // SKIP_NO_DELAYS
+
+static void sdram_ddr5_cs_ca_training(training_ctx_t *const ctx) {
+    int32_t _channel;
+    uint8_t CA_BUS_success;
+
+    CA_BUS_success = 1;
+    sdram_ddr5_ca_cs_prep(ctx);
+
+    for (_channel = 0; _channel < ctx->channels; ++_channel) {
+        CA_BUS_success &= sdram_ddr5_cs_ca_channel_training(ctx, _channel);
+#ifndef KEEP_GOING_ON_DRAM_ERROR
+        ctx->CS_CA_successful &= CA_BUS_success;
+        if (!ctx->CS_CA_successful)
+            return;
+#endif // KEEP_GOING_ON_DRAM_ERROR
+    }
+
+    CK_CS_CA_finalize_timings(ctx, -1);
+}
 
 // MR2:OP[7] value to use, whenever MR2 is being modified
 static int use_internal_write_timing = 0;
@@ -626,7 +604,10 @@ static bool sdram_ddr5_check_enumerate(int rank, int width, int channels, int mo
         send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
         busy_wait_us(1);
     }
+#ifndef KEEP_GOING_ON_DRAM_ERROR
     return ok;
+#endif // KEEP_GOING_ON_DRAM_ERROR
+    return true;
 }
 
 static bool dram_enumerate(training_ctx_t *const ctx , int rank) {
@@ -1842,261 +1823,16 @@ bool sdram_ddr5_write_training(training_ctx_t *const ctx ) {
     return true;
 }
 
-/**
- * ca_check_if_has_line13
- *
- * Detect if CA13 is present.
- * Requires to already be in the CATM.
- */
-static int ca_check_if_has_line13(int32_t channel) {
-    cmd_injector(channel, 0xf, 0, 1<<13, 0, 0, 1, 0);
-    cmd_injector(channel, 0x1, 1, 1<<13, 0, 0, 1, 0);
-    store_continuous(channel);
-
-    return and_sample(channel);
-}
-
-#if defined(CONFIG_HAS_I2C)
-enum module_type {
-    RDIMM       = 0b0001,
-    UDIMM       = 0b0010,
-    SODIMM      = 0b0011,
-    LRDIMM      = 0b0100,
-    DDIM        = 0b1010,
-    SOLDER_DOWN = 0b1011,
-};
-
-/**
- * read_module_type
- *
- * Reads the 3rd byte of the SPD and extracts the module type.
- * If the SPD cannot be read, it defaults to the UDIMM.
- */
-static enum module_type read_module_type(uint8_t spd) {
-    uint8_t module_type;
-    if (!sdram_read_spd(spd, 3, &module_type, 1, false)) {
-        printf("Couldn't read the SPD and check the module type. Defaulting to UDIMM.\n");
-        return UDIMM;
-    }
-
-    // Module type is in the lower nibble
-    return module_type & 0x0f;
-}
-
-//static uint8_t read_module_width(uint8_t spd) {
-//    uint8_t buf;
-//
-//    // Module width is stored in SPD[6][7:5]
-//    //     000: x4
-//    //     001: x8
-//    //     010: x16
-//    //     011: x32
-//
-//    if (!sdram_read_spd(spd, 6, &buf, 1, false)) {
-//        printf("Couldn't read module width from the SPD, defaulting to x%d.\n", SDRAM_PHY_DQ_DQS_RATIO);
-//        return SDRAM_PHY_DQ_DQS_RATIO;
-//    }
-//
-//    // minimal supported is x4
-//    uint8_t shift = (buf & 0xe0) >> 5;
-//    uint8_t module_width = 4 << shift;
-//
-//    return module_width;
-//}
-
-static uint8_t read_module_ranks(uint8_t spd) {
-    uint8_t buf;
-
-    // Module ranks count is stored in SPD[234][5:3]
-    //     000: 1
-    //     001: 2
-    //     010: 3
-    //     .
-    //     .
-    //     .
-    //     111: 8
-
-    if (!sdram_read_spd(spd, 234, &buf, 1, false)) {
-        printf("Couldn't read module ranks from the SPD, defaulting to x%d.\n", 1);
-        return 1;
-    }
-
-    // minimal supported is x4
-    uint8_t shift = (buf & 0x38) >> 3;
-    uint8_t module_ranks = shift + 1;
-
-    return module_ranks;
-}
-
-static uint8_t read_module_channels(uint8_t spd) {
-    uint8_t buf;
-
-    // Module channels count is stored in SPD[235][6:5]
-    //     00: 1
-    //     01: 2
-
-    if (!sdram_read_spd(spd, 235, &buf, 1, false)) {
-        printf("Couldn't read module channels from the SPD, defaulting to x%d.\n", CHANNELS);
-        return CHANNELS;
-    }
-
-    // minimal supported is x4
-    uint8_t shift = (buf & 0x60) >> 5;
-    uint8_t module_channels = shift + 1;
-
-    return module_channels;
-}
-
-static uint8_t read_module_enabled_clock(uint8_t spd) {
-    uint8_t buf;
-
-    // Module channels count is stored in SPD[248]
-    //     [0]: QACK: 0 enable/1 disable
-    //     [1]: QBCK: 0 enable/1 disable
-    //     [2]: QCCK: 0 enable/1 disable
-    //     [3]: QDCK: 0 enable/1 disable
-    //     [5]:  BCK: 0 enable/1 disable (LRDIMM)
-
-    if (!sdram_read_spd(spd, 248, &buf, 1, false)) {
-        printf("Couldn't read module clock enables from the SPD, defaulting to x%d.\n", 0);
-        return 0;
-    }
-
-    return buf & 0x2f;
-}
-
-static uint8_t read_module_enabled_ca(uint8_t spd) {
-    uint8_t buf;
-
-    // Module channels count is stored in SPD[249]
-    //     [0]:    QACA: 0 enable/1 disable
-    //     [1]:    QBCA: 0 enable/1 disable
-    //     [2]:  DCS1_n: 0 enable/1 disable
-    //     [3]:   BCS_n: 0 enable/1 disable
-    //     [4]:  QxCA13: 0 enable/1 disable
-    //     [5]: QACSx_n: 0 enable/1 disable
-    //     [6]: QBCSx_n: 0 enable/1 disable
-
-    if (!sdram_read_spd(spd, 249, &buf, 1, false)) {
-        printf("Couldn't read module CA enables from the SPD, defaulting to x%d.\n", 0);
-        return 0;
-    }
-
-    return buf & 0x7f;
-}
-
-static uint8_t read_module_qck_setup(uint8_t spd) {
-    uint8_t buf;
-
-    // Module channels count is stored in SPD[250]
-    // [1:0]: QACK: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
-    // [3:2]: QBCK: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
-    // [5:4]: QCCK: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
-    // [7:6]: QDCK: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
-
-    if (!sdram_read_spd(spd, 250, &buf, 1, false)) {
-        printf("Couldn't read module QCK setup from the SPD, defaulting to x%d.\n", 0);
-        return 0;
-    }
-
-    return buf & 0xff;
-}
-
-static uint8_t read_module_qca_qcs_setup(uint8_t spd) {
-    uint8_t buf;
-
-    // Module channels count is stored in SPD[252]
-    // [1:0]: QxCA: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
-    // [5:4]: QxCS: 00 20Ohm/ 01 14Ohm /10 10Ohm /11 RES
-
-    if (!sdram_read_spd(spd, 252, &buf, 1, false)) {
-        printf("Couldn't read module QCA/QCS setup from the SPD, defaulting to x%d.\n", 0);
-        return 0;
-    }
-
-    return buf & 0x33;
-}
-
-static uint8_t read_module_slew_rates(uint8_t spd) {
-    uint8_t buf;
-
-    // Module channels count is stored in SPD[252]
-    // [1:0]: QxCK: 00 12-20 V/ns/ 01 14-27 V/ns /10 RES /11 RES
-    // [3:2]: QxCA: 00   4-7 V/ns/ 01  6-10 V/ns /10 2.7-4.5 V/ns /11 RES
-    // [5:4]: QxCS: 00   4-7 V/ns/ 01  6-10 V/ns /10 2.7-4.5 V/ns /11 RES
-
-    if (!sdram_read_spd(spd, 254, &buf, 1, false)) {
-        printf("Couldn't read module slew rates from the SPD, defaulting to x%d.\n", 0);
-        return 0;
-    }
-
-    return buf & 0x3f;
-}
-
-static uint16_t read_module_rcd_manufacturer(uint8_t spd) {
-    uint8_t buf[2];
-
-    // Module channels count is stored in SPD[240:241]
-
-    if (!sdram_read_spd(spd, 240, &buf[0], 1, false)) {
-        printf("Couldn't read module RCD manufacturer from the SPD, defaulting to x%d.\n", 0);
-        return 0;
-    }
-    if (!sdram_read_spd(spd, 241, &buf[1], 1, false)) {
-        printf("Couldn't read module RCD manufacturer from the SPD, defaulting to x%d.\n", 0);
-        return 0;
-    }
-    uint16_t val;
-    val = *(uint16_t*)buf;
-    printf("RCD manufacturer: %x\n", val);
-
-    return val;
-}
-
-static uint8_t read_module_rcd_device_type(uint8_t spd) {
-    uint8_t buf;
-
-    // Module channels count is stored in SPD[240:241]
-
-    if (!sdram_read_spd(spd, 242, &buf, 1, false)) {
-        printf("Couldn't read module RCD device type from the SPD, defaulting to x%d.\n", 0);
-        return 0;
-    }
-    printf("RCD type: %x\n", buf);
-
-    return buf;
-}
-
-static uint8_t read_module_rcd_device_rev(uint8_t spd) {
-    uint8_t buf;
-
-    // Module channels count is stored in SPD[240:241]
-
-    if (!sdram_read_spd(spd, 243, &buf, 1, false)) {
-        printf("Couldn't read module RCD device rev from the SPD, defaulting to x%d.\n", 0);
-        return 0;
-    }
-    printf("RCD rev: %x\n", buf);
-
-    return buf;
-}
-#endif // defined(CONFIG_HAS_I2C)
-
 training_ctx_t host_dram_ctx;
-#if defined(CONFIG_HAS_I2C)
 training_ctx_t host_rcd_ctx;
 training_ctx_t rcd_dram_ctx;
-#endif // defined(CONFIG_HAS_I2C)
 
 static void init_structs(void) {
     host_dram_ctx = (training_ctx_t) DEFAULT_HOST_DRAM;
-#if defined(CONFIG_HAS_I2C)
     host_rcd_ctx  = (training_ctx_t) DEFAULT_HOST_RCD;
     rcd_dram_ctx  = (training_ctx_t) DEFAULT_RCD_DRAM;
-#endif // defined(CONFIG_HAS_I2C)
 }
 
-#if defined(CONFIG_HAS_I2C)
 static void rcd_init(training_ctx_t *const ctx ) {
     // Issue a VR_ENABLE command to the PMIC
     uint8_t cmd = 0xa0;
@@ -2125,11 +1861,9 @@ static void rcd_init(training_ctx_t *const ctx ) {
         ctx->ca.check = dca_check_if_works_ddr_MONTAGE_QUIRK;
     }
 
-    sdram_ddr5_cs_ca_training(ctx, -1);
-#ifndef KEEP_GOING_ON_DRAM_ERROR
+    sdram_ddr5_cs_ca_training(ctx);
     if(!ctx->CS_CA_successful)
         return;
-#endif // KEEP_GOING_ON_DRAM_ERROR
     busy_wait(6);
 
     // FIXME: this function should initialize all RCDs
@@ -2169,7 +1903,6 @@ static void rcd_init(training_ctx_t *const ctx ) {
     busy_wait(2);
 
 }
-#endif // defined(CONFIG_HAS_I2C)
 
 /**
  * sdram_ddr5_flow
@@ -2191,13 +1924,8 @@ void sdram_ddr5_flow(void) {
     training_ctx_t *base_ctx = &host_dram_ctx;
 
     bool is_rdimm = false;
-#if defined(CONFIG_HAS_I2C)
     ddr5_i2c_reset();
-#ifdef DDR5_RDIMM_SIM
-    is_rdimm = true;
-#else
     is_rdimm = read_module_type(0) == RDIMM;
-#endif // DDR5_RDIMM_SIM
     // FIXME: handle multiple sticks and SPDs
     int die_width = SDRAM_PHY_DQ_DQS_RATIO; //FIXME: change to SPD value when PHY works `read_module_width(0);`
     if (is_rdimm) {
@@ -2209,12 +1937,10 @@ void sdram_ddr5_flow(void) {
     rcd_dram_ctx.die_width = die_width;
     rcd_dram_ctx.ranks     = read_module_ranks(0); // FIXME: handle multiple sticks and SPDs
     rcd_dram_ctx.channels  = read_module_channels(0); // FIXME: handle multiple sticks and SPDs
-#endif // defined(CONFIG_HAS_I2C)
 
     reset_all_phy_regs(host_dram_ctx.channels, host_dram_ctx.ranks,
         host_dram_ctx.all_ca_count, host_dram_ctx.modules, host_dram_ctx.die_width);
 
-#if defined(CONFIG_HAS_I2C)
     if (is_rdimm) {
         printf("Detected RDIMM. Initializing RCD and running Host->RCD training\n");
         ddrphy_CSRModule_rdimm_mode_write(1);
@@ -2223,10 +1949,8 @@ void sdram_ddr5_flow(void) {
         base_ctx->rate = host_rcd_ctx.rate;
         base_ctx->CS_CA_successful &= host_rcd_ctx.CS_CA_successful;
         base_ctx->manufacturer = host_rcd_ctx.manufacturer;
-#ifndef KEEP_GOING_ON_DRAM_ERROR
         if(!base_ctx->CS_CA_successful)
             return;
-#endif // KEEP_GOING_ON_DRAM_ERROR
         if (base_ctx->manufacturer == 0x9D86) {
             base_ctx->cs.enter_training_mode = enter_qcstm_RAMBUS_QUIRK;
             base_ctx->cs.check = qcs_check_if_works_RAMBUS_QUIRK;
@@ -2236,11 +1960,6 @@ void sdram_ddr5_flow(void) {
         reset_sequence(base_ctx->ranks);
 #endif // SKIP_RESET_SEQUENCE
     }
-#else
-#ifndef SKIP_RESET_SEQUENCE
-    reset_sequence(base_ctx->ranks);
-#endif // SKIP_RESET_SEQUENCE
-#endif // defined(CONFIG_HAS_I2C)
 
     dram_start_sequence(base_ctx->ranks);
 
@@ -2257,7 +1976,9 @@ void sdram_ddr5_flow(void) {
 #endif // SKIP_MRS_SEQUENCE
 #ifndef SKIP_CSCA_TRAINING
         for (int channel = 0; channel < base_ctx->channels; ++channel) {
-            sdram_ddr5_cs_ca_training(base_ctx, channel);
+            sdram_ddr5_ca_cs_prep(base_ctx);
+            sdram_ddr5_cs_ca_channel_training(base_ctx, channel);
+            CK_CS_CA_finalize_timings(base_ctx, channel);
         }
 #endif // SKIP_CSCA_TRAINING
     } else {
@@ -2266,18 +1987,16 @@ void sdram_ddr5_flow(void) {
             setup_dram_mrs_sequence(rank);
 #endif // SKIP_MRS_SEQUENCE
 #ifndef SKIP_CSCA_TRAINING
-        sdram_ddr5_cs_ca_training(base_ctx, -1);
+        sdram_ddr5_cs_ca_training(base_ctx);
 #endif // SKIP_CSCA_TRAINING
     }
+
+    if(!base_ctx->CS_CA_successful)
+        return;
 
 #ifdef SKIP_CSCA_TRAINING
     disable_dfi_2n_mode();
 #endif // SKIP_CSCA_TRAINING
-
-#ifndef KEEP_GOING_ON_DRAM_ERROR
-    if(!base_ctx->CS_CA_successful)
-        return;
-#endif // KEEP_GOING_ON_DRAM_ERROR
 
     use_1n_mode = 1<<2;
     if(is_rdimm) {
@@ -2322,11 +2041,8 @@ void sdram_ddr5_flow(void) {
             send_mpc(channel, rank, 0x58, 0);
 
     for (int rank = 0; rank < base_ctx->ranks; ++rank) {
-        if(dram_enumerate(base_ctx, rank))
-            continue;
-#ifndef KEEP_GOING_ON_DRAM_ERROR
-        return;
-#endif // KEEP_GOING_ON_DRAM_ERROR
+        if(!dram_enumerate(base_ctx, rank))
+            return;
     }
 
     // Enable DQ RTT after enumerate
@@ -2343,25 +2059,19 @@ void sdram_ddr5_flow(void) {
             }
     }
 
-#if defined(CONFIG_HAS_I2C)
     if (is_rdimm) {
         base_ctx = &host_dram_ctx;
         host_dram_ctx.ranks = rcd_dram_ctx.ranks;
         host_dram_ctx.RDIMM = rcd_dram_ctx.RDIMM;
     }
-#endif // defined(CONFIG_HAS_I2C)
 
     base_ctx->ranks = 1; //FIXME: when PHY works with multiple ranks
 
     if (!sdram_ddr5_read_training(base_ctx)) {
-#ifndef KEEP_GOING_ON_DRAM_ERROR
         return;
-#endif // KEEP_GOING_ON_DRAM_ERROR
     }
     if (!sdram_ddr5_write_training(base_ctx)) {
-#ifndef KEEP_GOING_ON_DRAM_ERROR
         return;
-#endif // KEEP_GOING_ON_DRAM_ERROR
     }
 }
 

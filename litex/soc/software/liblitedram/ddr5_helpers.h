@@ -65,6 +65,8 @@ int and_sample_module(int channel, int module, int width);
 
 void read_registers(int channel, int rank, int module, int width);
 
+int check_ca_13th_line(int32_t channel, int32_t rank);
+
 void enable_dfi_2n_mode(void);
 void disable_dfi_2n_mode(void);
 void disable_dram_2n_mode(int, int);
@@ -159,7 +161,6 @@ void clear_phy_fifos(int channel);
 int wr_dqs_check_if_works(int channel, int rank, int module, int width);
 void wleveling_scan(int channel, int rank, int module, int width, int max_delay, eye_t *eye_state);
 
-#if defined(CONFIG_HAS_I2C)
 uint8_t get_rcd_id(int rank);
 
 enum dca_rate {
@@ -209,18 +210,6 @@ void qca_rst(int channel, int rank, int address);
 void enter_qcatm(int channel, int rank);
 void exit_qcatm(int channel, int rank);
 int qca_check_if_works(int channel, int rank, int _address, int shift_back);
-#else
-
-void enter_ca_pass(int rank);
-void exit_ca_pass(int rank);
-void select_ca_pass(int rank);
-
-enum dca_rate {
-    SDR1 = 0b00,
-    DDR  = 0b01,
-};
-
-#endif // defined(CONFIG_HAS_I2C)
 
 #endif // SDRAM_PHY_DDR5
 

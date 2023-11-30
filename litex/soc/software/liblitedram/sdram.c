@@ -294,6 +294,13 @@ void sdram_mode_register_write(char reg, int value) {
 }
 #endif
 
+#ifdef SDRAM_PHY_DDR5
+uint8_t sdram_mode_register_read(int channel, int pda, int reg) {
+    send_mrr(channel, 0, reg);
+    return recover_mrr_value(channel, pda, SDRAM_PHY_DQ_DQS_RATIO); //TODO: use correct width when PHY supports multiple widths
+}
+#endif
+
 #if !defined(SDRAM_PHY_DDR5) && defined(CSR_DDRPHY_BASE)
 
 /*-----------------------------------------------------------------------*/

@@ -11,9 +11,6 @@
 // DRAM Mode Registers Definitions
 #define DRAM_SCRATCH_PAD 63
 
-// Use max int16_t, all Fs could be interpreted as -1
-#define UNSET_DELAY 0xefff
-
 // max CL is 66 (JESD79-5A 3.5.2)
 // if in 2N Mode, 1 more cycle is used for the command
 #define MAX_READ_CYCLE_DELAY (66 + 1)
@@ -61,7 +58,7 @@ typedef struct {
 
         delay_checker_ca_t check;
 
-        int (*has_line13)(int32_t channel);
+        int (*has_line13)(int32_t channel, int32_t rank);
     } ca;
     struct {
         int delays[CHANNELS][2];
@@ -117,7 +114,7 @@ typedef struct {
         .inc_dly = ca_inc,                    \
         .rst_dly = ca_rst,                    \
         .check = ca_check_if_works,           \
-        .has_line13 = ca_check_if_has_line13, \
+        .has_line13 = check_ca_13th_line,     \
     },                                        \
     .training_type = HOST_DRAM,               \
                                               \
@@ -211,7 +208,6 @@ typedef struct {
 }
 
 
-void sdram_ddr5_cs_ca_training(training_ctx_t *ctx, int channel);
 bool sdram_ddr5_read_training(training_ctx_t *ctx);
 bool sdram_ddr5_write_training(training_ctx_t *ctx);
 
