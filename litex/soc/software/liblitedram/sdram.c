@@ -149,12 +149,12 @@ static void sdram_dfii_pix_address_write(unsigned char phase, unsigned int value
 	}
 }
 
-static void sdram_dfii_pird_address_write(unsigned int value) {
+void sdram_dfii_pird_address_write(unsigned int value) {
 	unsigned char rdphase = sdram_dfii_get_rdphase();
 	sdram_dfii_pix_address_write(rdphase, value);
 }
 
-static void sdram_dfii_piwr_address_write(unsigned int value) {
+void sdram_dfii_piwr_address_write(unsigned int value) {
 	unsigned char wrphase = sdram_dfii_get_wrphase();
 	sdram_dfii_pix_address_write(wrphase, value);
 }
@@ -181,12 +181,12 @@ static void sdram_dfii_pix_baddress_write(unsigned char phase, unsigned int valu
 	}
 }
 
-static void sdram_dfii_pird_baddress_write(unsigned int value) {
+void sdram_dfii_pird_baddress_write(unsigned int value) {
 	unsigned char rdphase = sdram_dfii_get_rdphase();
 	sdram_dfii_pix_baddress_write(rdphase, value);
 }
 
-static void sdram_dfii_piwr_baddress_write(unsigned int value) {
+void sdram_dfii_piwr_baddress_write(unsigned int value) {
 	unsigned char wrphase = sdram_dfii_get_wrphase();
 	sdram_dfii_pix_baddress_write(wrphase, value);
 }
@@ -213,12 +213,12 @@ static void command_px(unsigned char phase, unsigned int value) {
 	}
 }
 
-static void command_prd(unsigned int value) {
+void command_prd(unsigned int value) {
 	unsigned char rdphase = sdram_dfii_get_rdphase();
 	command_px(rdphase, value);
 }
 
-static void command_pwr(unsigned int value) {
+void command_pwr(unsigned int value) {
 	unsigned char wrphase = sdram_dfii_get_wrphase();
 	command_px(wrphase, value);
 }

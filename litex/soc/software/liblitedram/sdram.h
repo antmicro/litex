@@ -27,6 +27,17 @@ struct sdram_timings_s {
 };
 
 /*-----------------------------------------------------------------------*/
+/* Helpers                                                               */
+/*-----------------------------------------------------------------------*/
+void cdelay(int i);
+void command_prd(unsigned int value);
+void command_pwr(unsigned int value);
+void sdram_dfii_pird_address_write(unsigned int value);
+void sdram_dfii_piwr_address_write(unsigned int value);
+void sdram_dfii_pird_baddress_write(unsigned int value);
+void sdram_dfii_piwr_baddress_write(unsigned int value);
+
+/*-----------------------------------------------------------------------*/
 /* Constants                                                             */
 /*-----------------------------------------------------------------------*/
 int sdram_get_databits(void);
