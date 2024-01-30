@@ -763,6 +763,10 @@ static int sdram_write_leveling_scan(int *delays, int loops, int show) {
 			printf("%d", all_modules_working[wdly]);
 		ok += all_modules_working[wdly];
 	}
+	for(module = SDRAM_PHY_MODULES-1; module >= 0; module--) {
+		if(delays[module] < 0)
+			ok = -1;
+	}
 	if (show)
 		printf("| total: %d\n", ok);
 
@@ -774,7 +778,7 @@ static void sdram_write_leveling_find_cmd_delay(
 	int *cdly_scores, int cdly_start, int cdly_stop, int cdly_step) {
 	int cdly;
 	int delays[SDRAM_PHY_MODULES];
-	int ok;
+	int ok, module;
 
 	/* Scan through the range */
 	sdram_rst_clock_delay();
@@ -790,12 +794,31 @@ static void sdram_write_leveling_find_cmd_delay(
 #else
 		ok = sdram_write_leveling_scan(delays, 8, 0);
 #endif // SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
-		cdly_scores[cdly] = ok;
+		// Calculate mean distance for modules from their
+		// 01 transition to clock_period/2.
+		// Set -1 when at least 1 module doesn't show 01 transition
+		int delay_mean = 0;
+		int delay_count = 0;
+		int inter;
+		for (module = 0; module < SDRAM_PHY_MODULES; ++module) {
+			if (delays[module] == -1) {
+				delay_mean = -1;
+				delay_count = 1;
+				break;
+			}
+			inter = (_sdram_tck_taps  - 2*delays[module]) * 32;
+			inter = inter < 0 ? -inter : inter;
+			delay_mean += inter;
+			delay_count += 1;
+		}
+		// Calculate delay score
+		if (delay_mean/delay_count > 0)
+			cdly_scores[cdly] = (_sdram_tck_taps * 32) - delay_mean/delay_count;
 
-		if (ok >= *best_count) {
+		if (cdly_scores[cdly] > 0 && cdly_scores[cdly] >= *best_count) {
 			*best_cdly  = cdly;
-			*best_error = SDRAM_PHY_DELAYS - ok;
-			*best_count = ok;
+			*best_error = delay_mean/delay_count;
+			*best_count = cdly_scores[cdly];
 		}
 #ifndef SDRAM_WRITE_LEVELING_CMD_DELAY_DEBUG
 		printf("%d", !!ok);
@@ -824,7 +847,7 @@ int sdram_write_leveling(void) {
 		 * values is slow, but we can use a simple optimization method of iterativly
 		 * scanning smaller ranges with decreasing step */
 		cdly_range_start = 0;
-		cdly_range_end = SDRAM_PHY_DELAYS;
+		cdly_range_end = SDRAM_PHY_DELAYS/2;
 
 		printf("  Cmd/Clk scan (%d-%d)\n", cdly_range_start, cdly_range_end);
 		if (SDRAM_PHY_DELAYS > 32)
