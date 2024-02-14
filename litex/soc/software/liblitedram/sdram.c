@@ -451,7 +451,11 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 	return errors;
 }
 
+#ifdef SIM_SKIP_LOOPS
+static int _seed_array[] = {42};
+#else
 static int _seed_array[] = {42, 84, 36, 72, 24, 48};
+#endif
 static int _seed_array_length = sizeof(_seed_array) / sizeof(_seed_array[0]);
 
 static int run_test_pattern(int module, int dq_line) {
@@ -616,6 +620,9 @@ void sdram_write_leveling_force_cmd_delay(int taps, int show) {
 }
 
 static int sdram_write_leveling_scan(int *delays, int loops, int show) {
+#ifdef SIM_SKIP_LOOPS
+	loops = 1;
+#endif
 	int module, wdly, k, dq_line;
 
 	unsigned char taps_scan[SDRAM_PHY_DELAYS];
