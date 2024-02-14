@@ -508,7 +508,7 @@ static void sdram_leveling_center_module(
 	delay_max = delay_min;
 	cur_delay_min = delay_min;
 	/* Find largest working delay range */
-	while(1) {
+	while(1 && (SDRAM_PHY_DELAYS>1)) {
 		errors = run_test_pattern(module, dq_line);
 		working = errors == 0;
 		show = show_long && (delay%MODULO == 0);
