@@ -67,12 +67,16 @@
 #define min(x, y) (((x) < (y)) ? (x) : (y))
 
 __attribute__((unused)) void cdelay(int i) {
+#ifdef USE_BUSY_WAIT_IN_CDEALY
+	busy_wait_ck(i);
+#else
 #ifndef CONFIG_BIOS_NO_DELAYS
 	while(i > 0) {
 		__asm__ volatile(CONFIG_CPU_NOP);
 		i--;
 	}
 #endif // CONFIG_BIOS_NO_DELAYS
+#endif // USE_BUSY_WAIT_IN_CDEALY
 }
 
 /*-----------------------------------------------------------------------*/
