@@ -359,33 +359,51 @@ static void print_scan_errors(unsigned int errors) {
 #define READ_CHECK_TEST_PATTERN_MAX_ERRORS (8*SDRAM_PHY_PHASES*DFII_PIX_DATA_BYTES/SDRAM_PHY_MODULES)
 #define MODULE_BITMASK ((1<<SDRAM_PHY_DQ_DQS_RATIO)-1)
 
-static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int seed, int dq_line) {
-	int p, i, bit;
-	unsigned int errors;
-	unsigned int prv;
-	unsigned char value;
-	unsigned char tst[DFII_PIX_DATA_BYTES];
-	unsigned char prs[SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
+#ifdef SIM_SKIP_LOOPS
+static int _seed_array[] = {42};
+static uint8_t precomputed[1][SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
+#else
+static int _seed_array[] = {42, 84, 36, 72, 24, 48};
+static uint8_t precomputed[6][SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
+#endif
+static int _seed_array_length = sizeof(_seed_array) / sizeof(_seed_array[0]);
 
-	/* Generate pseudo-random sequence */
-	prv = seed;
-	for(p=0;p<SDRAM_PHY_PHASES;p++) {
-		for(i=0;i<DFII_PIX_DATA_BYTES;i++) {
-			value = 0;
-			for (bit=0;bit<8;bit++) {
-				prv = lfsr(32, prv);
-				value |= (prv&1) << bit;
+static void precompute_prs(void) {
+	uint8_t value;
+	uint32_t prv;
+	int p, i, bit;
+	for (int seed_id = 0; seed_id < _seed_array_length; seed_id++) {
+		/* Generate pseudo-random sequence */
+		prv = _seed_array[seed_id];
+		for(p=0;p<SDRAM_PHY_PHASES;p++) {
+			for(i=0;i<DFII_PIX_DATA_BYTES;i++) {
+				value = 0;
+				for (bit=0;bit<8;bit++) {
+					prv = lfsr(32, prv);
+					value |= (prv&1) << bit;
+				}
+				precomputed[seed_id][p][i] = value;
 			}
-			prs[p][i] = value;
 		}
 	}
+}
+
+static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int id, int dq_line) {
+	int p;
+	unsigned int errors;
+	uint8_t tst[DFII_PIX_DATA_BYTES];
 
 	/* Activate */
 	sdram_activate_test_row();
 
 	/* Write pseudo-random sequence */
 	for(p=0;p<SDRAM_PHY_PHASES;p++) {
-		csr_wr_buf_uint8(sdram_dfii_pix_wrdata_addr(p), prs[p], DFII_PIX_DATA_BYTES);
+		csr_wr_buf_uint32(sdram_dfii_pix_wrdata_addr(p),
+		                  (uint32_t*)precomputed[id][p],
+		                  (DFII_PIX_DATA_BYTES/4));
+		csr_wr_buf_uint8(sdram_dfii_pix_wrdata_addr(p),
+		                 precomputed[id][p] + (DFII_PIX_DATA_BYTES & (~0x3)),
+		                 (DFII_PIX_DATA_BYTES & 0x3));
 	}
 	sdram_dfii_piwr_address_write(0);
 	sdram_dfii_piwr_baddress_write(0);
@@ -408,7 +426,10 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 	errors = 0;
 	for(p=0;p<SDRAM_PHY_PHASES;p++) {
 		/* Read back test pattern */
-		csr_rd_buf_uint8(sdram_dfii_pix_rddata_addr(p), tst, DFII_PIX_DATA_BYTES);
+		csr_rd_buf_uint32(sdram_dfii_pix_rddata_addr(p), (uint32_t *)tst, DFII_PIX_DATA_BYTES/4);
+		csr_rd_buf_uint8(sdram_dfii_pix_rddata_addr(p),
+		                 tst + (DFII_PIX_DATA_BYTES & ~0x3),
+		                 DFII_PIX_DATA_BYTES & 0x3);
 		/* Verify bytes matching current 'module' */
 		int pebo;   // module's positive_edge_byte_offset
 		int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
@@ -434,20 +455,20 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 
 		ibo = (module * SDRAM_PHY_DQ_DQS_RATIO)%8; // Non zero only if x4 ICs are used
 
-		errors += popcount(((prs[p][pebo] >> ibo) & mask) ^
+		errors += popcount(((precomputed[id][p][pebo] >> ibo) & mask) ^
 		                   ((tst[pebo] >> ibo) & mask));
 		if (SDRAM_PHY_DQ_DQS_RATIO == 16)
-			errors += popcount(((prs[p][pebo+1] >> ibo) & mask) ^
+			errors += popcount(((precomputed[id][p][pebo+1] >> ibo) & mask) ^
 			                   ((tst[pebo+1] >> ibo) & mask));
 
 
 #if SDRAM_PHY_XDR == 2
 		if (DFII_PIX_DATA_BYTES == 1) // Special case for x4 single IC
 			ibo = 0x4;
-		errors += popcount(((prs[p][nebo] >> ibo) & mask) ^
+		errors += popcount(((precomputed[id][p][nebo] >> ibo) & mask) ^
 		                   ((tst[nebo] >> ibo) & mask));
 		if (SDRAM_PHY_DQ_DQS_RATIO == 16)
-			errors += popcount(((prs[p][nebo+1] >> ibo) & mask) ^
+			errors += popcount(((precomputed[id][p][nebo+1] >> ibo) & mask) ^
 			                   ((tst[nebo+1] >> ibo) & mask));
 #endif // SDRAM_PHY_XDR == 2
 	}
@@ -460,17 +481,10 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 	return errors;
 }
 
-#ifdef SIM_SKIP_LOOPS
-static int _seed_array[] = {42};
-#else
-static int _seed_array[] = {42, 84, 36, 72, 24, 48};
-#endif
-static int _seed_array_length = sizeof(_seed_array) / sizeof(_seed_array[0]);
-
 static int run_test_pattern(int module, int dq_line) {
 	int errors = 0;
 	for (int i = 0; i < _seed_array_length; i++) {
-		errors += sdram_write_read_check_test_pattern(module, _seed_array[i], dq_line);
+		errors += sdram_write_read_check_test_pattern(module, i, dq_line);
 	}
 	return errors;
 }
@@ -1266,6 +1280,7 @@ int sdram_init(void) {
 #ifdef SDRAM_PHY_DDR5
 	sdram_ddr5_flow();
 #else
+	precompute_prs();
 	reset_sequence();
 	init_sequence();
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
