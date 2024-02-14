@@ -28,6 +28,7 @@ void flush_l2_cache(void);
 
 void busy_wait(unsigned int ms);
 void busy_wait_us(unsigned int us);
+void busy_wait_ck(unsigned int ck);
 
 #ifdef __cplusplus
 }
