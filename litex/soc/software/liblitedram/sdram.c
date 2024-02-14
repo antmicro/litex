@@ -347,7 +347,12 @@ static void print_scan_errors(unsigned int errors) {
 	else
 		printf("%x", errors);
 #else
-		printf("%d", errors == 0);
+		int no_errors = errors == 0;
+		if (no_errors) {
+			printf("1");
+		} else {
+			printf("0");
+		}
 #endif // SDRAM_LEVELING_SCAN_DISPLAY_HEX_DIV
 }
 
