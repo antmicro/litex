@@ -234,6 +234,10 @@ class Builder:
                 self.soc.sdram.controller.settings.timing)
             write_to_file(os.path.join(self.generated_dir, "sdram_timings.h"), timings_contents)
 
+        if hasattr(self.soc, "early_init"):
+            early_init_contents = self.soc._early_init.generate()
+            write_to_file(os.path.join(self.generated_dir, "early_init.h"), early_init_contents)
+
     def _generate_csr_map(self):
         # JSON Export.
         if self.csr_json is not None:

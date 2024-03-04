@@ -13,6 +13,7 @@ import logging
 import argparse
 import datetime
 from math import log2, ceil
+from contextlib import contextmanager
 
 from migen import *
 
@@ -40,6 +41,68 @@ def auto_int(x):
 def build_time(with_time=True):
     fmt = "%Y-%m-%d %H:%M:%S" if with_time else "%Y-%m-%d"
     return datetime.datetime.fromtimestamp(time.time()).strftime(fmt)
+
+# C Early Init Header ------------------------------------------------------------------------------
+
+class CGenerator(list):
+    # C code generator - list of strings (=lines) or CGenerator instances (sub-generators)
+    def __init__(self, indent=0, indent_str="\t"):
+        self.indent = indent
+        self.indent_str = indent_str
+
+    def __iadd__(self, x):
+        # make `c += "int x = 0;"` append it as line, not char-by-char
+        if isinstance(x, str):
+            x = [x]
+        return super().__iadd__(x)
+
+    def header_guard(self, name):
+        self._header_guard = name
+
+    def generate_lines(self):
+        if getattr(self, "_header_guard", None) is not None:
+            self.insert(0, f"#ifndef {self._header_guard}")
+            self.insert(1, f"#define {self._header_guard}")
+            self.insert(2, "")
+            self.append("")
+            self.append(f"#endif /* {self._header_guard} */")
+            self._header_guard = None
+        lines = []
+        for entry in self:
+            if isinstance(entry, CGenerator):
+                lines.extend(entry.generate_lines())
+            else:
+                line = (self.indent * self.indent_str) + entry
+                lines.append(line.rstrip())
+        return lines
+
+    def generate(self):
+        lines = self.generate_lines()
+        return "\n".join(lines).strip() + "\n"
+
+    def include(self, path):
+        self.append(f"#include {path}")
+
+    def define(self, var, value=None):
+        if isinstance(value, (int, float)):
+            value = str(value)
+        self.append(f"#define {var}" + (f" {value}" if value is not None else ""))
+
+    def newline(self, n=1):
+        self.extend([""] * n)
+
+    @contextmanager
+    def block(self, head=None, newline=True):
+        if head is not None:
+            self.append(head + (" {" if not newline else ""))
+            if newline:
+                self.append("{")
+        else:
+            self.append("{")
+        subgenerator = CGenerator(indent=self.indent + 1, indent_str=self.indent_str)
+        yield subgenerator
+        self.append(subgenerator)
+        self.append("}")
 
 # SoCError -----------------------------------------------------------------------------------------
 
@@ -897,6 +960,14 @@ class SoC(LiteXModule, SoCCoreCompat):
                 colorer(name),
                 colorer("declared", color="red")))
             raise SoCError()
+
+    def create_early_init(self):
+        if not hasattr(self, "early_init"):
+            setattr(self, "_early_init", CGenerator())
+            setattr(self, "early_init",
+                self._early_init.block("static inline void early_init(void)"))
+            self.add_constant("EARLY_INIT")
+        return self.early_init
 
     def add_constant(self, name, value=None, check_duplicate=True):
         name = name.upper()

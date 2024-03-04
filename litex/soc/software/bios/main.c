@@ -49,6 +49,9 @@
 
 #include <liblitesdcard/sdcard.h>
 #include <liblitesata/sata.h>
+#ifdef EARLY_INIT
+#include <generated/early_init.h>
+#endif /* EARLY_INIT */
 
 #ifndef CONFIG_BIOS_NO_BOOT
 static void boot_sequence(void)
@@ -173,6 +176,9 @@ __attribute__((__used__)) int main(int i, char **c)
 
 #if defined(CSR_ETHMAC_BASE) || defined(MAIN_RAM_BASE) || defined(CSR_SPIFLASH_CORE_BASE)
     printf("--========== \e[1mInitialization\e[0m ============--\n");
+#ifdef EARLY_INIT
+	early_init();
+#endif /* EARLY_INIT */
 #ifdef CSR_ETHMAC_BASE
 	eth_init();
 #endif
