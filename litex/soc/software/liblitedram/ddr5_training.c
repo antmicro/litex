@@ -56,6 +56,7 @@
 
 static int32_t helper_modules_without_shift;
 static int32_t helper_modules_seen;
+static bool seen_working;
 
 static int reduce_cs(uint32_t cs, int modules) {
     uint32_t ok, module;
@@ -73,6 +74,10 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
     for (csdly = 0; csdly < ctx->max_delay_taps; csdly++) {
         works = works_ = 0;
         works = ctx->cs.check(channel, rank, 0, shift_0101, ctx->modules, ctx->die_width);
+        if (!seen_working) {
+            helper_modules_without_shift = 0;
+            helper_modules_seen = 0;
+        }
         helper = works & helper_modules_without_shift;
         works = helper == helper_modules_without_shift ? works : 0;
         // helper = set of modules that work without shift and aren't in helper_modules_without_shift
@@ -93,16 +98,19 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
         works = works & works_ ? 0 : works | works_;
         printf("%d", reduce_cs(works, ctx->modules));
         set_helper_arr_value_and_advance(reduce_cs(works, ctx->modules));
+        seen_working |= reduce_cs(works, ctx->modules);
         ctx->cs.inc_dly(channel, rank, 0);
     }
     ctx->cs.rst_dly(channel, rank, 0);
 }
 
-static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank) {
+static bool CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank) {
     int shift = 1;
+    bool subtract = false;
     clear_helper_arr();
     helper_modules_without_shift = 0;
     helper_modules_seen = 0;
+    seen_working = false;
     ctx->cs.rst_dly(channel, rank, 0);
 
     // Enter CS training
@@ -116,12 +124,14 @@ static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t ra
             printf("\nshift 0101|");
             CS_scan_single(ctx, channel, rank, 1);
             shift = !shift;
+            subtract = true;
         case 1:
             printf("|");
             CS_scan_single(ctx, channel, rank, shift);
             printf("|\n");
         break;
         case 0:
+            // Only when training RCD
             clear_helper_arr();
             helper_modules_without_shift = 0;
             helper_modules_seen = 0;
@@ -134,16 +144,20 @@ static void CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t ra
     };
     // Exit CS training
     ctx->cs.exit_training_mode(channel, rank);
+    return subtract;
 }
+
+static void CA_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, int32_t address);
 
 static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *success) {
     int left_side, right_side;
     int32_t csdly, coarse;
+    bool subtract;
 
     for (int _rank = 0; _rank < ctx->ranks; ++_rank) {
         left_side = UNSET_DELAY;
         right_side = UNSET_DELAY;
-        CS_scan(ctx, channel, _rank);
+        subtract = CS_scan(ctx, channel, _rank);
         find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
 
         if (left_side == UNSET_DELAY || right_side == UNSET_DELAY) {
@@ -151,8 +165,7 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
             *success = 0;
             return;
         }
-        // When delay is around 0 delay, allow for small negative bias
-        if ((right_side + left_side) / 2 >= ctx->max_delay_taps - (ctx->max_delay_taps/32)) {
+        if (subtract) {
             right_side -= ctx->max_delay_taps;
             left_side -= ctx->max_delay_taps;
         }
@@ -170,6 +183,32 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
 
         ctx->cs.delays[channel][_rank][0] = right_side;
         ctx->cs.delays[channel][_rank][1] = left_side;
+
+        // Check CS using CA 0
+        CA_scan(ctx, channel, _rank, 0);
+        left_side = UNSET_DELAY;
+        right_side = UNSET_DELAY;
+        find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
+        right_side -= ctx->max_delay_taps;
+        left_side -= ctx->max_delay_taps;
+        if (right_side < 0) {
+            right_side = ctx->cs.delays[channel][_rank][0] + ctx->max_delay_taps;
+            left_side = ctx->cs.delays[channel][_rank][1] + ctx->max_delay_taps;
+
+            printf("CS eye captures previous CLK, move CS to the right\n");
+            printf("Rank delays: %2d:%2d\n", right_side, left_side);
+            coarse = (right_side + left_side) / 2;
+            coarse = MAX(0, coarse);
+            printf("Coarse adjustment:%"PRId32"\n", coarse);
+            ctx->cs.coarse_delays[channel][_rank] = coarse;
+
+            ctx->cs.rst_dly(channel, _rank, 0);
+            for (csdly = 0; csdly < coarse; ++csdly)
+                ctx->cs.inc_dly(channel, _rank, 0);
+
+            ctx->cs.delays[channel][_rank][0] = right_side;
+            ctx->cs.delays[channel][_rank][1] = left_side;
+        }
     }
 }
 
@@ -518,8 +557,8 @@ static bool sdram_ddr5_cs_ca_channel_training(training_ctx_t *const ctx , int ch
 #ifndef KEEP_GOING_ON_DRAM_ERROR
     if (!CA_success) {
         return false;
-#endif // KEEP_GOING_ON_DRAM_ERROR
     }
+#endif // KEEP_GOING_ON_DRAM_ERROR
 
 #ifndef KEEP_GOING_ON_DRAM_ERROR
     return (CS_success & CA_success);
@@ -1983,8 +2022,9 @@ void sdram_ddr5_flow(void) {
 #endif // SKIP_CSCA_TRAINING
     } else {
 #ifndef SKIP_MRS_SEQUENCE
-        for (int rank = 0; rank < base_ctx->ranks; ++rank)
+        for (int rank = 0; rank < base_ctx->ranks; ++rank) {
             setup_dram_mrs_sequence(rank);
+        }
 #endif // SKIP_MRS_SEQUENCE
 #ifndef SKIP_CSCA_TRAINING
         sdram_ddr5_cs_ca_training(base_ctx);
