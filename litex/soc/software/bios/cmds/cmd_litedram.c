@@ -388,7 +388,7 @@ static void sdram_mr_write_handler(int nb_params, char **params)
 }
 define_command(sdram_mr_write, sdram_mr_write_handler, "Write SDRAM Mode Register", LITEDRAM_CMDS);
 
-#ifdef SDRAM_PHY_DDR5
+#if defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_LPDDR5)
 /**
  * Command "sdram_mr_read"
  *
@@ -426,11 +426,15 @@ static void sdram_mr_read_handler(int nb_params, char **params)
 	}
 	sdram_software_control_on();
 	printf("Reading from channel:%d device:%d MR%d\n", channel, device, reg);
-	printf("Value:%02x\n", sdram_mode_register_read(channel, device, reg));
-	sdram_software_control_off();
+	#ifdef SDRAM_PHY_DDR5
+		printf("Value:%02x\n", sdram_mode_register_read(channel, device, reg));
+	#else
+		printf("Value:%02x\n", sdram_mode_register_read(reg));
+	#endif
+	// sdram_software_control_off();
 }
 define_command(sdram_mr_read, sdram_mr_read_handler, "Read SDRAM Mode Register", LITEDRAM_CMDS);
-#endif // SDRAM_PHY_DDR5
+#endif // defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_LPDDR5)
 
 #endif /* CSR_SDRAM_BASE */
 

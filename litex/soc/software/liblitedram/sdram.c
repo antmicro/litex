@@ -305,6 +305,21 @@ uint8_t sdram_mode_register_read(int channel, int pda, int reg) {
 }
 #endif
 
+#ifdef SDRAM_PHY_LPDDR5
+// void cmd_injector(int channel, int phases, int cs, int command,
+//                  int wrdata_en, uint64_t wrdata_mask, int rddata_en, int single)
+void sdram_mode_register_read(int reg) {
+	printf("SDRAM mode register read %d\n", reg);
+	// sdram_dfii_pi0_address_write(0);
+	// sdram_dfii_pi0_baddress_write(reg);
+	// command_p0(0x24 << 1|DFII_COMMAND_CAS|DFII_COMMAND_CS);
+
+	sdram_dfii_pi0_address_write(0x24);
+	sdram_dfii_pi0_baddress_write(reg);
+	command_p0(DFII_COMMAND_CS |DFII_COMMAND_CAS | 1 << CSR_SDRAM_DFII_PI0_COMMAND_RDEN_OFFSET);
+}
+#endif
+
 #if !defined(SDRAM_PHY_DDR5) && defined(CSR_DDRPHY_BASE)
 
 /*-----------------------------------------------------------------------*/
@@ -1253,10 +1268,16 @@ int sdram_init(void) {
 		sdram_timings_spd(&spd_ctx);
 	}
 #endif // defined(SDRAM_PHY_DDR4) && defined(CONFIG_HAS_I2C)
+	int i;
 
+#ifdef SDRAM_PHY_LPDDR5
+	printf("Test mode register reads:\n");
+	for (i=0; i<47; i++){
+		sdram_mode_register_read(i);
+	}
+#endif
 	/* Reset Cmd/Dat delays */
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
-	int i;
 	sdram_write_leveling_rst_cmd_delay(0);
 	for (i=0; i<16; i++) sdram_write_leveling_rst_dat_delay(i, 0);
 #ifdef SDRAM_PHY_BITSLIPS
@@ -1283,7 +1304,12 @@ int sdram_init(void) {
 	ddrphy_rst_write(0);
 	busy_wait_us(10);
 #endif // CSR_DDRPHY_RST_ADDR
-
+#ifdef SDRAM_PHY_LPDDR5
+	printf("Test mode register reads:\n");
+	for (i=0; i<47; i++){
+		sdram_mode_register_read(i);
+	}
+#endif
 #ifdef CSR_DDRCTRL_BASE
 	ddrctrl_init_done_write(0);
 	ddrctrl_init_error_write(0);
