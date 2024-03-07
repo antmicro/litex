@@ -310,13 +310,9 @@ uint8_t sdram_mode_register_read(int channel, int pda, int reg) {
 //                  int wrdata_en, uint64_t wrdata_mask, int rddata_en, int single)
 void sdram_mode_register_read(int reg) {
 	printf("SDRAM mode register read %d\n", reg);
-	// sdram_dfii_pi0_address_write(0);
-	// sdram_dfii_pi0_baddress_write(reg);
-	// command_p0(0x24 << 1|DFII_COMMAND_CAS|DFII_COMMAND_CS);
-
-	sdram_dfii_pi0_address_write(0x24);
-	sdram_dfii_pi0_baddress_write(reg);
-	command_p0(DFII_COMMAND_CS |DFII_COMMAND_CAS | 1 << CSR_SDRAM_DFII_PI0_COMMAND_RDEN_OFFSET);
+	sdram_dfii_pi0_address_write(reg);
+	sdram_dfii_pi0_baddress_write(1);
+	command_p0(DFII_COMMAND_CS |DFII_COMMAND_WE);
 }
 #endif
 
