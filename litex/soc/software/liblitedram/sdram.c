@@ -308,15 +308,29 @@ uint8_t sdram_mode_register_read(int channel, int pda, int reg) {
 #ifdef SDRAM_PHY_LPDDR5
 // void cmd_injector(int channel, int phases, int cs, int command,
 //                  int wrdata_en, uint64_t wrdata_mask, int rddata_en, int single)
-void sdram_mode_register_read(int reg) {
+uint8_t sdram_mode_register_read(int reg) {
 	printf("SDRAM mode register read %d\n", reg);
 	sdram_dfii_pi0_address_write(reg);
 	sdram_dfii_pi0_baddress_write(1);
 	command_p0(DFII_COMMAND_CS |DFII_COMMAND_WE);
+	return 0x00;
 }
 #endif
 
 #if !defined(SDRAM_PHY_DDR5) && defined(CSR_DDRPHY_BASE)
+
+/*************************************************************************/
+/* Read from SDRAM                                                       */
+/*************************************************************************/
+
+#if defined(SDRAM_PHY_LPDDR5)
+void sdram_read(uint8_t bank, uint8_t column) {
+	sdram_dfii_pird_address_write(column);
+	sdram_dfii_pird_baddress_write(bank);
+	command_prd(DFII_COMMAND_CAS|DFII_COMMAND_CS|DFII_COMMAND_RDDATA);
+	cdelay(15);
+}
+#endif
 
 /*-----------------------------------------------------------------------*/
 /* Leveling Centering (Common for Read/Write Leveling)                   */

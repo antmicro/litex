@@ -44,10 +44,21 @@ void sdram_software_control_off(void);
 /* Mode Register                                                         */
 /*-----------------------------------------------------------------------*/
 void sdram_mode_register_write(char reg, int value);
-#ifdef SDRAM_PHY_DDR5
+#if defined(SDRAM_PHY_DDR5)
 uint8_t sdram_mode_register_read(int channel, int pda, int reg);
+#elif defined(SDRAM_PHY_LPDDR5)
+// void cmd_injector(int channel, int phases, int cs, int command,
+//                  int wrdata_en, uint64_t wrdata_mask, int rddata_en, int single)
+uint8_t sdram_mode_register_read(int reg);
 #endif
 
+/*************************************************************************/
+/* Read from SDRAM                                                       */
+/*************************************************************************/
+
+#if defined(SDRAM_PHY_LPDDR5)
+void sdram_read(uint8_t bank, uint8_t column);
+#endif
 
 /*-----------------------------------------------------------------------*/
 /* Write Leveling                                                        */

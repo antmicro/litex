@@ -436,6 +436,44 @@ static void sdram_mr_read_handler(int nb_params, char **params)
 define_command(sdram_mr_read, sdram_mr_read_handler, "Read SDRAM Mode Register", LITEDRAM_CMDS);
 #endif // defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_LPDDR5)
 
+#if defined(SDRAM_PHY_LPDDR5)
+/**
+ * Command "sdram_read"
+ *
+ * Read SDRAM Mode Register (only DDR5)
+ *
+ */
+static void sdram_read_handler(int nb_params, char **params)
+{
+	char *c;
+	uint8_t bank;
+	uint8_t column;
+
+	if (nb_params < 2) {
+		printf("sdram_read <bank> <column>");
+		return;
+	}
+
+	bank = strtoul(params[0], &c, 0);
+	if (*c != 0 || bank > 15) {
+		printf("Incorrect bank");
+		return;
+	}
+
+	column = strtoul(params[1], &c, 0);
+	if (*c != 0 || column > 63) {
+		printf("Incorrect device");
+		return;
+	}
+
+	sdram_software_control_on();
+	printf("Reading from bank:%d column:%d\n", bank, column);
+	sdram_read(bank, column);
+	// sdram_software_control_off();
+}
+define_command(sdram_read, sdram_read_handler, "Read SDRAM", LITEDRAM_CMDS);
+#endif // defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_LPDDR5)
+
 #endif /* CSR_SDRAM_BASE */
 
 /**
