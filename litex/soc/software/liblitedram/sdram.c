@@ -29,10 +29,13 @@
 #include <liblitedram/sdram_dbg.h>
 #include <liblitedram/sdram_spd.h>
 
-#ifdef SDRAM_PHY_DDR5
+#if defined(SDRAM_PHY_DDR5)
 #include <liblitedram/ddr5_helpers.h>
 #include <liblitedram/ddr5_training.h>
-#else
+#elif defined(SDRAM_PHY_LPDDR5)
+#include <liblitedram/lpddr5_training.h>
+#include <liblitedram/lpddr5_helpers.h>
+#else // neither defined(SDRAM_PHY_DDR5) nor defined(SDRAM_PHY_LPDDR5)
 #include <liblitedram/accessors.h>
 #endif // SDRAM_PHY_DDR5
 
@@ -64,6 +67,7 @@
 /*-----------------------------------------------------------------------*/
 
 #define DFII_PIX_DATA_BYTES SDRAM_PHY_DFI_DATABITS/8
+#define DFII_CK_WCK_RATIO (DFII_PIX_DATA_BYTES/SDRAM_PHY_MODULES/SDRAM_PHY_XDR)
 
 int sdram_get_databits(void) {
 	return SDRAM_PHY_DATABITS;
@@ -109,6 +113,8 @@ __attribute__((unused)) void cdelay(int i) {
 #endif // USE_BUSY_WAIT_IN_CDEALY
 }
 
+
+#if !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5)
 #ifdef SIM_SKIP_LOOPS
 static int _seed_array[] = {42};
 static uint8_t precomputed[1][SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
@@ -137,13 +143,14 @@ static void precompute_prs(void) {
 		}
 	}
 }
+#endif // !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5)
 
 /*-----------------------------------------------------------------------*/
 /* DFII                                                                  */
 /*-----------------------------------------------------------------------*/
 
 #ifdef CSR_DDRPHY_BASE
-#ifndef SDRAM_PHY_DDR5
+#if !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5)
 static unsigned char sdram_dfii_get_rdphase(void) {
 #ifdef CSR_DDRPHY_RDPHASE_ADDR
 	return ddrphy_rdphase_read();
@@ -255,7 +262,7 @@ static void command_pwr(unsigned int value) {
 	unsigned char wrphase = sdram_dfii_get_wrphase();
 	command_px(wrphase, value);
 }
-#endif // ndef SDRAM_PHY_DDR5
+#endif // !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5)
 #endif // CSR_DDRPHY_BASE
 
 /*-----------------------------------------------------------------------*/
@@ -341,25 +348,12 @@ uint8_t sdram_mode_register_read(int reg) {
 	printf("SDRAM mode register read %d\n", reg);
 	sdram_dfii_pi0_address_write(reg);
 	sdram_dfii_pi0_baddress_write(1);
-	command_p0(DFII_COMMAND_CS |DFII_COMMAND_WE);
+	command_p0(DFII_COMMAND_CS|DFII_COMMAND_WE|DFII_COMMAND_RDDATA);
 	return 0x00;
 }
 #endif
 
-#if !defined(SDRAM_PHY_DDR5) && defined(CSR_DDRPHY_BASE)
-
-/*************************************************************************/
-/* Read from SDRAM                                                       */
-/*************************************************************************/
-
-#if defined(SDRAM_PHY_LPDDR5)
-void sdram_read(uint8_t bank, uint8_t column) {
-	sdram_dfii_pird_address_write(column);
-	sdram_dfii_pird_baddress_write(bank);
-	command_prd(DFII_COMMAND_CAS|DFII_COMMAND_CS|DFII_COMMAND_RDDATA);
-	cdelay(15);
-}
-#endif
+#if !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5) && defined(CSR_DDRPHY_BASE)
 
 /*-----------------------------------------------------------------------*/
 /* Leveling Centering (Common for Read/Write Leveling)                   */
@@ -466,6 +460,7 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 		csr_rd_buf_uint8(sdram_dfii_pix_rddata_addr(p) + (DFII_PIX_DATA_BYTES & (~0x3)),
 		                 tst + (DFII_PIX_DATA_BYTES & ~0x3),
 		                 DFII_PIX_DATA_BYTES & 0x3);
+		csr_rd_buf_uint8(sdram_dfii_pix_rddata_addr(p), tst, DFII_PIX_DATA_BYTES);
 		/* Verify bytes matching current 'module' */
 		int pebo;   // module's positive_edge_byte_offset
 		int nebo;   // module's negative_edge_byte_offset, could be undefined if SDR DRAM is used
@@ -1078,7 +1073,7 @@ void sdram_read_leveling(void) {
 
 #endif // SDRAM_PHY_READ_LEVELING_CAPABLE
 
-#endif /* !defined(SDRAM_PHY_DDR5) && defined(CSR_DDRPHY_BASE) */
+#endif /* !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5) && defined(CSR_DDRPHY_BASE)  */
 
 /*-----------------------------------------------------------------------*/
 /* Write latency calibration                                             */
@@ -1278,14 +1273,7 @@ int sdram_init(void) {
 		sdram_timings_spd(&spd_ctx);
 	}
 #endif // defined(SDRAM_PHY_DDR4) && defined(CONFIG_HAS_I2C)
-	int i;
 
-#ifdef SDRAM_PHY_LPDDR5
-	printf("Test mode register reads:\n");
-	for (i=0; i<47; i++){
-		sdram_mode_register_read(i);
-	}
-#endif
 	/* Reset Cmd/Dat delays */
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
 	sdram_write_leveling_rst_cmd_delay(0);
@@ -1314,29 +1302,28 @@ int sdram_init(void) {
 	ddrphy_rst_write(0);
 	busy_wait_us(10);
 #endif // CSR_DDRPHY_RST_ADDR
-#ifdef SDRAM_PHY_LPDDR5
-	printf("Test mode register reads:\n");
-	for (i=0; i<47; i++){
-		sdram_mode_register_read(i);
-	}
-#endif
 #ifdef CSR_DDRCTRL_BASE
 	ddrctrl_init_done_write(0);
 	ddrctrl_init_error_write(0);
 #endif // CSR_DDRCTRL_BASE
-#ifdef SDRAM_PHY_DDR5
+
+#if defined(SDRAM_PHY_DDR5)
 	sdram_ddr5_flow();
 #else
-	precompute_prs();
 	reset_sequence();
 	init_sequence();
+#if defined(SDRAM_PHY_LPDDR5)
+	sdram_lpddr5_flow();
+#else
 #if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
+	precompute_prs();
 	sdram_leveling();
 #endif // defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
+#endif /* SDRAM_PHY_LPDDR5 */
 #endif /* SDRAM_PHY_DDR5 */
 	sdram_software_control_off();
 
-#ifndef SDRAM_PHY_DDR5
+#if !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5)
 	printf("\nSelected bitslips and delays:\n");
 #ifdef SDRAM_PHY_WRITE_LEVELING_CAPABLE
 	printf("Clock delay: %d\n", sdram_clock_delay);
@@ -1368,7 +1355,7 @@ int sdram_init(void) {
 		printf("%3d", read_dq_delay[i]);
 	printf("\n");
 #endif // SDRAM_PHY_READ_LEVELING_CAPABLE
-#endif /* not SDRAM_PHY_DDR5 */
+#endif /* !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5) */
 
 #ifndef SDRAM_TEST_DISABLE
 	if(!memtest((unsigned int *) MAIN_RAM_BASE, MEMTEST_DATA_SIZE)) {

@@ -1,5 +1,5 @@
-#ifndef LIBLITEDRAM_DDR5_EYE_DETECTION_HELPER_H
-#define LIBLITEDRAM_DDR5_EYE_DETECTION_HELPER_H
+#ifndef LIBLITEDRAM_UTILS_EYE_DETECTION_HELPER_H
+#define LIBLITEDRAM_UTILS_EYE_DETECTION_HELPER_H
 #include <generated/csr.h>
 #ifdef CSR_SDRAM_BASE
 #include <generated/sdram_phy.h>
@@ -41,4 +41,4 @@ int one_in_helper_arr(int max);
  */
 void find_eye_in_helper_arr(int *left, int *right, int max);
 #endif // CSR_SDRAM_BASE
-#endif // LIBLITEDRAM_DDR5_EYE_DETECTION_HELPER_H
+#endif // LIBLITEDRAM_UTILS_EYE_DETECTION_HELPER_H

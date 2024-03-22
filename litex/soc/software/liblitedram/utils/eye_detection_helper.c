@@ -1,6 +1,6 @@
-#include <liblitedram/ddr5/eye_detection_helper.h>
+#include <liblitedram/utils/eye_detection_helper.h>
 
-#if defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
+#if defined(CSR_SDRAM_BASE)
 
 #include <stdbool.h>
 #include <inttypes.h>
@@ -44,4 +44,4 @@ void find_eye_in_helper_arr(int *left, int *right, int max) {
     if (helper_arr[2*max - 1])
         *left = 2 * max;
 }
-#endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
+#endif // defined(CSR_SDRAM_BASE)

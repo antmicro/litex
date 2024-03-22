@@ -52,14 +52,6 @@ uint8_t sdram_mode_register_read(int channel, int pda, int reg);
 uint8_t sdram_mode_register_read(int reg);
 #endif
 
-/*************************************************************************/
-/* Read from SDRAM                                                       */
-/*************************************************************************/
-
-#if defined(SDRAM_PHY_LPDDR5)
-void sdram_read(uint8_t bank, uint8_t column);
-#endif
-
 /*-----------------------------------------------------------------------*/
 /* Write Leveling                                                        */
 /*-----------------------------------------------------------------------*/

@@ -1,8 +1,8 @@
 #include <liblitedram/ddr5_training.h>
 
 #if defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
+#include <liblitedram/utils/eye_detection_helper.h>
 #include <liblitedram/ddr5/ddr5_spd_parse.h>
-#include <liblitedram/ddr5/eye_detection_helper.h>
 #include <liblitedram/ddr5_helpers.h>
 
 #include <liblitedram/sdram_rcd.h>

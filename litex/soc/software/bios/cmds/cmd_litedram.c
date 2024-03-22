@@ -437,20 +437,22 @@ define_command(sdram_mr_read, sdram_mr_read_handler, "Read SDRAM Mode Register",
 #endif // defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_LPDDR5)
 
 #if defined(SDRAM_PHY_LPDDR5)
+#include <liblitedram/lpddr5_helpers.h>
 /**
  * Command "sdram_read"
  *
- * Read SDRAM Mode Register (only DDR5)
+ * Read SDRAM (only LPDDR5)
  *
  */
 static void sdram_read_handler(int nb_params, char **params)
 {
 	char *c;
 	uint8_t bank;
+	uint16_t row;
 	uint8_t column;
 
-	if (nb_params < 2) {
-		printf("sdram_read <bank> <column>");
+	if (nb_params < 3) {
+		printf("sdram_read <bank> <row> <column>");
 		return;
 	}
 
@@ -460,19 +462,71 @@ static void sdram_read_handler(int nb_params, char **params)
 		return;
 	}
 
-	column = strtoul(params[1], &c, 0);
+	row = strtoul(params[1], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect row");
+		return;
+	}
+
+	column = strtoul(params[2], &c, 0);
 	if (*c != 0 || column > 63) {
 		printf("Incorrect device");
 		return;
 	}
 
 	sdram_software_control_on();
-	printf("Reading from bank:%d column:%d\n", bank, column);
-	sdram_read(bank, column);
-	// sdram_software_control_off();
+	printf("Reading from bank:%d row:%"PRId16" column:%d\n", bank, row, column);
+	sdram_read(bank, row, column);
+	sdram_software_control_off();
 }
 define_command(sdram_read, sdram_read_handler, "Read SDRAM", LITEDRAM_CMDS);
-#endif // defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_LPDDR5)
+
+/**
+ * Command "sdram_write"
+ *
+ * Write SDRAM (only LPDDR5)
+ *
+ */
+static void sdram_write_handler(int nb_params, char **params)
+{
+	char *c;
+	uint8_t bank;
+	uint16_t row;
+	uint8_t column;
+	uint8_t value;
+
+	if (nb_params < 4) {
+		printf("sdram_write <bank> <row> <column> <value>");
+		return;
+	}
+
+	bank = strtoul(params[0], &c, 0);
+	if (*c != 0 || bank > 15) {
+		printf("Incorrect bank");
+		return;
+	}
+
+	row = strtoul(params[1], &c, 0);
+	if (*c != 0) {
+		printf("Incorrect row");
+		return;
+	}
+
+	column = strtoul(params[2], &c, 0);
+	if (*c != 0 || column > 63) {
+		printf("Incorrect device");
+		return;
+	}
+
+	value = strtoul(params[3], &c, 0);
+
+	sdram_software_control_on();
+	printf("Writing to bank:%d row:%"PRId16" column:%d value:%d\n", bank, row, column, value);
+	sdram_write(bank, row, column, value);
+	sdram_software_control_off();
+}
+define_command(sdram_write, sdram_write_handler, "Write SDRAM", LITEDRAM_CMDS);
+#endif // defined(SDRAM_PHY_LPDDR5)
 
 #endif /* CSR_SDRAM_BASE */
 
