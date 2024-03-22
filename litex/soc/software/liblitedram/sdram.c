@@ -389,19 +389,25 @@ static void precompute_prs(void) {
 }
 
 static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int id, int dq_line) {
-	int p;
+	int p, i, j;
 	unsigned int errors;
 	uint8_t tst[DFII_PIX_DATA_BYTES];
+	uint8_t _buff[DFII_PIX_DATA_BYTES];
 
 	/* Activate */
 	sdram_activate_test_row();
 
 	/* Write pseudo-random sequence */
 	for(p=0;p<SDRAM_PHY_PHASES;p++) {
+		for (i=0;i<DFII_PIX_DATA_BYTES/4;++i) {
+			for (j=0;j<4;++j) {
+				_buff[i*4+j] = precomputed[id][p][(i+1)*4-j-1];
+			}
+		}
 		csr_wr_buf_uint32(sdram_dfii_pix_wrdata_addr(p),
-		                  (uint32_t*)precomputed[id][p],
+		                  (uint32_t*)_buff,
 		                  (DFII_PIX_DATA_BYTES/4));
-		csr_wr_buf_uint8(sdram_dfii_pix_wrdata_addr(p),
+		csr_wr_buf_uint8(sdram_dfii_pix_wrdata_addr(p) + (DFII_PIX_DATA_BYTES & (~0x3)),
 		                 precomputed[id][p] + (DFII_PIX_DATA_BYTES & (~0x3)),
 		                 (DFII_PIX_DATA_BYTES & 0x3));
 	}
@@ -426,8 +432,13 @@ static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int
 	errors = 0;
 	for(p=0;p<SDRAM_PHY_PHASES;p++) {
 		/* Read back test pattern */
-		csr_rd_buf_uint32(sdram_dfii_pix_rddata_addr(p), (uint32_t *)tst, DFII_PIX_DATA_BYTES/4);
-		csr_rd_buf_uint8(sdram_dfii_pix_rddata_addr(p),
+		csr_rd_buf_uint32(sdram_dfii_pix_rddata_addr(p), (uint32_t *)_buff, DFII_PIX_DATA_BYTES/4);
+		for (i=0;i<DFII_PIX_DATA_BYTES/4;++i) {
+			for (j=0;j<4;++j) {
+				tst[i*4+j] = _buff[(i+1)*4-j-1];
+			}
+		}
+		csr_rd_buf_uint8(sdram_dfii_pix_rddata_addr(p) + (DFII_PIX_DATA_BYTES & (~0x3)),
 		                 tst + (DFII_PIX_DATA_BYTES & ~0x3),
 		                 DFII_PIX_DATA_BYTES & 0x3);
 		/* Verify bytes matching current 'module' */
