@@ -60,26 +60,6 @@
 #endif // SDRAM_PHY_DELAYS > 32
 
 /*-----------------------------------------------------------------------*/
-/* Helpers                                                               */
-/*-----------------------------------------------------------------------*/
-
-#define max(x, y) (((x) > (y)) ? (x) : (y))
-#define min(x, y) (((x) < (y)) ? (x) : (y))
-
-__attribute__((unused)) void cdelay(int i) {
-#ifdef USE_BUSY_WAIT_IN_CDEALY
-	busy_wait_ck(i);
-#else
-#ifndef CONFIG_BIOS_NO_DELAYS
-	while(i > 0) {
-		__asm__ volatile(CONFIG_CPU_NOP);
-		i--;
-	}
-#endif // CONFIG_BIOS_NO_DELAYS
-#endif // USE_BUSY_WAIT_IN_CDEALY
-}
-
-/*-----------------------------------------------------------------------*/
 /* Constants                                                             */
 /*-----------------------------------------------------------------------*/
 
@@ -107,6 +87,55 @@ int sdram_get_cwl(void) {
 #else
 	return -1;
 #endif // SDRAM_PHY_CWL
+}
+
+/*-----------------------------------------------------------------------*/
+/* Helpers                                                               */
+/*-----------------------------------------------------------------------*/
+
+#define max(x, y) (((x) > (y)) ? (x) : (y))
+#define min(x, y) (((x) < (y)) ? (x) : (y))
+
+__attribute__((unused)) void cdelay(int i) {
+#ifdef USE_BUSY_WAIT_IN_CDEALY
+	busy_wait_ck(i);
+#else
+#ifndef CONFIG_BIOS_NO_DELAYS
+	while(i > 0) {
+		__asm__ volatile(CONFIG_CPU_NOP);
+		i--;
+	}
+#endif // CONFIG_BIOS_NO_DELAYS
+#endif // USE_BUSY_WAIT_IN_CDEALY
+}
+
+#ifdef SIM_SKIP_LOOPS
+static int _seed_array[] = {42};
+static uint8_t precomputed[1][SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
+#else
+static int _seed_array[] = {42, 84, 36, 72, 24, 48};
+static uint8_t precomputed[6][SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
+#endif
+static int _seed_array_length = sizeof(_seed_array) / sizeof(_seed_array[0]);
+
+static void precompute_prs(void) {
+	uint8_t value;
+	uint32_t prv;
+	int p, i, bit;
+	for (int seed_id = 0; seed_id < _seed_array_length; seed_id++) {
+		/* Generate pseudo-random sequence */
+		prv = _seed_array[seed_id];
+		for(p=0;p<SDRAM_PHY_PHASES;p++) {
+			for(i=0;i<DFII_PIX_DATA_BYTES;i++) {
+				value = 0;
+				for (bit=0;bit<8;bit++) {
+					prv = lfsr(32, prv);
+					value |= (prv&1) << bit;
+				}
+				precomputed[seed_id][p][i] = value;
+			}
+		}
+	}
 }
 
 /*-----------------------------------------------------------------------*/
@@ -383,35 +412,6 @@ static void print_scan_errors(unsigned int errors) {
 
 #define READ_CHECK_TEST_PATTERN_MAX_ERRORS (8*SDRAM_PHY_PHASES*DFII_PIX_DATA_BYTES/SDRAM_PHY_MODULES)
 #define MODULE_BITMASK ((1<<SDRAM_PHY_DQ_DQS_RATIO)-1)
-
-#ifdef SIM_SKIP_LOOPS
-static int _seed_array[] = {42};
-static uint8_t precomputed[1][SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
-#else
-static int _seed_array[] = {42, 84, 36, 72, 24, 48};
-static uint8_t precomputed[6][SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
-#endif
-static int _seed_array_length = sizeof(_seed_array) / sizeof(_seed_array[0]);
-
-static void precompute_prs(void) {
-	uint8_t value;
-	uint32_t prv;
-	int p, i, bit;
-	for (int seed_id = 0; seed_id < _seed_array_length; seed_id++) {
-		/* Generate pseudo-random sequence */
-		prv = _seed_array[seed_id];
-		for(p=0;p<SDRAM_PHY_PHASES;p++) {
-			for(i=0;i<DFII_PIX_DATA_BYTES;i++) {
-				value = 0;
-				for (bit=0;bit<8;bit++) {
-					prv = lfsr(32, prv);
-					value |= (prv&1) << bit;
-				}
-				precomputed[seed_id][p][i] = value;
-			}
-		}
-	}
-}
 
 static unsigned int sdram_write_read_check_test_pattern(int module, unsigned int id, int dq_line) {
 	int p, i, j;
