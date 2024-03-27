@@ -107,19 +107,19 @@ static int _read_verbosity = 0;
  * MR47-MR54.
  * JESD209-5B 6.3
  */
-//static uint64_t read_serial_number(int module, int width) {
-//    int i;
-//    uint64_t serial_number = 0;
-//
-//    // Serial number is a 5 byte value
-//    for (i = 0; i < 8; i++) {
-//        // Base register 65
-//        send_mrr(47+i);
-//        serial_number = (serial_number << 8) | recover_mrr_value(module, width);
-//    }
-//
-//    return serial_number;
-//}
+static uint64_t read_serial_number(int module, int width) {
+    int i;
+    uint64_t serial_number = 0;
+
+    // Serial number is a 5 byte value
+    for (i = 0; i < 8; i++) {
+        // Base register 65
+        send_mrr(47+i);
+        serial_number = (serial_number << 8) | recover_mrr_value(module, width);
+    }
+
+    return serial_number;
+}
 
 /**
  * rd_bitslip_idly_check_if_works
@@ -132,25 +132,26 @@ static int _read_verbosity = 0;
  *
  * JESD209-5B 4.2.9
  */
-//static int rd_bitslip_idly_check_if_works(int module, int width) {
-//    int works = 1;
-//    int seed;
-//
-//    // Check if Serial readout works
-//    for (seed = 0; seed < serial_count && works; seed++) {
-//        /* Setup MRs */
-//        send_mrw(33, serial[seed]&0xff);
-//        send_mrw(34, serial[seed]>>8);
-//        for (int i = 0 ; i < 16 && works; ++i) {
-//            send_rdc();
-//            works &= compare_serial(module, width, serial[seed], 0xA5, 0);
-//            if (!works && _read_verbosity > 1) {
-//                compare_serial(module, width, serial[seed], 0xA5, 1);
-//            }
-//        }
-//    }
-//    return works;
-//}
+static int rd_bitslip_idly_check_if_works(int module, int width) {
+    int works = 1;
+    int seed;
+
+    send_mrw(31, 0xA5);
+    // Check if Serial readout works
+    for (seed = 0; seed < serial_count && works; seed++) {
+        /* Setup MRs */
+        send_mrw(33, serial[seed]&0xff);
+        send_mrw(34, serial[seed]>>8);
+        for (int i = 0 ; i < 16 && works; ++i) {
+            send_rdc();
+            works &= compare_serial(module, width, serial[seed], 0xA5, 0);
+            if (!works && _read_verbosity > 1) {
+                compare_serial(module, width, serial[seed], 0xA5, 1);
+            }
+        }
+    }
+    return works;
+}
 
 /**
  * read_training_data_scan
@@ -159,7 +160,7 @@ static int _read_verbosity = 0;
  * It finds the first eye of working delays and selects its center
  * to configure the read bitslips and DQ delays.
  */
-/*
+
 static eye_t read_training_data_scan(int module, int width, int max_delay_taps) {
     eye_t eye = DEFAULT_EYE;
 
@@ -169,13 +170,11 @@ static eye_t read_training_data_scan(int module, int width, int max_delay_taps) 
     printf("Data scan:\n");
 
     // Set read cycle delay
-    rd_rst(module, width);
+    rd_rst(module);
 
     for (rd_bitslip = 0; rd_bitslip < SDRAM_PHY_BITSLIPS; ++rd_bitslip) {
-        if (_read_verbosity > 0)
-            printf("%2d|", rd_bitslip);
-
-        idly_rst(module, width);
+        printf("%2d|", rd_bitslip);
+        idly_rst(module);
         for(idly = 0; idly < max_delay_taps; idly++){
 
             works = rd_bitslip_idly_check_if_works(module, width);
@@ -189,12 +188,10 @@ static eye_t read_training_data_scan(int module, int width, int max_delay_taps) 
                 eye.state = AFTER;
             }
 
-            idly_inc(module, width);
+            idly_inc(module);
         }
-        if (_read_verbosity > 0)
-            printf("|\n");
-
-        rd_inc(module, width);
+        printf("|\n");
+        rd_inc(module);
     }
 
     if (eye.state != AFTER) {
@@ -234,14 +231,14 @@ static bool read_training(int modules, int die_width, int max_taps) {
             eye_width, eye_center_bitslip, eye_center_delay);
 
         // Setting read delay to eye center
-        rd_rst(module, die_width);
+        rd_rst(module);
         for (rd_bitslip = 0; rd_bitslip < eye_center_bitslip; ++rd_bitslip) {
-            rd_inc(module, die_width);
+            rd_inc(module);
         }
 
-        idly_rst(module, die_width);
+        idly_rst(module);
         for (idly = 0; idly < eye_center_delay; idly++) {
-            idly_inc(module, die_width);
+            idly_inc(module);
         }
     }
 //#if defined(COMMON_VREF_CONTROL)
@@ -264,7 +261,7 @@ static void read_check(
         );
     }
 
-    if (_read_verbosity > 1) {
+    if (_read_verbosity) {
         for (module = 0; module < modules; module++) {
             printf("Module:%d\n", module);
             read_registers(module, die_width);
@@ -272,7 +269,7 @@ static void read_check(
     }
     return;
 }
-*/
+
 
 /**
  * sdram_lpddr5_read_training
@@ -283,7 +280,7 @@ static void read_check(
  * 1. Find read cycle
  * 2. Perform a simple read check
  */
-/*
+
 static bool sdram_lpddr5_read_training(training_ctx_t *const ctx) {
     bool good = true;
     good &= read_training(ctx->modules,
@@ -302,7 +299,7 @@ static bool sdram_lpddr5_read_training(training_ctx_t *const ctx) {
 #endif // KEEP_GOING_ON_DRAM_ERROR
     return true;
 }
-
+/*
 #ifdef WRITE_DEEP_DEBUG_LPDDR5
 static int _write_verbosity = 3;
 #elif defined(WRITE_DEBUG_LPDDR5)
@@ -564,9 +561,11 @@ void sdram_lpddr5_flow(void) {
     if (!sdram_lpddr5_wck_training(base_ctx)) {
         return;
     }
-//    if (!sdram_lpddr5_read_training(base_ctx)) {
-//        return;
-//    }
+    printf("CK2WCK done\n");
+    if (!sdram_lpddr5_read_training(base_ctx)) {
+        return;
+    }
+    printf("Read training done\n");
 //    if (!sdram_lpddr5_write_training(base_ctx)) {
 //        return;
 //    }

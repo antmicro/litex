@@ -28,11 +28,23 @@ typedef struct {
     .end    = -1,       \
 }
 
+void rd_rst(uint8_t module);
+void rd_inc(uint8_t module);
+void idly_rst(uint8_t module);
+void idly_inc(uint8_t module);
+
 void enter_CK2WCK_leveling(void);
 bool sample_CK2WCK_shift(void);
 void exit_CK2WCK_leveling(void);
 
+void send_rdc(void);
+int compare_serial(int module, int width,
+                   uint16_t data, int inv, int print);
+
 void send_mrw(uint8_t reg, uint8_t val);
+void send_mrr(uint8_t reg);
+uint8_t recover_mrr_value(uint8_t module, uint8_t width);
+void read_registers(int module, int width);
 
 void sdram_read(uint8_t bank, uint16_t row, uint8_t column);
 void sdram_write(uint8_t bank, uint16_t row, uint8_t column, uint8_t value);

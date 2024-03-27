@@ -9,6 +9,8 @@
 
 #include <generated/sdram_phy.h>
 
+#if defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_DDR4_RDIMM)
+
 static uint8_t pec_calc(uint8_t pec, uint8_t *buf, uint8_t len) {
     uint16_t inter = 0;
     for (int i=0; i<len; ++i) {
@@ -22,8 +24,6 @@ static uint8_t pec_calc(uint8_t pec, uint8_t *buf, uint8_t len) {
     }
     return pec;
 }
-
-#if defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_DDR4_RDIMM)
 
 #ifdef SDRAM_PHY_DDR5SIMPHY
 bool sdram_rcd_read(uint8_t rcd, uint8_t dev, uint8_t function, uint8_t page_num, uint8_t reg_num, uint8_t *data, bool byte_read) {
