@@ -115,6 +115,7 @@ __attribute__((unused)) void cdelay(int i) {
 
 
 #if !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5)
+#if defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 #ifdef SIM_SKIP_LOOPS
 static int _seed_array[] = {42};
 static uint8_t precomputed[1][SDRAM_PHY_PHASES][DFII_PIX_DATA_BYTES];
@@ -143,6 +144,7 @@ static void precompute_prs(void) {
 		}
 	}
 }
+#endif // defined(SDRAM_PHY_WRITE_LEVELING_CAPABLE) || defined(SDRAM_PHY_READ_LEVELING_CAPABLE)
 #endif // !defined(SDRAM_PHY_DDR5) && !defined(SDRAM_PHY_LPDDR5)
 
 /*-----------------------------------------------------------------------*/
@@ -1265,6 +1267,7 @@ int sdram_leveling(void) {
 /*-----------------------------------------------------------------------*/
 
 int sdram_init(void) {
+	int i;
 	/* Set timings (from SPD, if available) */
 	sdram_timings_init();
 #if defined(SDRAM_PHY_DDR4) && defined(CONFIG_HAS_I2C)

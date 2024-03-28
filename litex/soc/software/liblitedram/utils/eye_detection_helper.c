@@ -11,6 +11,10 @@
 #define MAX(a, b) (a > b ? a : b)
 #define MIN(a, b) (a < b ? a : b)
 
+#ifndef SDRAM_PHY_DELAYS
+#define SDRAM_PHY_DELAYS 0
+#endif
+
 static int32_t helper_arr[2*MAX(64, SDRAM_PHY_DELAYS)];
 static int32_t helper_arr_it;
 
