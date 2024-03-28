@@ -66,6 +66,7 @@ static bool sdram_lpddr5_wck_training(training_ctx_t *const ctx) {
     // initial aligment
     ddrphy_cadly_rst_write(1);
     ddrphy_wdly_dqs_rst_write(1);
+    ddrphy_wdly_dqs_bitslip_rst_write(1);
     phase = sample_CK2WCK_shift();
     prev_phase = phase;
     for (count = 0; count < ctx->max_delay_taps && phase == prev_phase; ++count) {
@@ -283,6 +284,7 @@ static void read_check(
 
 static bool sdram_lpddr5_read_training(training_ctx_t *const ctx) {
     bool good = true;
+    printf("DQ read training\n");
     good &= read_training(ctx->modules,
                           ctx->die_width,
                           ctx->max_delay_taps);
@@ -299,7 +301,7 @@ static bool sdram_lpddr5_read_training(training_ctx_t *const ctx) {
 #endif // KEEP_GOING_ON_DRAM_ERROR
     return true;
 }
-/*
+
 #ifdef WRITE_DEEP_DEBUG_LPDDR5
 static int _write_verbosity = 3;
 #elif defined(WRITE_DEBUG_LPDDR5)
@@ -310,97 +312,52 @@ static int _write_verbosity = 1;
 static int _write_verbosity = 0;
 #endif
 
-static void setup_serial_write_data(training_ctx_t *const ctx , int cnt_seed, int module, int print) {
-    int it;
-    uint8_t temp;
-    uint16_t wrdata;
-    if(print)
-        printf("wrdata:");
-    for (it =0; it <8; ++it) {
-        wrdata = 0;
-        for (temp = 0; temp < ctx->die_width; ++temp) {
-            wrdata |= ((serial[cnt_seed]>>(2*it))&1) << temp;
-        }
-        for (temp = 0; temp < ctx->die_width; ++temp) {
-            wrdata |= ((serial[cnt_seed]>>(2*it+1))&1) << (temp + ctx->die_width);
-        }
-        if(print)
-            printf("%04"PRIx16"|", wrdata);
-        set_data_module_phase(module, ctx->die_width, it, wrdata);
-    }
-    if(print)
-        printf("\n");
-}
-
-static int compare_serial_write_data(training_ctx_t *const ctx , int cnt_seed, int module, int print) {
-    int phase;
-    uint8_t temp;
-    uint16_t rddata;
-    int works = 1;
-    if(print)
-        printf("rddata:");
-    for (phase = 0; phase < 8 && works; ++phase) {
-        rddata = get_data_module_phase(module, ctx->die_width, phase);
-        if(print)
-            printf("%04"PRIx16"|", rddata);
-        for (temp = 0; temp < ctx->die_width; ++temp)
-            works &= !!(((rddata>>temp)&1) == ((serial[cnt_seed]>>(2*phase))&1));
-        for (temp = 0; temp < ctx->die_width; ++temp)
-            works &= !!(((rddata>>(temp + ctx->die_width)) & 1) == ((serial[cnt_seed]>>(2*phase+1)) & 1));
-    }
-    if(print)
-        printf("\n");
-    return works;
-}
-
-static int write_serial_check(training_ctx_t *const ctx , int module) {
-    int cnt_seed, it;
+static int write_serial_check(training_ctx_t *const ctx, int module) {
+    int cnt_seed, i;
     int works = 1;
     for (cnt_seed = 0; cnt_seed < serial_count; ++cnt_seed) {
-        setup_serial_write_data(ctx, cnt_seed, module, 0);
-        for (int i=0; i < 8; ++i) {
+        setup_serial_write_data(module, ctx->die_width, serial[cnt_seed], 0, 0);
+        for (i = 0; i < 8; ++i) {
             send_fifo_write();
             send_fifo_read();
-            works &= compare_serial_write_data(ctx, cnt_seed, module, 0);
+            works &= compare_serial(module, ctx->die_width, serial[cnt_seed], 0, 0);
             if (!works && _write_verbosity > 1) {
-                setup_serial_write_data(ctx, cnt_seed, module, 1);
-                compare_serial_write_data(ctx, cnt_seed, module, 1);
+                setup_serial_write_data(module, ctx->die_width, serial[cnt_seed], 0, 1);
+                compare_serial(module, ctx->die_width, serial[cnt_seed], 0, 1);
             }
             if (!works)
                 return works;
         }
-        // Set all 0's
-        for (it =0; it <8; ++it) {
-            set_data_module_phase(module, ctx->die_width, it, 0);
-        }
     }
     return works;
 }
 
-static eye_t write_data_scan(training_ctx_t *const ctx, int module, int print) {
+static eye_t write_data_scan(training_ctx_t *const ctx, int module, int initial_bitslip, int print) {
     eye_t eye = DEFAULT_EYE;
-    eye_t serial_only_eye = DEFAULT_EYE;
-    int works = 1, p_works;
+    int works = 1;
     int bitslip;
 
     if (print)
         printf("Data scan:\n");
-    for (bitslip = 0; bitslip < SDRAM_PHY_BITSLIPS; ++bitslip) {
+    wr_rst(module);
+    for(bitslip = 0; bitslip < initial_bitslip; ++bitslip) {
+        wr_inc(module);
+    }
+    for (bitslip = initial_bitslip; bitslip < SDRAM_PHY_BITSLIPS && eye.state != AFTER; ++bitslip) {
         if (print) {
             printf("%2d|", bitslip);
             if (_write_verbosity > 2)
                 printf("\n");
         }
 
-        odly_dq_rst(module, ctx->die_width);
-        for(int delay = 0; delay < ctx->max_delay_taps; ++delay){
+        odly_rst(module);
+        for(int delay = 0; delay < ctx->max_delay_taps && eye.state != AFTER; ++delay){
             works = 1;
-            p_works = 0;
 #ifndef LPDDR5_TRAINING_SIM
             works &= write_serial_check(ctx, module);
 #endif // LPDDR5_TRAINING_SIM
             if (print)
-                printf("%d", p_works);
+                printf("%d", works);
             if (_write_verbosity > 1)
                 printf("\n");
 
@@ -412,21 +369,22 @@ static eye_t write_data_scan(training_ctx_t *const ctx, int module, int print) {
                 eye.state  = AFTER;
             }
 
-            odly_dq_inc(module, ctx->die_width);
+            odly_inc(module);
         }
         if (print)
             printf("|\n");
-        wr_dq_inc(module, ctx->die_width);
+        wr_inc(module);
     }
     return eye;
 }
 
 static int moduel_dq_vref_scan(training_ctx_t *const ctx, int module) {
 #ifdef LPDDR5_TRAINING_SIM
-    return 0;
+    return 0x30;
 #endif
     int eye_width_range [2][SDRAM_PHY_DELAYS];
-    int vref, _width;
+    int vref, _width, initial_bitslip;
+    eye_t last_eye = DEFAULT_EYE;
     int best_vref = -1;
 
     for(_width = 0; _width < SDRAM_PHY_DELAYS; ++_width) {
@@ -434,14 +392,19 @@ static int moduel_dq_vref_scan(training_ctx_t *const ctx, int module) {
         eye_width_range[1][_width] = -1;
     }
 
-    for(vref = 0xA; vref < 0x7F; ++vref) { // FIXME: check over whole DQ VREF space, but keep performance
+    for(vref = 0xA; vref < 0x80; ++vref) { // FIXME: check over whole DQ VREF space, but keep performance
         if (_write_verbosity)
             printf("Vref:%2X", vref);
         send_mrw(14, vref);
         busy_wait_us(1);
         if (_write_verbosity)
             printf("\n");
-        eye_t eye = write_data_scan(ctx, module, _write_verbosity);
+        if (last_eye.state == BEFORE) {
+            initial_bitslip = 0;
+        } else {
+            initial_bitslip = last_eye.start/ctx->max_delay_taps - 1;
+        }
+        eye_t eye = write_data_scan(ctx, module, initial_bitslip, _write_verbosity);
         if (_write_verbosity)
             printf("|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
                 eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
@@ -458,6 +421,7 @@ static int moduel_dq_vref_scan(training_ctx_t *const ctx, int module) {
                 eye_width_range[0][_width] = vref;
             eye_width_range[1][_width] = vref + 1;
         }
+        last_eye = eye;
     }
 
     for (_width = 0; _width < SDRAM_PHY_DELAYS; ++_width) {
@@ -478,8 +442,8 @@ static int moduel_dq_vref_scan(training_ctx_t *const ctx, int module) {
 static int module_vref_scan(training_ctx_t *const ctx, int module) {
     int best_vref, middle_cycle, middle_delay, it;
 
-    wr_dq_rst(module, ctx->die_width);
-    odly_dq_rst(module, ctx->die_width);
+    wr_rst(module);
+    odly_rst(module);
     best_vref = moduel_dq_vref_scan(ctx, module);
 
 #ifndef KEEP_GOING_ON_DRAM_ERROR
@@ -488,9 +452,9 @@ static int module_vref_scan(training_ctx_t *const ctx, int module) {
 #endif // KEEP_GOING_ON_DRAM_ERROR
 
     // Setting read delay to eye center
-    wr_dq_rst(module, ctx->die_width);
-    odly_dq_rst(module, ctx->die_width);
-    eye_t eye = write_data_scan(ctx, module, 1);
+    wr_rst(module);
+    odly_rst(module);
+    eye_t eye = write_data_scan(ctx, module, 0, 1);
     middle_cycle = ((eye.start + eye.end)/2)/ctx->max_delay_taps;
     middle_delay = ((eye.start + eye.end)/2)%ctx->max_delay_taps;
     eye.center = eye.end - eye.start;
@@ -501,15 +465,15 @@ static int module_vref_scan(training_ctx_t *const ctx, int module) {
     printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
         eye.center, middle_cycle, middle_delay);
 
-    wr_dq_rst(module, ctx->die_width);
-    odly_dq_rst(module, ctx->die_width);
+    wr_rst(module);
+    odly_rst(module);
     if (eye.state == AFTER)
         for (it = 0; it < middle_cycle; ++it) {
-            wr_dq_inc(module, ctx->die_width);
+            wr_inc(module);
         }
     if (eye.state == AFTER)
     for (it = 0; it < middle_delay; ++it) {
-        odly_dq_inc(module, ctx->die_width);
+        odly_inc(module);
     }
 
     return best_vref;
@@ -538,7 +502,7 @@ static bool sdram_lpddr5_write_training(training_ctx_t *const ctx ) {
 #endif // KEEP_GOING_ON_DRAM_ERROR
     return true;
 }
-*/
+
 
 training_ctx_t host_dram_ctx;
 
@@ -558,6 +522,17 @@ void sdram_lpddr5_flow(void) {
 
     training_ctx_t *base_ctx = &host_dram_ctx;
 
+    // Reset PHY state
+    ddrphy_cadly_rst_write(1);
+    ddrphy_wdly_dqs_rst_write(1);
+    ddrphy_wdly_dqs_bitslip_rst_write(1);
+    for (int module = 0; module < base_ctx->modules; ++module) {
+        rd_rst(module);
+        idly_rst(module);
+        wr_rst(module);
+        odly_rst(module);
+    }
+
     if (!sdram_lpddr5_wck_training(base_ctx)) {
         return;
     }
@@ -566,9 +541,10 @@ void sdram_lpddr5_flow(void) {
         return;
     }
     printf("Read training done\n");
-//    if (!sdram_lpddr5_write_training(base_ctx)) {
-//        return;
-//    }
+    if (!sdram_lpddr5_write_training(base_ctx)) {
+        return;
+    }
+    printf("Write training done\n");
 }
 
 #endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_LPDDR5)
