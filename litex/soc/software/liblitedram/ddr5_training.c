@@ -191,7 +191,7 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
         find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
         right_side -= ctx->max_delay_taps;
         left_side -= ctx->max_delay_taps;
-        if (right_side < 0) {
+        if (left_side < 0) {
             right_side = ctx->cs.delays[channel][_rank][0] + ctx->max_delay_taps;
             left_side = ctx->cs.delays[channel][_rank][1] + ctx->max_delay_taps;
 
