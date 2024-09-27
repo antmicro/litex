@@ -140,6 +140,7 @@ static bool CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t ra
             printf("|");
             CS_scan_single(ctx, channel, rank, 0);
             printf("|\n");
+            subtract = true;
         break;
     };
     // Exit CS training
