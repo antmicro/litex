@@ -41,6 +41,7 @@ typedef struct {
         action_callback_t inc_dly;
 
         delay_checker_cs_t check;
+        uint8_t invert[CHANNELS];
     } cs;
     struct {
         int line_count;

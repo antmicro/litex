@@ -36,6 +36,13 @@ int one_in_helper_arr(int max) {
     return 0;
 }
 
+int one_stride_helper_arr(int max) {
+    for (int it = 0; it < max; ++it) {
+       if (!helper_arr[it]) return it;
+    }
+    return max;
+}
+
 void find_eye_in_helper_arr(int *left, int *right, int max) {
     for (int it = 0; it < 2* max; ++it) {
         if (helper_arr[it] && *right == UNSET_DELAY)

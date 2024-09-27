@@ -33,6 +33,16 @@ void set_helper_arr_value_and_advance(uint32_t value);
 int one_in_helper_arr(int max);
 
 /**
+ * one_stride_helper_arr
+ * Iterates over helper array from 0 up to `max`.
+ * Returns:
+ *  `idx` if `idx` contains 0 and all previous indices
+ *  had non zero value
+ *  max if array is full of non zero values
+ */
+int one_stride_helper_arr(int max);
+
+/**
  * find_eye_in_helper_arr
  * Searches helper array from 0 to 2*`max`, `max` not included.
  * It returns first index with non-zero value in the `right` variable,

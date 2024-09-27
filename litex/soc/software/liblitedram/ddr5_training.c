@@ -104,8 +104,8 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
     ctx->cs.rst_dly(channel, rank, 0);
 }
 
-static bool CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank) {
-    int shift = 1;
+static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank) {
+    int shift = ctx->cs.invert[channel];
     bool subtract = false;
     clear_helper_arr();
     helper_modules_without_shift = 0;
@@ -117,16 +117,30 @@ static bool CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t ra
     printf("Rank: %2"PRId32"\t|", rank);
     ctx->cs.enter_training_mode(channel, rank);
     printf("\nInitial scan|");
-    CS_scan_single(ctx, channel, rank, 0);
+    CS_scan_single(ctx, channel, rank, shift);
+
+    if(ctx->training_type == HOST_RCD &&
+      one_in_helper_arr(ctx->max_delay_taps) == -1 &&
+      one_stride_helper_arr(ctx->max_delay_taps) < (ctx->max_delay_taps/8)) {
+        ctx->cs.invert[channel] = 1;
+        shift = 1;
+        clear_helper_arr();
+        helper_modules_without_shift = 0;
+        helper_modules_seen = 0;
+        printf("\nChanging polarization |");
+        CS_scan_single(ctx, channel, rank, shift);
+    }
+
     switch (one_in_helper_arr(ctx->max_delay_taps)) {
         case -1:
             clear_helper_arr();
             printf("\nshift 0101|");
-            CS_scan_single(ctx, channel, rank, 1);
             shift = !shift;
+            CS_scan_single(ctx, channel, rank, shift);
             subtract = true;
         case 1:
             printf("|");
+            shift = !shift;
             CS_scan_single(ctx, channel, rank, shift);
             printf("|\n");
         break;
@@ -135,12 +149,11 @@ static bool CS_scan(const training_ctx_t *const ctx, int32_t channel, int32_t ra
             clear_helper_arr();
             helper_modules_without_shift = 0;
             helper_modules_seen = 0;
-            printf("\nChange polarization|");
-            CS_scan_single(ctx, channel, rank, 1);
+            printf("\nChange polarization |");
+            CS_scan_single(ctx, channel, rank, !shift);
             printf("|");
-            CS_scan_single(ctx, channel, rank, 0);
+            CS_scan_single(ctx, channel, rank, shift);
             printf("|\n");
-            subtract = true;
         break;
     };
     // Exit CS training
@@ -158,17 +171,26 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
     for (int _rank = 0; _rank < ctx->ranks; ++_rank) {
         left_side = UNSET_DELAY;
         right_side = UNSET_DELAY;
-        subtract = CS_scan(ctx, channel, _rank);
-        find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
 
-        if (left_side == UNSET_DELAY || right_side == UNSET_DELAY) {
-            printf("CS:%2d Eye width:0 Failed\n", _rank);
-            *success = 0;
-            return;
-        }
-        if (subtract) {
-            right_side -= ctx->max_delay_taps;
-            left_side -= ctx->max_delay_taps;
+        // With RDIMMs it's safe to assume that CS0 and CS1 will have the same
+        // delays, as CS signals must be within 20 ps of each other and RCD DCS
+        // paths should be identical
+        if (ctx->training_type != HOST_RCD || (_rank&1) == 0) {
+            subtract = CS_scan(ctx, channel, _rank);
+            find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
+
+            if (left_side == UNSET_DELAY || right_side == UNSET_DELAY) {
+                printf("CS:%2d Eye width:0 Failed\n", _rank);
+                *success = 0;
+                return;
+            }
+            if (subtract) {
+                right_side -= ctx->max_delay_taps;
+                left_side -= ctx->max_delay_taps;
+            }
+        } else {
+            right_side = ctx->cs.delays[channel][_rank^1][0];
+            left_side  = ctx->cs.delays[channel][_rank^1][1];
         }
 
         // Set up coarse delay adjustment until we get CA results
