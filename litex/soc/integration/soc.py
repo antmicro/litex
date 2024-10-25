@@ -1679,9 +1679,9 @@ class LiteXSoC(SoC):
                 l2_cache_size = 2**int(log2(l2_cache_size))                  # Round to nearest power of 2
                 l2_cache_data_width = max(port.data_width, l2_cache_min_data_width)
                 l2_cache = wishbone.Cache(
-                    cachesize = l2_cache_size//4,
+                    cachesize = l2_cache_size//(wb_sdram.data_width//8),
                     master    = wb_sdram,
-                    slave     = wishbone.Interface(l2_cache_data_width),
+                    slave     = wishbone.Interface.keep_address_space(l2_cache_data_width, wb_sdram),
                     reverse   = l2_cache_reverse)
                 if l2_cache_full_memory_we:
                     l2_cache = FullMemoryWE()(l2_cache)

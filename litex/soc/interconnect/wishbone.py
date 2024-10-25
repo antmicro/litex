@@ -65,6 +65,11 @@ class Interface(Record):
     def like(other):
         return Interface(len(other.dat_w))
 
+    @staticmethod
+    def keep_address_space(new_data_width, source):
+        new_addr_width = source.adr_width - int(log2(new_data_width/source.data_width))
+        return Interface(new_data_width, new_addr_width)
+
     def _do_transaction(self):
         yield self.cyc.eq(1)
         yield self.stb.eq(1)
@@ -571,7 +576,7 @@ class Cache(Module):
         linebits = log2_int(cachesize) - offsetbits
         # log2_int(number cache lines)
 
-        tagbits = addressbits - linebits
+        tagbits = addressbits - linebits - offsetbits
         # bits for tag
 
         wordbits = log2_int(max(dw_from//dw_to, 1))
@@ -873,7 +878,6 @@ class Cache(Module):
             slave.cyc.eq(1),
             slave.we.eq(1),
             If(slave.ack,
-                slave_dat_w_lookahead_reg.eq(1),
                 word_inc.eq(1),
                 If(word_is_last(word),
                     # Write the tag first to set the slave address

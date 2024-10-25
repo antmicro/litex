@@ -10,6 +10,7 @@
 import os
 import sys
 import subprocess
+import logging
 
 from migen.fhdl.structure import *
 from migen.fhdl.specials import Instance, Tristate
@@ -195,18 +196,22 @@ class XilinxMemoryImpl:
     def emit_verilog(memory, namespace, add_data_file):
         # Helpers.
         # --------
-
         def _get_name(e):
             if isinstance(e, Memory):
                 return namespace.get_name(e)
             else:
                 return verilog_printexpr(namespace, e)[0]
+        logger = logging.getLogger(f"Xilinx Memory Writer ({_get_name(memory)})")
 
         # Parameters.
         # -----------
         r         = ""
         adr_regs  = {}
         data_regs = {}
+        intermediate_eq = {}
+        intermediate_sigs = {}
+        data_old_regs = {}
+        load_data_old_regs = {}
 
         # Ports Transformations.
         # ----------------------
@@ -250,6 +255,7 @@ class XilinxMemoryImpl:
 
         # Memory Logic Declaration/Initialization.
         # ----------------------------------------
+
         r += f"reg [{memory.width-1}:0] {_get_name(memory)}[0:{memory.depth-1}];\n"
         if memory.init is not None:
             content = ""
@@ -265,84 +271,178 @@ class XilinxMemoryImpl:
         # Port Intermediate Signals.
         # --------------------------
         for n, port in enumerate(memory.ports):
+            # Solve for memory EN
+            if port.re is not None:
+                logger.info("Xilinx memory primitives don't support RE signal")
+
+            if port.re is not None and not port.async_read:
+                intermediate_sigs[n] = Signal(name_override=f"{_get_name(memory)}_en{n}")
+                intermediate_eq[n] = f"{_get_name(port.re)}"
+                if port.we is not None:
+                    intermediate_eq[n] += f" | {_get_name(port.we)}"
+
+            if hasattr(port, "en"):
+                en_str = f"{_get_name(port.en)}"
+                if n not in intermediate_sigs:
+                    intermediate_sigs[n] = Signal(name_override=f"{_get_name(memory)}_en{n}")
+                    intermediate_eq[n] = en_str
+                else:
+                    intermediate_eq[n] = f"({intermediate_eq[n]}) & {en_str}"
+
+            if n in intermediate_sigs:
+                r += f"wire {_get_name(intermediate_sigs[n])};\n"
+                r += f"assign {_get_name(intermediate_sigs[n])} = {intermediate_eq[n]};\n"
+            # Solve for data register
+            if port.re is not None or hasattr(port, "en"):
+                data_old_regs[n] = Signal(name_override=f"{_get_name(memory)}_old_dat{n}")
+                r += f"reg [{memory.width-1}:0] {_get_name(data_old_regs[n])} = {{({memory.width}){{1'b0}}}};\n"
+                load_data_old_regs[n] = Signal(name_override=f"{_get_name(memory)}_old_re{n}")
+                if port.async_read:
+                    r += f"wire {_get_name(load_data_old_regs[n])} = 1'b0;\n"
+                else:
+                    r += f"reg {_get_name(load_data_old_regs[n])} = 1'b0;\n"
+
             # No Intermediate Signal for Async Read.
             if port.async_read:
                 continue
-
-            # Create Address Register in Write-First mode.
-            if port.mode in [WRITE_FIRST]:
+            # Create Read Address Register
+            if port.mode in [WRITE_FIRST] and port.we is not None:
                 adr_regs[n] = Signal(name_override=f"{_get_name(memory)}_adr{n}")
                 r += f"reg [{bits_for(memory.depth-1)-1}:0] {_get_name(adr_regs[n])};\n"
+                continue
+            # Create Read Data Register
+            data_regs[n] = Signal(name_override=f"{_get_name(memory)}_dat{n}")
+            r += f"reg [{memory.width-1}:0] {_get_name(data_regs[n])};\n"
 
-            # Create Data Register in Read-First/No Change mode.
-            if port.mode in [READ_FIRST, NO_CHANGE]:
-                data_regs[n] = Signal(name_override=f"{_get_name(memory)}_dat{n}")
-                r += f"reg [{memory.width-1}:0] {_get_name(data_regs[n])};\n"
+        def sync_start(_r, _indent, _n, _port):
+            _r += f"{_indent}always @(posedge {_get_name(_port.clock)}) begin\n"
+            _indent += "\t";
+            return _r, _indent
+        def sync_end(_r, _indent):
+            _indent = _indent [:-1]
+            _r += f"{_indent}end\n"
+            return _r, _indent
+
+        def en_start(_r, _indent, _n):
+            if _n in intermediate_sigs:
+                _r += f"{_indent}if({_get_name(intermediate_sigs[_n])}) begin\n"
+                _indent += "\t"
+            return _r, _indent
+        def en_end(_r, _indent, _n):
+            if _n in intermediate_sigs:
+                _indent = _indent [:-1]
+                _r += f"{_indent}end\n"
+            return _r, _indent
+
+        def loop_declar(_r, _indent, _loop_var):
+            _r += f"{_indent}integer {_loop_var};\n"
+            return _r, _indent
+        def loop_pre(_r, _indent, _loop_var, _nb_col):
+            _r += f"{_indent}for({_loop_var} = 0; "
+            _r += f"{_loop_var} < {_nb_col}; "
+            _r += f"{_loop_var}={_loop_var}+1) begin\n"
+            _indent += "\t"
+            return _r, _indent
+        def loop_post(_r, _indent):
+            _indent = _indent[:-1]
+            _r += f"{_indent}end\n"
+            return (_r, _indent)
+
+        def simple_line(_r, _indent, _body):
+            _r += _body.format(_indent=_indent, dslc="")
+            return _r, _indent
+        def if_body(_r, _indent, _n, _port, _loop_var, _col_width, _body):
+            wbit = f"[{_loop_var}]" if _loop_var is not None else ""
+            _r += f"{_indent}if ({_get_name(_port.we)}{wbit}) begin\n"
+            _indent += "\t"
+            dslc = ""
+            if _loop_var is not None:
+                dslc = f"[{_loop_var}*{_col_width} +: {_col_width}]"
+            _r += _body.format(_indent=_indent, dslc=dslc)
+            _indent = _indent[:-1]
+            _r += f"{_indent}end\n"
+            return _r, _indent
+
+        # Read Logic.
+        def read_fn(_n, _port):
+            main_path = ""
+            if not _port.async_read:
+                main_path = "{_indent}"
+                # Add Read-Enable Logic is already handled in the en.
+                if _port.mode == NO_CHANGE:
+                    main_path += f"if (~|{_get_name(_port.we)})\n{{_indent}}\t"
+                if _port.mode == WRITE_FIRST and _port.we is not None:
+                    main_path = f"{{_indent}}{_get_name(adr_regs[_n])}" +\
+                                f" <= {_get_name(_port.adr)};\n"
+                    return main_path
+                main_path += f"{_get_name(data_regs[_n])}" +\
+                             f" <= {_get_name(memory)}[{_get_name(_port.adr)}];\n"
+            return main_path
+
+        def write_fn(_n, _port):
+            path = ""
+            nb_col = 1
+            col_width = memory.width
+            loop_var = None
+            if _port.we is not None:
+                if memory.width != _port.we_granularity:
+                    # Declare loop variable before always block
+                    loop_var = f"{_get_name(memory)}_{_n}_loop_var"
+                    nb_col = memory.width // _port.we_granularity
+                    col_width = _port.we_granularity
+
+                path = f"{{_indent}}{_get_name(memory)}[{_get_name(_port.adr)}]{{dslc}}" +\
+                       f" <= {_get_name(_port.dat_w)}{{dslc}};\n"
+            return path, loop_var, nb_col, col_width
 
         # Ports Write/Read Logic.
         # -----------------------
         for n, port in enumerate(memory.ports):
-            loop_var_name = f"{_get_name(memory)}_{n}_loop_var"
-            # Declare loop variable before always block
-            if port.we is not None and memory.width != port.we_granularity:
-                r += f"integer {loop_var_name};\n"
-            r += f"always @(posedge {_get_name(port.clock)}) begin\n"
-            # Write Logic.
+            indent = ""
+            read_main = read_fn(n, port)
+            write, loop_var, nb_col, col_width = write_fn(n, port)
+            if loop_var is not None:
+                r, indent = loop_declar(r, indent, loop_var)
+            r, indent = sync_start(r, indent, n, port)
+            r, indent = en_start(r, indent, n)
+            if loop_var is not None:
+                r, indent = loop_pre(r, indent, loop_var, nb_col)
             if port.we is not None:
-                # Create for loop with we.
-                preamble = ""
-                postamble = ""
-                if memory.width != port.we_granularity:
-                    preamble += f"for({loop_var_name} = 0; "
-                    preamble += f"{loop_var_name} < {memory.width//port.we_granularity}; "
-                    preamble += f"{loop_var_name}={loop_var_name}+1) begin\n"
-                    postamble = "end\n"
-                r += preamble
-                wbit = f"[{loop_var_name}]" if memory.width != port.we_granularity else ""
-                r += f"\tif ({_get_name(port.we)}{wbit}) begin\n"
-                dslc = f"[{loop_var_name}*{port.we_granularity}+: {port.we_granularity}]" if (memory.width != port.we_granularity) else ""
-                r += f"\t\t{_get_name(memory)}[{_get_name(port.adr)}]{dslc} <= {_get_name(port.dat_w)}{dslc};\n"
-                r += "\tend\n"
-                r += postamble
-
-            # Read Logic.
-            if not port.async_read:
-                # In Write-First mode, Read from Address Register.
-                if port.mode in [WRITE_FIRST]:
-                    rd = f"\t{_get_name(adr_regs[n])} <= {_get_name(port.adr)};\n"
-
-                # In Read-First/No Change mode:
-                if port.mode in [READ_FIRST, NO_CHANGE]:
-                    rd = ""
-                    # Only Read in No-Change mode when no Write.
-                    if port.mode == NO_CHANGE:
-                        rd += f"\tif (!{_get_name(port.we)})\n\t"
-                    # Read-First/No-Change Read logic.
-                    rd += f"\t{_get_name(data_regs[n])} <= {_get_name(memory)}[{_get_name(port.adr)}];\n"
-
-                # Add Read-Enable Logic.
-                if port.re is None:
-                    r += rd
-                else:
-                    r += f"\tif ({_get_name(port.re)})\n"
-                    r += "\t" + rd.replace("\n\t", "\n\t\t")
-            r += "end\n"
+                r, indent = if_body(r, indent, n, port, loop_var, col_width, write)
+            if loop_var is not None:
+                r, indent = loop_post(r, indent)
+            r, indent = simple_line(r, indent, read_main)
+            r, indent = en_end(r, indent, n)
+            r, indent = sync_end(r, indent)
+            assert len(indent) == 0
 
         # Ports Read Mapping.
         # -------------------
         for n, port in enumerate(memory.ports):
             # Direct (Asynchronous) Read on Async-Read mode.
-            if port.async_read:
-                r += f"assign {_get_name(port.dat_r)} = {_get_name(memory)}[{_get_name(port.adr)}];\n"
+            rdata_source = f"{_get_name(memory)}[{_get_name(port.adr)}]"
+            if not port.async_read and port.mode == WRITE_FIRST and port.we is not None:
+                rdata_source = f"{_get_name(memory)}[{_get_name(adr_regs[n])}]"
+            elif not port.async_read:
+                rdata_source = f"{_get_name(data_regs[n])}"
+            if n not in data_old_regs:
+                r += f"assign {_get_name(port.dat_r)} = {rdata_source};\n"
                 continue
-
-            # Write-First mode: Do Read through Address Register.
-            if port.mode in [WRITE_FIRST]:
-                r += f"assign {_get_name(port.dat_r)} = {_get_name(memory)}[{_get_name(adr_regs[n])}];\n"
-
-            # Read-First/No-Change mode: Data already Read on Data Register.
-            if port.mode in [READ_FIRST, NO_CHANGE]:
-                 r += f"assign {_get_name(port.dat_r)} = {_get_name(data_regs[n])};\n"
+            logic = f"{_get_name(port.re)}"
+            if hasattr(port, "en"):
+                logic += f" & {_get_name(port.en)}"
+            if not port.async_read:
+                r, indent = sync_start(r, indent, n, port)
+                r += f"{indent}{_get_name(load_data_old_regs[n])} <= {logic};\n"
+            else:
+                r += f"assign {_get_name(load_data_old_regs[n])} = {logic};\n"
+                r, indent = sync_start(r, indent, n, port)
+            r += f"{indent}if({_get_name(load_data_old_regs[n])})\n"
+            r += f"{indent}\t{_get_name(data_old_regs[n])} <= {_get_name(data_regs[n])};\n"
+            r, indent = sync_end(r, indent)
+            assert len(indent) == 0
+            r += f"assign {_get_name(port.dat_r)} = {_get_name(load_data_old_regs[n])} ?" +\
+                 f" {_get_name(data_regs[n])} : {_get_name(data_old_regs[n])};\n"
         r += "\n\n"
 
         return r
