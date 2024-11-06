@@ -84,6 +84,7 @@ class RemoteServer(EtherboneIPC):
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if hasattr(socket, "SO_REUSEPORT"):
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.socket.bind((self.bind_ip, self.bind_port))
         print("tcp port: {:d}".format(self.bind_port))
         self.socket.listen(1)

@@ -48,6 +48,7 @@ class RemoteClient(EtherboneIPC, CSRBuilder):
         if hasattr(self, "socket"):
             return
         self.socket = socket.create_connection((self.host, self.port), 5.0)
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.socket.settimeout(5.0)
 #        self._receive_server_info()
 
