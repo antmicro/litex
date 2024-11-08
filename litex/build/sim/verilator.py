@@ -130,8 +130,24 @@ def _generate_sim_config(config):
     content = config.get_json()
     tools.write_to_file("sim_config.js", content)
 
+def _generate_sim_trace_file(namespace, top_name):
+    content = "`verilator_config\n"
+    traced_signals = [sig for sig in namespace.sigs.keys() if isinstance(sig, Signal) if "trace" in sig.attr]
+    if len(traced_signals) > 0:
+        # Disable tracing
+        content += f"tracing_off -scope \"{top_name}*\" -levels 0\n"
+        # Always trace clocks and resets
+        for domain in namespace.clock_domains:
+            for sig in ["clk", "rst"]:
+                if getattr(domain, sig) is not None:
+                    traced_signals.append(getattr(domain, sig))
+    for sig in traced_signals:
+        verilog_name = namespace.get_name(sig)
+        content += f"tracing_on -scope \"{top_name}.{verilog_name}\"\n"
+    tools.write_to_file("verilator_trace_scope.vlt", content)
 
-def _build_sim(build_name, sources, jobs, threads, coverage, opt_level="O3", trace_fst=False, timing=False):
+
+def _build_sim(build_name, sources, jobs, threads, coverage, opt_level="O3", trace=False, trace_fst=False, timing=False):
     makefile = os.path.join(core_directory, 'Makefile')
 
     cc_srcs = []
@@ -141,7 +157,7 @@ def _build_sim(build_name, sources, jobs, threads, coverage, opt_level="O3", tra
 
     build_script_contents = """\
 rm -rf obj_dir/
-make -C . -f {} {} {} {} {} {} {} {}
+make -C . -f {} {} {} {} {} {} {} {} {} {}
 """.format(makefile,
     "CC_SRCS=\"{}\"".format("".join(cc_srcs)),
     "JOBS={}".format(jobs) if jobs else "",
@@ -149,6 +165,8 @@ make -C . -f {} {} {} {} {} {} {} {}
     "COVERAGE=1" if coverage else "",
     "TIMING=1" if timing else "",
     "OPT_LEVEL={}".format(opt_level),
+    "TRACE=1" if trace and not trace_fst else "",
+    "TRACE_MULTITHREAD=1" if trace and trace_fst else "",
     "TRACE_FST=1" if trace_fst else "",
     )
     build_script_file = "build_" + build_name + ".sh"
@@ -228,6 +246,7 @@ class SimVerilatorToolchain:
                 name         = build_name,
                 regular_comb = regular_comb
             )
+
             named_sc, named_pc = platform.resolve_signals(v_output.ns)
             v_file = build_name + ".v"
             v_output.write(v_file)
@@ -240,13 +259,14 @@ class SimVerilatorToolchain:
             _generate_sim_variables(platform.verilog_include_paths,
                                     extra_mods,
                                     extra_mods_path)
+            _generate_sim_trace_file(v_output.ns, build_name)
 
             # Generate sim config
             if sim_config:
                 _generate_sim_config(sim_config)
 
             # Build
-            _build_sim(build_name, platform.sources, jobs, threads, coverage, opt_level, trace_fst, timing)
+            _build_sim(build_name, platform.sources, jobs, threads, coverage, opt_level, trace, trace_fst, timing)
 
         # Run
         if run:

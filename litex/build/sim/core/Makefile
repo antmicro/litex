@@ -48,10 +48,12 @@ sim: $(OBJS_SIM) | mkdir
 		$(if $(THREADS), --threads $(THREADS),) \
 		-CFLAGS "$(CFLAGS) -I$(SRC_DIR)" \
 		-LDFLAGS "$(LDFLAGS)" \
-		--trace \
+		$(if $(TRACE), --trace,) \
+		$(if $(TRACE_MULTITHREAD), --trace-threads 2,) \
 		$(if $(TRACE_FST), --trace-fst,) \
 		$(if $(COVERAGE), --coverage,) \
 		$(if $(TIMING), --timing) \
+		verilator_trace_scope.vlt \
 		--unroll-count 256 \
 		--output-split 5000 \
 		--output-split-cfuncs 500 \
