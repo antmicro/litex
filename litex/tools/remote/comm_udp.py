@@ -16,9 +16,10 @@ from litex.tools.remote.csr_builder import CSRBuilder
 # CommUDP ------------------------------------------------------------------------------------------
 
 class CommUDP(CSRBuilder):
-    def __init__(self, server="192.168.1.50", port=1234, csr_csv=None, debug=False, timeout=1.0):
+    def __init__(self, server="192.168.1.50", host="", port=1234, csr_csv=None, debug=False, timeout=5.0):
         CSRBuilder.__init__(self, comm=self, csr_csv=csr_csv)
         self.server = server
+        self.host   = host
         self.port   = port
         self.debug  = debug
         self.timeout= timeout
@@ -28,7 +29,7 @@ class CommUDP(CSRBuilder):
         if hasattr(self, "socket"):
             return
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.bind(("", self.port))
+        self.socket.bind((self.host, self.port))
         self.socket.settimeout(self.timeout)
         if probe:
             self.probe(self.server, self.port)

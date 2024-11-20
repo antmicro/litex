@@ -142,7 +142,7 @@ class RemoteServer(EtherboneIPC):
                     if record.reads != None:
                         max_length = {
                             "CommUART": 256,
-                            "CommUDP":    1,
+                            "CommUDP":  255,
                         }.get(self.comm.__class__.__name__, 1)
                         bursts = {
                             "CommUART": ["incr", "fixed"]
@@ -249,7 +249,7 @@ def main():
             exit()
         else:
             print("[CommUDP] ip: {} / port: {} / ".format(udp_ip, udp_port), end="")
-            comm = CommUDP(udp_ip, udp_port, debug=args.debug)
+            comm = CommUDP(server=udp_ip, port=udp_port, debug=args.debug)
 
     # PCIe mode
     elif args.pcie:
