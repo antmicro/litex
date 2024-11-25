@@ -7,6 +7,8 @@
 
 import socket
 import time
+from operator import and_
+from functools import reduce
 
 from litex.tools.remote.etherbone import EtherbonePacket, EtherboneRecord
 from litex.tools.remote.etherbone import EtherboneReads, EtherboneWrites
@@ -149,3 +151,25 @@ class CommUDP(CSRBuilder):
         if self.debug:
             for i, value in enumerate(datas):
                 print("write 0x{:08x} @ 0x{:08x}".format(value, addr + 4*i))
+
+        # Etherbone devices will send response to write records when NR flag is not set
+        # Currently LiteETH etherbone implementation ignores NR flag and always
+        # responds to the write records
+        if not packet.nr:
+            timed_out = False
+            while True:
+                try:
+                    datas, dummy = self.socket.recvfrom(8192)
+                except socket.timeout:
+                    timed_out = True
+                    break
+                break
+            if timed_out:
+                raise socket.timeout
+            resp_packet = EtherbonePacket(datas)
+            resp_packet.decode()
+            assert resp_packet.nr, "Etherbone device responded with NR not set"
+            resp_record = resp_packet.records[0]
+            assert resp_record.rcount == record.wcount
+            assert resp_record.reads.base_ret_addr == 0
+            assert reduce(and_, [read.addr == 0 for read in resp_record.reads.reads], True)
