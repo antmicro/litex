@@ -9,7 +9,9 @@
 #include <generated/soc.h>
 #include <generated/csr.h>
 #include <generated/mem.h>
+#if defined(CSR_SDRAM_BASE)
 #include <generated/sdram_phy.h>
+#endif // defined(CSR_SDRAM_BASE)
 #include <libbase/i2c.h>
 
 #include <liblitedram/sdram.h>
