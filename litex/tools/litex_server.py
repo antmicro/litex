@@ -12,6 +12,7 @@ import argparse
 
 import os
 import sys
+import select
 import socket
 import time
 import threading
@@ -75,6 +76,7 @@ class RemoteServer(EtherboneIPC):
         self.bind_ip   = bind_ip
         self.bind_port = bind_port
         self.lock      = False
+        self.server_threads = []
 
     def open(self):
         if hasattr(self, "socket"):
@@ -96,6 +98,8 @@ class RemoteServer(EtherboneIPC):
             return
         self.socket.close()
         del self.socket
+        for thread in self.server_threads:
+            thread.join()
 
     def _send_server_info(self, client_socket):
         # FIXME: Formalize info/improve.
@@ -108,8 +112,16 @@ class RemoteServer(EtherboneIPC):
 
     def _serve_thread(self):
         while True:
+            if not hasattr(self, "socket"):
+                # Server socket closed
+                break
+            socket, _, _ = select.select([self.socket], [],[], 0.5)
+            if not hasattr(self, "socket"):
+                # Server socket closed
+                break
+            if len(socket) == 0:
+                continue
             client_socket, addr = self.socket.accept()
-#            self._send_server_info(client_socket)
             print("Connected with " + addr[0] + ":" + str(addr[1]))
             try:
                 # Serve Etherbone reads/writes.
@@ -171,9 +183,10 @@ class RemoteServer(EtherboneIPC):
 
     def start(self, nthreads):
         for i in range(nthreads):
-            self.serve_thread = threading.Thread(target=self._serve_thread)
-            self.serve_thread.setDaemon(True)
-            self.serve_thread.start()
+            thread = threading.Thread(target=self._serve_thread)
+            thread.setDaemon(True)
+            thread.start()
+            self.server_threads.append(thread)
 
 # Run ----------------------------------------------------------------------------------------------
 
