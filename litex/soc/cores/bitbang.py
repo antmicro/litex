@@ -8,6 +8,7 @@ from migen import *
 from migen.fhdl.specials import Tristate
 
 from litex.soc.interconnect.csr import *
+from litex.soc.cores.i2c_worker import I2CWorker
 
 # I2C Master Bit-Banging ---------------------------------------------------------------------------
 
@@ -23,7 +24,7 @@ class I2CMaster(Module, AutoCSR):
     Software get back SDA value with the read CSRStatus (_r).
     """
     pads_layout = [("scl", 1), ("sda", 1)]
-    def __init__(self, pads=None, default_dev=False):
+    def __init__(self, pads=None, default_dev=False, sys_freq=None, bus_freq=None, fifo_depth=128):
         self.init = []
         if pads is None:
             pads = Record(self.pads_layout)
@@ -37,9 +38,16 @@ class I2CMaster(Module, AutoCSR):
             CSRField("sda", size=1, offset=0)],
             name="r")
 
-        self.default_dev = default_dev
+        if sys_freq is not None and bus_freq is not None:
+            self._sel = CSRStorage(fields=[
+                CSRField("worker_sel", size=1, offset=0, reset=0)],
+                name="worker")
+            self.submodules.i2c_worker = I2CWorker(sys_freq, bus_freq, fifo_depth)
+            self.connect_with_worker(pads)
+        else:
+            self.connect(pads)
 
-        self.connect(pads)
+        self.default_dev = default_dev
 
     def connect(self, pads):
         # SCL
@@ -54,8 +62,45 @@ class I2CMaster(Module, AutoCSR):
             i  = self._r.fields.sda
         )
 
+    def connect_with_worker(self, pads):
+        scl_o = Signal()
+        scl_oe = Signal()
+        scl_i = Signal()
+        sda_o = Signal()
+        sda_oe = Signal()
+        sda_i = Signal()
+        self.comb += [
+            If(self._sel.fields.worker_sel,
+               scl_o.eq(0),
+               scl_oe.eq(self.i2c_worker.scl_oe & ~self.i2c_worker.scl_o),
+               sda_o.eq(0),
+               sda_oe.eq(self.i2c_worker.sda_oe & ~self.i2c_worker.sda_o),
+            ).Else(
+               scl_o.eq(0),
+               scl_oe.eq(~self._w.fields.scl),
+               sda_o.eq(0),
+               sda_oe.eq(self._w.fields.oe & ~self._w.fields.sda),
+            ),
+            self.i2c_worker.scl_i.eq(scl_i),
+            self.i2c_worker.sda_i.eq(sda_i),
+            self._r.fields.sda.eq(sda_i),
+        ]
+        # SCL
+        self.specials += Tristate(pads.scl,
+            o  = scl_o,
+            oe = scl_oe,
+            i  = scl_i
+        )
+        # SDA
+        self.specials += Tristate(pads.sda,
+            o  = sda_o,
+            oe = sda_oe,
+            i  = sda_i
+        )
+
     def add_init(self, addr, init, init_addr_len=1):
         self.init.append((addr, init, init_addr_len))
+
 
 class I2CMasterSim(I2CMaster):
     """I2C Master Bit-Banging for Verilator simulation
