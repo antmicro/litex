@@ -27,6 +27,11 @@ def loopback(pads):
         yield
 
 
+def get_i2c_pads():
+    return Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
+                   ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+
+
 class TestBitBangI2C(unittest.TestCase):
 
     def _master_output_bitbang(self, val):
@@ -54,9 +59,7 @@ class TestBitBangI2C(unittest.TestCase):
                 self.assertEqual((yield i2c.pads.sda.o), sda_o)
                 self.assertEqual((yield i2c.pads.sda.oe), sda_oe)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
-        i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
+        i2c_master = I2CMaster(pads=get_i2c_pads(), sys_freq=100e6, bus_freq=400e3)
         run_simulation(i2c_master, [generator(i2c_master)])
         self.assertEqual(hasattr(i2c_master, "pads"), 1)
 
@@ -193,9 +196,7 @@ class TestI2C(unittest.TestCase):
                 self.assertEqual((yield i2c.pads.sda.o), sda_o)
                 self.assertEqual((yield i2c.pads.sda.oe), sda_oe)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
-        i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
+        i2c_master = I2CMaster(pads=get_i2c_pads(), sys_freq=100e6, bus_freq=400e3)
         run_simulation(i2c_master, [generator(i2c_master)])
 
     def test_i2c_master_worker_en(self):
@@ -215,9 +216,7 @@ class TestI2C(unittest.TestCase):
                 self.assertEqual((yield i2c.pads.sda.o), 0)
                 self.assertEqual((yield i2c.pads.sda.oe), 0)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
-        i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
+        i2c_master = I2CMaster(pads=get_i2c_pads(), sys_freq=100e6, bus_freq=400e3)
         run_simulation(i2c_master, generator(i2c_master))
 
     def test_i2c_master_worker_write_fifo_fill(self):
@@ -233,9 +232,7 @@ class TestI2C(unittest.TestCase):
                 self.assertEqual((yield i2c.i2c_worker._fifo_w.fields.fifo_depth), 128)
                 self.assertEqual((yield i2c.i2c_worker._fifo_w.fields.fifo_entries), i+1)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
-        i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
+        i2c_master = I2CMaster(pads=get_i2c_pads(), sys_freq=100e6, bus_freq=400e3)
         run_simulation(i2c_master, generator(i2c_master))
 
     def test_i2c_master_worker_write_fifo_clr(self):
@@ -255,9 +252,7 @@ class TestI2C(unittest.TestCase):
                 yield
             self.assertEqual((yield i2c.i2c_worker._fifo_w.fields.fifo_entries), 0)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
-        i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
+        i2c_master = I2CMaster(pads=get_i2c_pads(), sys_freq=100e6, bus_freq=400e3)
         run_simulation(i2c_master, generator(i2c_master))
 
     def test_i2c_master_worker_state_rst(self):
@@ -274,9 +269,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 0)
             yield i2c.i2c_worker._ctrl.fields.reset_fsm.eq(0)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
-        i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
+        i2c_master = I2CMaster(pads=get_i2c_pads(), sys_freq=100e6, bus_freq=400e3)
         run_simulation(i2c_master, generator(i2c_master))
 
     def test_i2c_master_worker_start(self):
@@ -297,8 +290,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
             self.assertEqual(self.start_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(i2c_master, [generator(i2c_master), loopback(pads), self.check_start(pads)])
 
@@ -325,8 +317,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -360,8 +351,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -391,8 +381,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -426,8 +415,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -461,8 +449,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -500,8 +487,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -537,8 +523,7 @@ class TestI2C(unittest.TestCase):
             expected_output.append((data[i], i & 1))
             data[i] |= (i & 1) << 8  # Allow for response
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -583,8 +568,7 @@ class TestI2C(unittest.TestCase):
             expected_output.append(data[i] | (i & 1) << 8)
             data[i] = (data[i], (i & 1))
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -634,8 +618,7 @@ class TestI2C(unittest.TestCase):
             expected_output.append((data[i], i & 1))
             data[i] |= (i & 1) << 8  # Allow for response
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -681,8 +664,7 @@ class TestI2C(unittest.TestCase):
         for i in range(len(data)):
             data[i] |= (i & 1) << 8  # Allow for response
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -739,8 +721,7 @@ class TestI2C(unittest.TestCase):
             expected_output.append(data[i] << 1 | (i & 1))
             data[i] |= (i & 1) << 8  # Allow for response
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -775,8 +756,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
             self.assertEqual(self.stop_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -815,8 +795,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
             self.assertEqual(self.stop_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -858,8 +837,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
             self.assertEqual(self.stop_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -904,8 +882,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
             self.assertEqual(self.start_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -947,8 +924,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
             self.assertEqual(self.start_seen, True)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
@@ -978,8 +954,7 @@ class TestI2C(unittest.TestCase):
                 yield
             self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 9)
 
-        pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
-                       ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
+        pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
