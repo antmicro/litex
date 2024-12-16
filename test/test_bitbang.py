@@ -47,7 +47,6 @@ class TestBitBangI2C(unittest.TestCase):
             yield
             self.assertEqual((yield i2c._r.fields.sda), 0)
             for i in range(8):
-                print(i)
                 yield from i2c._w.write(i)
                 scl_o, scl_oe, sda_o, sda_oe = self._master_output_bitbang(i)
                 self.assertEqual((yield i2c.pads.scl.o), scl_o)
@@ -187,7 +186,6 @@ class TestI2C(unittest.TestCase):
             yield
             self.assertEqual((yield i2c._r.fields.sda), 0)
             for i in range(8):
-                print(i)
                 yield from i2c._w.write(i)
                 scl_o, scl_oe, sda_o, sda_oe = self._master_output_bitbang(i)
                 self.assertEqual((yield i2c.pads.scl.o), scl_o)
@@ -211,9 +209,7 @@ class TestI2C(unittest.TestCase):
             yield
             self.assertEqual((yield i2c._r.fields.sda), 0)
             for i in range(8):
-                print(i)
                 yield from i2c._w.write(i)
-                scl_o, scl_oe, sda_o, sda_oe = self._master_output_bitbang(i)
                 self.assertEqual((yield i2c.pads.scl.o), 0)
                 self.assertEqual((yield i2c.pads.scl.oe), 0)
                 self.assertEqual((yield i2c.pads.sda.o), 0)
