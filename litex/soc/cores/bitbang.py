@@ -24,6 +24,7 @@ class I2CMaster(Module, AutoCSR):
     Software get back SDA value with the read CSRStatus (_r).
     """
     pads_layout = [("scl", 1), ("sda", 1)]
+
     def __init__(self, pads=None, default_dev=False, sys_freq=None, bus_freq=None, fifo_depth=128):
         self.init = []
         if pads is None:

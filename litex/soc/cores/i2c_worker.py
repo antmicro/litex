@@ -127,7 +127,6 @@ class I2CWorker(Module, AutoCSR):
             )
         ]
 
-
         # Worker FSM
         _recv = Signal(9)
         _send = Signal(9)
@@ -139,13 +138,13 @@ class I2CWorker(Module, AutoCSR):
         # Context: Free bus | NACK
         _ctx = Signal(2)
         _state_ctx = Signal(4)
+
         def fsm_body_with_reset(*body):
             if not isinstance(body, list):
                 body = [body]
             return [If(self._ctrl.fields.reset_fsm,
                NextState("IDLE"),
             ).Else(*body)]
-
 
         fsm = FSM(reset_state="IDLE")
         self.submodules += fsm
@@ -323,7 +322,11 @@ class I2CWorker(Module, AutoCSR):
         fsm.act("DATA",
             *fsm_body_with_reset(
                 [
-                    If((_state_ctx == i), NextValue(_bit_access, 8 - i), NextValue(_bit_ctx, 0), NextState("DATA_BIT")) for i in range(9)
+                    If((_state_ctx == i),
+                       NextValue(_bit_access, 8 - i),
+                       NextValue(_bit_ctx, 0),
+                       NextState("DATA_BIT")
+                       ) for i in range(9)
                 ] + [
                  If((_state_ctx == 9),
                     read_fifo.we.eq(1),
@@ -434,6 +437,3 @@ class I2CWorker(Module, AutoCSR):
         )
         fsm.finalize()
         self.comb += self._state.fields.fsm_state.eq(fsm.state)
-
-
-
