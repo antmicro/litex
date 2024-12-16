@@ -1,8 +1,9 @@
 #
 # This file is part of LiteX.
 #
-# Copyright (c) 2024 Maciej Dudek <mdudek@antmicro.com>
+# Copyright (c) 2024 Antmicro <www.antmicro.com>
 # SPDX-License-Identifier: BSD-2-Clause
+
 import math
 
 from migen import *
@@ -12,24 +13,30 @@ from litex.soc.interconnect.csr import *
 
 
 class I2CWorker(Module, AutoCSR):
-    """
-    Simple I2C Master worker. It works by sending data from the write queue,
-    and gathers response in the read queue. Queue entries have following format:
-    8-bit data, 1-bit ack/nack, 7-bits reserved, 1-bit Start, 1-bit Data, 1-bit Stop,
+    """Simple I2C Master worker.
+
+    I2C worker operates by sending data from the write queue and collecting responses
+    in the read queue.
+
+    Queue entries have a following format:
+    8-bit data, 1-bit ACK/NACK, 7-bits reserved, 1-bit Start, 1-bit Data, 1-bit Stop,
     1-bit go to Idle, 1-bit abort queue on NACK.
-    If data or ack/nack bits are set to 1, worker will not drive SDA bus,
-    allowing for device to set correct value. This simplifies implementation,
-    as read/write operation are always done through write fifo, it also
+
+    If the data or ACK/NACK bits are set to 1, the worker will not drive the SDA bus,
+    allowing the device to set correct values. This simplifies the implementation,
+    as read/write operations are always done through the write fifo. It also
     allows for I2C SDA loopback.
-    It supports:
-    * clock stretching
-    * start and stop
-    * repeated start
-    It doesn't support:
-    * arbitration
+
+    Supported features:
+        * Clock stretching
+        * Start and stop
+        * Repeated start
+
+    Known limitations:
+        * Unsupported arbitration
     """
     def __init__(self, sys_freq, bus_freq, fifo_depth=128):
-        #Get number of cycles for low/high periods
+        # Get the number of cycles for low/high periods
         ratio = math.ceil(math.ceil(sys_freq/bus_freq)/4)
         self._start = CSR()
         self._ctrl = CSRStorage(fields=[
