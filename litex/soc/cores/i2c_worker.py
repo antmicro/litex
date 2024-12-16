@@ -6,10 +6,10 @@
 
 import math
 
-from migen import *
+from migen import FSM, Cat, If, Module, NextState, NextValue, Signal
 from migen.genlib import fifo
 
-from litex.soc.interconnect.csr import *
+from litex.soc.interconnect.csr import CSR, AutoCSR, CSRField, CSRStatus, CSRStorage
 
 
 class I2CWorker(Module, AutoCSR):

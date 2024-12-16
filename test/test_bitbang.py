@@ -7,7 +7,7 @@
 
 import unittest
 
-from migen import *
+from migen import Record, run_simulation
 
 from litex.gen.sim import passive
 from litex.soc.cores.bitbang import I2CMaster, SPIMaster
