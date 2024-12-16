@@ -11,6 +11,7 @@ from migen import Record, run_simulation
 
 from litex.gen.sim import passive
 from litex.soc.cores.bitbang import I2CMaster, SPIMaster
+from litex.soc.cores.i2c_worker import I2CState
 
 
 @passive
@@ -246,7 +247,7 @@ class TestI2C(unittest.TestCase):
                 yield
             yield i2c.i2c_worker._ctrl.fields.clr_fifos.eq(1)
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
             while not ((yield i2c.i2c_worker._state.fields.ready)):
                 yield
@@ -260,13 +261,13 @@ class TestI2C(unittest.TestCase):
             yield
             yield from i2c._sel.write(1)
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             yield i2c.i2c_worker._ctrl.fields.reset_fsm.eq(1)
             yield
             yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 0)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.IDLE)
             yield i2c.i2c_worker._ctrl.fields.reset_fsm.eq(0)
 
         i2c_master = I2CMaster(pads=get_i2c_pads(), sys_freq=100e6, bus_freq=400e3)
@@ -278,16 +279,16 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 16)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_start = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 4)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 4):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual(self.start_seen, True)
 
         pads = get_i2c_pads()
@@ -300,20 +301,20 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 16 | 1 << 18)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_start = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 4)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START)
             self.detect_stop = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 4):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 8)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 8):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
@@ -331,23 +332,23 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 18)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_start = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 4)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 4):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_stop = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 8)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 8):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
@@ -364,20 +365,20 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 16 | 1 << 18 | 1 << 19)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_start = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 4)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START)
             self.detect_stop = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 4):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 8)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 8):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 0)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.IDLE)
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
@@ -395,23 +396,23 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 19)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_start = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 4)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START)
             self.detect_stop = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 4):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 8)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 8):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 0)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.IDLE)
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
@@ -429,23 +430,23 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 18 | 1 << 19)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_start = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 4)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 4):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_stop = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 8)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 8):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 0)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.IDLE)
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
@@ -464,26 +465,26 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 19)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_start = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 4)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 4):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.detect_stop = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 8)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 8):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 0)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.IDLE)
             self.assertEqual(self.start_seen, True)
             self.assertEqual(self.stop_seen, True)
 
@@ -501,21 +502,21 @@ class TestI2C(unittest.TestCase):
                 yield from i2c.i2c_worker._fifo.write(byte | 1 << 17)
                 yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
             for _ in range(len(_bytes)):
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                     yield
                 for _ in range(9):
-                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                         yield
-                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 5)
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA_BIT)
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                         yield
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
         data = [0x55, 0x55, 0x96, 0x96, 0x42, 0x42, 0xAA, 0xAA, 0xFF, 0xFF, 0x00, 0x00]
         expected_output = []
@@ -538,21 +539,21 @@ class TestI2C(unittest.TestCase):
                 yield from i2c.i2c_worker._fifo.write(0x1ff | 1 << 17)
                 yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
             for _ in range(len(_bytes)):
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                     yield
                 for _ in range(9):
-                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                         yield
-                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 5)
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA_BIT)
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                         yield
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
             self.assertEqual((yield i2c.i2c_worker._fifo_r.fields.fifo_entries), len(_bytes))
             i = 0
@@ -585,21 +586,21 @@ class TestI2C(unittest.TestCase):
                 yield from i2c.i2c_worker._fifo.write(byte | 1 << 17)
                 yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
             for _ in range(len(_bytes)):
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                     yield
                 for _ in range(9):
-                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                         yield
-                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 5)
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                    self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA_BIT)
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                         yield
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
             self.assertEqual((yield i2c.i2c_worker._fifo_r.fields.fifo_entries), len(_bytes))
             i = 0
@@ -641,19 +642,19 @@ class TestI2C(unittest.TestCase):
             while (yield i2c.i2c_worker._fifo_w.fields.fifo_entries) < 8:
                 yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
             for _ in range(128):
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                     yield
                 for _ in range(9):
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                         yield
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                         yield
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual((yield i2c.i2c_worker._fifo_r.fields.fifo_entries), 128)
             self.assertEqual((yield i2c.i2c_worker._fifo_w.fields.fifo_entries), 4)
 
@@ -684,29 +685,29 @@ class TestI2C(unittest.TestCase):
             while (yield i2c.i2c_worker._fifo_w.fields.fifo_entries) < 8:
                 yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
             for _ in range(128):
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                     yield
                 for _ in range(9):
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                         yield
-                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                    while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                         yield
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual((yield i2c.i2c_worker._fifo_r.fields.fifo_entries), 128)
             self.assertEqual((yield i2c.i2c_worker._fifo_w.fields.fifo_entries), 0)
             yield i2c.i2c_worker._ctrl.fields.reset_fsm.eq(1)
             yield
             yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 0)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.IDLE)
             yield i2c.i2c_worker._ctrl.fields.reset_fsm.eq(0)
             yield i2c.i2c_worker._ctrl.fields.clr_fifos.eq(1)
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
             while not ((yield i2c.i2c_worker._state.fields.ready)):
                 yield
@@ -734,26 +735,26 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 17 | 1 << 18)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
             for _ in range(9):
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 5)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA_BIT)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                     yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
             self.detect_stop = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 8)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 8):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual(self.stop_seen, True)
 
         pads = get_i2c_pads()
@@ -770,29 +771,29 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 18)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
             for _ in range(9):
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 5)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA_BIT)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                     yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
             self.detect_stop = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 8)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 8):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual(self.stop_seen, True)
 
         pads = get_i2c_pads()
@@ -809,32 +810,32 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 18)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
             for _ in range(9):
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 5)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA_BIT)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                     yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
             self.detect_stop = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 7)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 7):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP_FROM_NACK)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP_FROM_NACK):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 8)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 8):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.STOP)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.STOP):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual(self.stop_seen, True)
 
         pads = get_i2c_pads()
@@ -851,35 +852,35 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 16)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
             for _ in range(9):
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 5)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA_BIT)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                     yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
             self.detect_start = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 2)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 2):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START_FROM_ACK)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START_FROM_ACK):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 3)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 3):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START_FROM_NACK)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START_FROM_NACK):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 4)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 4):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual(self.start_seen, True)
 
         pads = get_i2c_pads()
@@ -896,32 +897,32 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 16)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
             for _ in range(9):
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 5)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA_BIT)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                     yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
             self.detect_start = True
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 3)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 3):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START_FROM_NACK)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START_FROM_NACK):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 4)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 4):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.START)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.START):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
             self.assertEqual(self.start_seen, True)
 
         pads = get_i2c_pads()
@@ -937,22 +938,22 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._fifo.write(1 << 8 | 1 << 17 | 1 << 20)
             yield
             yield from i2c.i2c_worker._start.write(1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 0):
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 1)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 1):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                 yield
             for _ in range(9):
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
-                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 5)
-                while ((yield i2c.i2c_worker._state.fields.fsm_state) == 5):
+                self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA_BIT)
+                while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA_BIT):
                     yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 6)
-            while ((yield i2c.i2c_worker._state.fields.fsm_state) == 6):
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
+            while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                 yield
-            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), 9)
+            self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.ABORT)
 
         pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)

@@ -4,12 +4,27 @@
 # Copyright (c) 2024 Antmicro <www.antmicro.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
+from enum import IntEnum
 import math
 
 from migen import FSM, Cat, If, Module, NextState, NextValue, Signal
 from migen.genlib import fifo
 
 from litex.soc.interconnect.csr import CSR, AutoCSR, CSRField, CSRStatus, CSRStorage
+
+
+class I2CState(IntEnum):
+    IDLE = 0
+    RUN_I2C = 1
+    START_FROM_ACK = 2
+    START_FROM_NACK = 3
+    START = 4
+    DATA_BIT = 5
+    DATA = 6
+    STOP_FROM_NACK = 7
+    STOP = 8
+    ABORT = 9
+    CLR_FIFO = 10
 
 
 class I2CWorker(Module, AutoCSR):
@@ -143,12 +158,12 @@ class I2CWorker(Module, AutoCSR):
             if not isinstance(body, list):
                 body = [body]
             return [If(self._ctrl.fields.reset_fsm,
-               NextState("IDLE"),
+               NextState(I2CState.IDLE),
             ).Else(*body)]
 
-        fsm = FSM(reset_state="IDLE")
+        fsm = FSM(reset_state=I2CState.IDLE)
         self.submodules += fsm
-        fsm.act("IDLE",
+        fsm.act(I2CState.IDLE,
             self._state.fields.ready.eq(1),
             NextValue(sda_o, 1),
             NextValue(sda_oe, 0),
@@ -157,36 +172,36 @@ class I2CWorker(Module, AutoCSR):
             NextValue(_ctx, 1),
             If(self._start.re & self._ctrl.fields.clr_fifos,
                 NextValue(_clr, 1),
-                NextState("CLR_FIFO"),
+                NextState(I2CState.CLR_FIFO),
             ).Elif(self._start.re,
                 NextValue(_state_ctx, 0),
-                NextState("RUN_I2C"),
+                NextState(I2CState.RUN_I2C),
             )
         )
-        fsm.act("RUN_I2C",
+        fsm.act(I2CState.RUN_I2C,
             *fsm_body_with_reset(
                 If(write_fifo.readable & read_fifo.writable,
                     If(write_fifo.dout[16] & _ctx[0],
                         NextValue(_state_ctx, 0),
-                        NextState("START"),
+                        NextState(I2CState.START),
                     ).Elif(write_fifo.dout[16] & _ctx[1],
                         NextValue(_state_ctx, 0),
-                        NextState("START_FROM_NACK"),
+                        NextState(I2CState.START_FROM_NACK),
                     ).Elif(write_fifo.dout[16],
                         NextValue(_state_ctx, 0),
-                        NextState("START_FROM_ACK"),
+                        NextState(I2CState.START_FROM_ACK),
                     ).Elif(write_fifo.dout[17],
                         NextValue(_state_ctx, 0),
-                        NextState("DATA"),
+                        NextState(I2CState.DATA),
                     ).Elif(write_fifo.dout[18] & _ctx[1],
                         NextValue(_state_ctx, 0),
-                        NextState("STOP_FROM_NACK")
+                        NextState(I2CState.STOP_FROM_NACK)
                     ).Elif(write_fifo.dout[18],
                         NextValue(_state_ctx, 0),
-                        NextState("STOP")
+                        NextState(I2CState.STOP)
                     ).Elif(write_fifo.dout[19],
                         NextValue(_state_ctx, 0),
-                        NextState("IDLE")
+                        NextState(I2CState.IDLE)
                     ).Else(
                         # Empty entry
                         _next_w_entry.eq(1)
@@ -194,7 +209,7 @@ class I2CWorker(Module, AutoCSR):
                 )
             )
         )
-        fsm.act("START_FROM_ACK",
+        fsm.act(I2CState.START_FROM_ACK,
             *fsm_body_with_reset(
                 If((_state_ctx == 0) & timer_ready,
                     timer_start.eq(1),
@@ -209,7 +224,7 @@ class I2CWorker(Module, AutoCSR):
                 ).Elif((_state_ctx == 2) & timer_ready,
                     timer_start.eq(1),
                     NextValue(_state_ctx, 0),
-                    NextState("START_FROM_NACK"),
+                    NextState(I2CState.START_FROM_NACK),
                 ),
                 NextValue(sda_oe, 0),
                 NextValue(sda_o, 1),
@@ -217,7 +232,7 @@ class I2CWorker(Module, AutoCSR):
                 NextValue(scl_o, 0),
             )
         )
-        fsm.act("START_FROM_NACK",
+        fsm.act(I2CState.START_FROM_NACK,
             *fsm_body_with_reset(
                 If((_state_ctx == 0) & timer_ready,
                     timer_start.eq(1),
@@ -232,7 +247,7 @@ class I2CWorker(Module, AutoCSR):
                 ).Elif((_state_ctx == 2) & timer_ready,
                     timer_start.eq(1),
                     NextValue(_state_ctx, 0),
-                    NextState("START"),
+                    NextState(I2CState.START),
                 ),
                 NextValue(sda_oe, 0),
                 NextValue(sda_o, 1),
@@ -240,7 +255,7 @@ class I2CWorker(Module, AutoCSR):
                 NextValue(scl_o, 1),
             )
         )
-        fsm.act("START",
+        fsm.act(I2CState.START,
             *fsm_body_with_reset(
                 If((_state_ctx == 0) & timer_ready,
                     timer_start.eq(1),
@@ -254,13 +269,13 @@ class I2CWorker(Module, AutoCSR):
                 ).Elif((_state_ctx == 3) & timer_ready,
                     If(write_fifo.dout[17],
                         NextValue(_state_ctx, 0),
-                        NextState("DATA"),
+                        NextState(I2CState.DATA),
                     ).Elif(write_fifo.dout[18],
                         NextValue(_state_ctx, 0),
-                        NextState("STOP"),
+                        NextState(I2CState.STOP),
                     ).Else(
                         _next_w_entry.eq(1),
-                        NextState("RUN_I2C"),
+                        NextState(I2CState.RUN_I2C),
                     )
                 ),
                 If((_state_ctx == 3),
@@ -276,7 +291,7 @@ class I2CWorker(Module, AutoCSR):
         )
         _bit_access = Signal(4)
         _bit_ctx = Signal(3)
-        fsm.act("DATA_BIT",
+        fsm.act(I2CState.DATA_BIT,
             *fsm_body_with_reset(
                 If((_bit_ctx == 0) & timer_ready,
                     timer_start.eq(1),
@@ -297,7 +312,7 @@ class I2CWorker(Module, AutoCSR):
                     NextValue(_bit_ctx, 4),
                 ).Elif((_bit_ctx == 4) & timer_ready,
                     NextValue(_state_ctx, _state_ctx + 1),
-                    NextState("DATA")
+                    NextState(I2CState.DATA)
                 ),
                 If(_bit_ctx == 0,
                     NextValue(scl_oe, 1),
@@ -319,13 +334,13 @@ class I2CWorker(Module, AutoCSR):
                 NextValue(sda_o, _send.part(_bit_access, 1)),
             )
         )
-        fsm.act("DATA",
+        fsm.act(I2CState.DATA,
             *fsm_body_with_reset(
                 [
                     If((_state_ctx == i),
                        NextValue(_bit_access, 8 - i),
                        NextValue(_bit_ctx, 0),
-                       NextState("DATA_BIT")
+                       NextState(I2CState.DATA_BIT)
                        ) for i in range(9)
                 ] + [
                  If((_state_ctx == 9),
@@ -336,26 +351,26 @@ class I2CWorker(Module, AutoCSR):
                         NextValue(_ctx, 0),
                     ),
                     If(write_fifo.dout[20] & _recv[0],
-                        NextState("ABORTED"),
+                        NextState(I2CState.ABORT),
                     ).Elif(write_fifo.dout[18],
                         NextValue(_state_ctx, 0),
                         If(_recv[0],
                             NextValue(_state_ctx, 0),
-                            NextState("STOP_FROM_NACK"),
+                            NextState(I2CState.STOP_FROM_NACK),
                         ).Else(
                             NextValue(_state_ctx, 0),
-                            NextState("STOP"),
+                            NextState(I2CState.STOP),
                         )
                     ).Else(
                         _next_w_entry.eq(1),
                         NextValue(_state_ctx, 0),
-                        NextState("RUN_I2C"),
+                        NextState(I2CState.RUN_I2C),
                     ),
                 ),
                 ]
             )
         )
-        fsm.act("STOP_FROM_NACK",
+        fsm.act(I2CState.STOP_FROM_NACK,
             *fsm_body_with_reset(
                 If((_state_ctx == 0) & timer_ready,
                     timer_start.eq(1),
@@ -365,7 +380,7 @@ class I2CWorker(Module, AutoCSR):
                     NextValue(_state_ctx, 2),
                 ).Elif((_state_ctx == 2) & timer_ready,
                     NextValue(_state_ctx, 0),
-                    NextState("STOP")
+                    NextState(I2CState.STOP)
                 ),
                 If((_state_ctx == 0) | (_state_ctx == 1),
                     NextValue(scl_oe, 1),
@@ -378,7 +393,7 @@ class I2CWorker(Module, AutoCSR):
                 )
             )
         )
-        fsm.act("STOP",
+        fsm.act(I2CState.STOP,
             *fsm_body_with_reset(
                 If((_state_ctx == 0) & timer_ready,
                     timer_start.eq(1),
@@ -404,11 +419,11 @@ class I2CWorker(Module, AutoCSR):
                     _next_w_entry.eq(1),
                     If(write_fifo.dout[19],
                         NextValue(_state_ctx, 0),
-                        NextState("IDLE"),
+                        NextState(I2CState.IDLE),
                     ).Else(
                         NextValue(_ctx, 1),
                         NextValue(_state_ctx, 0),
-                        NextState("RUN_I2C"),
+                        NextState(I2CState.RUN_I2C),
                     )
                 ),
                 If((_state_ctx == 0) | (_state_ctx == 1) | (_state_ctx == 2),
@@ -424,15 +439,15 @@ class I2CWorker(Module, AutoCSR):
                 )
             )
         )
-        fsm.act("ABORTED",
+        fsm.act(I2CState.ABORT,
             self._state.fields.ready.eq(0),
             *fsm_body_with_reset()
         )
-        fsm.act("CLR_FIFO",
+        fsm.act(I2CState.CLR_FIFO,
             self._state.fields.ready.eq(0),
             If(~read_fifo.readable & ~write_fifo.readable,
                NextValue(_clr, 0),
-               NextState("IDLE")
+               NextState(I2CState.IDLE)
             )
         )
         fsm.finalize()
