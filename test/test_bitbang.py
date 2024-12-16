@@ -40,20 +40,20 @@ class TestBitBangI2C(unittest.TestCase):
     def test_i2c_master(self):
         def generator(i2c):
             yield
-            yield i2c_master.pads.sda.i.eq(1)
+            yield i2c.pads.sda.i.eq(1)
             yield
-            self.assertEqual((yield i2c_master._r.fields.sda), 1)
-            yield i2c_master.pads.sda.i.eq(0)
+            self.assertEqual((yield i2c._r.fields.sda), 1)
+            yield i2c.pads.sda.i.eq(0)
             yield
-            self.assertEqual((yield i2c_master._r.fields.sda), 0)
+            self.assertEqual((yield i2c._r.fields.sda), 0)
             for i in range(8):
                 print(i)
-                yield from i2c_master._w.write(i)
+                yield from i2c._w.write(i)
                 scl_o, scl_oe, sda_o, sda_oe = self._master_output_bitbang(i)
-                self.assertEqual((yield i2c_master.pads.scl.o), scl_o)
-                self.assertEqual((yield i2c_master.pads.scl.oe), scl_oe)
-                self.assertEqual((yield i2c_master.pads.sda.o), sda_o)
-                self.assertEqual((yield i2c_master.pads.sda.oe), sda_oe)
+                self.assertEqual((yield i2c.pads.scl.o), scl_o)
+                self.assertEqual((yield i2c.pads.scl.oe), scl_oe)
+                self.assertEqual((yield i2c.pads.sda.o), sda_o)
+                self.assertEqual((yield i2c.pads.sda.oe), sda_oe)
 
         pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
                        ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
@@ -180,20 +180,20 @@ class TestI2C(unittest.TestCase):
         def generator(i2c):
             yield
             yield from i2c._sel.write(0)
-            yield i2c_master.pads.sda.i.eq(1)
+            yield i2c.pads.sda.i.eq(1)
             yield
-            self.assertEqual((yield i2c_master._r.fields.sda), 1)
-            yield i2c_master.pads.sda.i.eq(0)
+            self.assertEqual((yield i2c._r.fields.sda), 1)
+            yield i2c.pads.sda.i.eq(0)
             yield
-            self.assertEqual((yield i2c_master._r.fields.sda), 0)
+            self.assertEqual((yield i2c._r.fields.sda), 0)
             for i in range(8):
                 print(i)
-                yield from i2c_master._w.write(i)
+                yield from i2c._w.write(i)
                 scl_o, scl_oe, sda_o, sda_oe = self._master_output_bitbang(i)
-                self.assertEqual((yield i2c_master.pads.scl.o), scl_o)
-                self.assertEqual((yield i2c_master.pads.scl.oe), scl_oe)
-                self.assertEqual((yield i2c_master.pads.sda.o), sda_o)
-                self.assertEqual((yield i2c_master.pads.sda.oe), sda_oe)
+                self.assertEqual((yield i2c.pads.scl.o), scl_o)
+                self.assertEqual((yield i2c.pads.scl.oe), scl_oe)
+                self.assertEqual((yield i2c.pads.sda.o), sda_o)
+                self.assertEqual((yield i2c.pads.sda.oe), sda_oe)
 
         pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
                        ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
@@ -204,20 +204,20 @@ class TestI2C(unittest.TestCase):
         def generator(i2c):
             yield
             yield from i2c._sel.write(1)
-            yield i2c_master.pads.sda.i.eq(1)
+            yield i2c.pads.sda.i.eq(1)
             yield
-            self.assertEqual((yield i2c_master._r.fields.sda), 1)
-            yield i2c_master.pads.sda.i.eq(0)
+            self.assertEqual((yield i2c._r.fields.sda), 1)
+            yield i2c.pads.sda.i.eq(0)
             yield
-            self.assertEqual((yield i2c_master._r.fields.sda), 0)
+            self.assertEqual((yield i2c._r.fields.sda), 0)
             for i in range(8):
                 print(i)
-                yield from i2c_master._w.write(i)
+                yield from i2c._w.write(i)
                 scl_o, scl_oe, sda_o, sda_oe = self._master_output_bitbang(i)
-                self.assertEqual((yield i2c_master.pads.scl.o), 0)
-                self.assertEqual((yield i2c_master.pads.scl.oe), 0)
-                self.assertEqual((yield i2c_master.pads.sda.o), 0)
-                self.assertEqual((yield i2c_master.pads.sda.oe), 0)
+                self.assertEqual((yield i2c.pads.scl.o), 0)
+                self.assertEqual((yield i2c.pads.scl.oe), 0)
+                self.assertEqual((yield i2c.pads.sda.o), 0)
+                self.assertEqual((yield i2c.pads.sda.oe), 0)
 
         pads = Record([("scl", [("o", 1), ("oe", 1), ("i", 1)]),
                        ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
