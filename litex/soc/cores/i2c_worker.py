@@ -13,7 +13,7 @@ from litex.soc.interconnect.csr import *
 
 class I2CWorker(Module, AutoCSR):
     """
-    Simple I2C Master worker. It works by sending data from write queue,
+    Simple I2C Master worker. It works by sending data from the write queue,
     and gathers response in the read queue. Queue entries have following format:
     8-bit data, 1-bit ack/nack, 7-bits reserved, 1-bit Start, 1-bit Data, 1-bit Stop,
     1-bit go to Idle, 1-bit abort queue on NACK.
