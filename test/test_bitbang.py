@@ -33,10 +33,15 @@ def get_i2c_pads():
                    ("sda", [("o", 1), ("oe", 1), ("i", 1)])])
 
 
-class TestBitBangI2C(unittest.TestCase):
+def i2c_master_output_bitbang(val):
+    scl_o = 0
+    scl_oe = (val ^ 1) & 1
+    sda_o = 0
+    sda_oe = ((val >> 1) & ~(val >> 2)) & 1
+    return (scl_o, scl_oe, sda_o, sda_oe)
 
-    def _master_output_bitbang(self, val):
-        return (0, (val ^ 1) & 1, 0, ((val >> 1) & ~(val >> 2)) & 1)
+
+class TestBitBangI2C(unittest.TestCase):
 
     def test_i2c_master_syntax(self):
         i2c_master = I2CMaster()
@@ -54,7 +59,7 @@ class TestBitBangI2C(unittest.TestCase):
             self.assertEqual((yield i2c._r.fields.sda), 0)
             for i in range(8):
                 yield from i2c._w.write(i)
-                scl_o, scl_oe, sda_o, sda_oe = self._master_output_bitbang(i)
+                scl_o, scl_oe, sda_o, sda_oe = i2c_master_output_bitbang(i)
                 self.assertEqual((yield i2c.pads.scl.o), scl_o)
                 self.assertEqual((yield i2c.pads.scl.oe), scl_oe)
                 self.assertEqual((yield i2c.pads.sda.o), sda_o)
@@ -66,9 +71,6 @@ class TestBitBangI2C(unittest.TestCase):
 
 
 class TestI2C(unittest.TestCase):
-
-    def _master_output_bitbang(self, val):
-        return (0, (val ^ 1) & 1, 0, ((val >> 1) & ~(val >> 2)) & 1)
 
     @passive
     def check_start(self, pads):
@@ -191,7 +193,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c._r.fields.sda), 0)
             for i in range(8):
                 yield from i2c._w.write(i)
-                scl_o, scl_oe, sda_o, sda_oe = self._master_output_bitbang(i)
+                scl_o, scl_oe, sda_o, sda_oe = i2c_master_output_bitbang(i)
                 self.assertEqual((yield i2c.pads.scl.o), scl_o)
                 self.assertEqual((yield i2c.pads.scl.oe), scl_oe)
                 self.assertEqual((yield i2c.pads.sda.o), sda_o)
