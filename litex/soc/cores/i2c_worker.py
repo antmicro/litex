@@ -4,9 +4,11 @@
 # Copyright (c) 2024 Antmicro <www.antmicro.com>
 # SPDX-License-Identifier: BSD-2-Clause
 
-from enum import IntEnum
 import math
+from dataclasses import KW_ONLY, dataclass
+from enum import IntEnum
 
+import param
 from migen import FSM, Cat, If, Module, NextState, NextValue, Signal
 from migen.genlib import fifo
 
@@ -27,15 +29,78 @@ class I2CState(IntEnum):
     CLR_FIFO = 10
 
 
+@dataclass
+class I2CQueueEntry(param.Parameterized):
+    """
+    Queue entries have a following format:
+
+    |20           |19  |18  |17        |16   |15|14|13|12|11|10|9|8     |7|6|5|4|3|2|1|0|
+    |Abort on NACK|Idle|Stop|Data State|Start|Reserved           |(N)ACK|Data           |
+    """
+    _: KW_ONLY
+    data: int = param.Integer(0, bounds=(0, 2**8 - 1))
+    ack: int = param.Integer(0, bounds=(0, 1))
+    s_start: int = param.Integer(0, bounds=(0, 1))
+    s_data: int = param.Integer(0, bounds=(0, 1))
+    s_stop: int = param.Integer(0, bounds=(0, 1))
+    s_idle: int = param.Integer(0, bounds=(0, 1))
+    abort_on_nack: int = param.Integer(0, bounds=(0, 1))
+
+    @property
+    def width(self):
+        return 21
+
+    @property
+    def rsvd(self):
+        return 0
+
+    @property
+    def fields_struct(self):
+        return {
+            "data": (0, 8),
+            "ack": (8, 1),
+            "rsvd": (9, 7),
+            "s_start": (16, 1),
+            "s_data": (17, 1),
+            "s_stop": (18, 1),
+            "s_idle": (19, 1),
+            "abort_on_nack": (20, 1)
+        }
+
+    def field_offset(self, field):
+        return self.fields_struct[field][0]
+
+    def field_length(self, field):
+        return self.fields_struct[field][1]
+
+    def pack(self):
+        """Pack the `I2CQueueEntry` dataclass into the I2CWorker's FIFO entry
+        internal representation.
+        """
+        ret = 0
+        fields = self.fields_struct.keys()
+        for f in fields:
+            offset, length = self.fields_struct[f]
+            ret |= (getattr(self, f) & (2**length - 1)) << offset
+        return ret
+
+    def from_int(self, value):
+        fields = self.fields_struct.keys()
+        for f in fields:
+            if f == "rsvd":
+                continue
+            offset, length = self.fields_struct[f]
+            setattr(self, f, (value >> offset) & (2**length - 1))
+        return self
+
+
 class I2CWorker(Module, AutoCSR):
     """Simple I2C Master worker.
 
     I2C worker operates by sending data from the write queue and collecting responses
     in the read queue.
 
-    Queue entries have a following format:
-    8-bit data, 1-bit ACK/NACK, 7-bits reserved, 1-bit Start, 1-bit Data, 1-bit Stop,
-    1-bit go to Idle, 1-bit abort queue on NACK.
+    Queue entries format is defined by `I2CQueueEntry`.
 
     If the data or ACK/NACK bits are set to 1, the worker will not drive the SDA bus,
     allowing the device to set correct values. This simplifies the implementation,
@@ -62,7 +127,7 @@ class I2CWorker(Module, AutoCSR):
             CSRField("ready", size=1, offset=0),
             CSRField("fsm_state", size=8, offset=8)],
             name="i2c_state")
-        self._fifo = CSR(size=21, name="fifos_access_port")
+        self._fifo = CSR(size=I2CQueueEntry().width, name="fifos_access_port")
         self._fifo_w = CSRStatus(fields=[
             CSRField("fifo_depth", size=8, offset=0, reset=fifo_depth),
             CSRField("fifo_entries", size=8, offset=8)],
@@ -145,9 +210,22 @@ class I2CWorker(Module, AutoCSR):
         # Worker FSM
         _recv = Signal(9)
         _send = Signal(9)
+
+        # Worker's flags
+        _s_start = Signal()
+        _s_data = Signal()
+        _s_stop = Signal()
+        _s_idle = Signal()
+        _s_abort_on_nack = Signal()
+
         self.comb += [
             _send.eq(Cat(write_fifo.dout[8], write_fifo.dout[:8])),
             read_fifo.din.eq(Cat(_recv[1:9], _recv[0])),
+            _s_start.eq(write_fifo.dout[16]),
+            _s_data.eq(write_fifo.dout[17]),
+            _s_stop.eq(write_fifo.dout[18]),
+            _s_idle.eq(write_fifo.dout[19]),
+            _s_abort_on_nack.eq(write_fifo.dout[20]),
         ]
         # Bit set: 0        | 1
         # Context: Free bus | NACK
@@ -181,25 +259,25 @@ class I2CWorker(Module, AutoCSR):
         fsm.act(I2CState.RUN_I2C,
             *fsm_body_with_reset(
                 If(write_fifo.readable & read_fifo.writable,
-                    If(write_fifo.dout[16] & _ctx[0],
+                    If(_s_start & _ctx[0],
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.START),
-                    ).Elif(write_fifo.dout[16] & _ctx[1],
+                    ).Elif(_s_start & _ctx[1],
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.START_FROM_NACK),
-                    ).Elif(write_fifo.dout[16],
+                    ).Elif(_s_start,
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.START_FROM_ACK),
-                    ).Elif(write_fifo.dout[17],
+                    ).Elif(_s_data,
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.DATA),
-                    ).Elif(write_fifo.dout[18] & _ctx[1],
+                    ).Elif(_s_stop & _ctx[1],
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.STOP_FROM_NACK)
-                    ).Elif(write_fifo.dout[18],
+                    ).Elif(_s_stop,
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.STOP)
-                    ).Elif(write_fifo.dout[19],
+                    ).Elif(_s_idle,
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.IDLE)
                     ).Else(
@@ -267,10 +345,10 @@ class I2CWorker(Module, AutoCSR):
                     timer_start.eq(1),
                     NextValue(_state_ctx, 3),
                 ).Elif((_state_ctx == 3) & timer_ready,
-                    If(write_fifo.dout[17],
+                    If(_s_data,
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.DATA),
-                    ).Elif(write_fifo.dout[18],
+                    ).Elif(_s_stop,
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.STOP),
                     ).Else(
@@ -350,9 +428,9 @@ class I2CWorker(Module, AutoCSR):
                     ).Else(
                         NextValue(_ctx, 0),
                     ),
-                    If(write_fifo.dout[20] & _recv[0],
+                    If(_s_abort_on_nack & _recv[0],
                         NextState(I2CState.ABORT),
-                    ).Elif(write_fifo.dout[18],
+                    ).Elif(_s_stop,
                         NextValue(_state_ctx, 0),
                         If(_recv[0],
                             NextValue(_state_ctx, 0),
@@ -417,7 +495,7 @@ class I2CWorker(Module, AutoCSR):
                     )
                 ).Elif((_state_ctx == 4) & timer_ready,
                     _next_w_entry.eq(1),
-                    If(write_fifo.dout[19],
+                    If(_s_idle,
                         NextValue(_state_ctx, 0),
                         NextState(I2CState.IDLE),
                     ).Else(

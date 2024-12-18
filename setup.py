@@ -18,6 +18,7 @@ setup(
         "packaging",
         "pyserial",
         "requests",
+        "param",
     ],
     packages=find_packages(exclude=("test*", "sim*", "doc*")),
     include_package_data=True,
