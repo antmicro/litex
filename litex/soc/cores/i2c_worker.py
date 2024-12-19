@@ -28,6 +28,14 @@ class I2CState(IntEnum):
     ABORT = 9
     CLR_FIFO = 10
 
+    @classmethod
+    def encode(self):
+        return list(map(lambda c: c.value, self))
+
+    @classmethod
+    def __len__(self):
+        return 11
+
 
 @dataclass
 class I2CQueueEntry(param.Parameterized):
