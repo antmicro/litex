@@ -11,7 +11,7 @@ from migen import Record, run_simulation
 
 from litex.gen.sim import passive
 from litex.soc.cores.bitbang import I2CMaster, SPIMaster
-from litex.soc.cores.i2c_worker import I2CState
+from litex.soc.cores.i2c_worker import I2CQueueEntry, I2CState
 
 
 @passive
@@ -39,6 +39,11 @@ def i2c_master_output_bitbang(val):
     sda_o = 0
     sda_oe = ((val >> 1) & ~(val >> 2)) & 1
     return (scl_o, scl_oe, sda_o, sda_oe)
+
+
+def generate_i2c_test_data(length, byte_subset=[0x55, 0xAA, 0xFF, 0x00]):
+    sub_len = len(byte_subset)
+    return [(byte_subset[i % sub_len], i & 1) for i in range(length)]
 
 
 class TestBitBangI2C(unittest.TestCase):
@@ -230,7 +235,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual(fifo_depth, 128)
             self.assertEqual((yield i2c.i2c_worker._fifo_w.fields.fifo_entries), 0)
             for i in range(fifo_depth):
-                yield from i2c.i2c_worker._fifo.write(0)
+                yield from i2c.i2c_worker._fifo.write(I2CQueueEntry().pack())
                 yield
                 self.assertEqual((yield i2c.i2c_worker._fifo_w.fields.fifo_depth), 128)
                 self.assertEqual((yield i2c.i2c_worker._fifo_w.fields.fifo_entries), i+1)
@@ -244,7 +249,7 @@ class TestI2C(unittest.TestCase):
             yield from i2c._sel.write(1)
             fifo_depth = (yield i2c.i2c_worker._fifo_w.fields.fifo_depth)
             for i in range(fifo_depth):
-                yield from i2c.i2c_worker._fifo.write(0)
+                yield from i2c.i2c_worker._fifo.write(I2CQueueEntry().pack())
             while ((yield i2c.i2c_worker._fifo_w.fields.fifo_entries) != 128):
                 yield
             yield i2c.i2c_worker._ctrl.fields.clr_fifos.eq(1)
@@ -278,7 +283,7 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_start(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 16)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_start=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -300,7 +305,7 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_start_stop(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 16 | 1 << 18)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_start=1, s_stop=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -330,8 +335,8 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_start_then_stop(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 16)
-            yield from i2c.i2c_worker._fifo.write(1 << 18)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_start=1).pack())
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_stop=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -364,7 +369,7 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_start_stop_end(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 16 | 1 << 18 | 1 << 19)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_start=1, s_stop=1, s_idle=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -394,8 +399,8 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_start_stop_then_end(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 16 | 1 << 18)
-            yield from i2c.i2c_worker._fifo.write(1 << 19)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_start=1, s_stop=1).pack())
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_idle=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -428,8 +433,8 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_start_then_stop_end(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 16)
-            yield from i2c.i2c_worker._fifo.write(1 << 18 | 1 << 19)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_start=1).pack())
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_stop=1, s_idle=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -462,9 +467,9 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_start_then_stop_then_end(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 16)
-            yield from i2c.i2c_worker._fifo.write(1 << 18)
-            yield from i2c.i2c_worker._fifo.write(1 << 19)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_start=1).pack())
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_stop=1).pack())
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_idle=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -501,7 +506,8 @@ class TestI2C(unittest.TestCase):
         def generator(i2c, _bytes):
             yield from i2c._sel.write(1)
             for byte in _bytes:
-                yield from i2c.i2c_worker._fifo.write(byte | 1 << 17)
+                data, ack = byte
+                yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(data=data, ack=ack, s_data=1).pack())
                 yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -520,30 +526,27 @@ class TestI2C(unittest.TestCase):
                 self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.DATA)
                 while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.DATA):
                     yield
-        data = [0x55, 0x55, 0x96, 0x96, 0x42, 0x42, 0xAA, 0xAA, 0xFF, 0xFF, 0x00, 0x00]
-        expected_output = []
-        for i in range(len(data)):
-            expected_output.append((data[i], i & 1))
-            data[i] |= (i & 1) << 8  # Allow for response
+        bytes = [0x55, 0x55, 0x96, 0x96, 0x42, 0x42, 0xAA, 0xAA, 0xFF, 0xFF, 0x00, 0x00]
+        data = generate_i2c_test_data(len(bytes), bytes)
 
         pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
             [generator(i2c_master, data), loopback(pads),
-             self.check_clk(pads), self.check_data(pads, expected_output)],
+             self.check_clk(pads), self.check_data(pads, data)],
         )
 
     def test_i2c_master_worker_recv_data(self):
         def generator(i2c, _bytes):
             yield from i2c._sel.write(1)
             for _ in range(len(_bytes)):
-                yield from i2c.i2c_worker._fifo.write(0x1ff | 1 << 17)
+                yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(data=0xff, ack=1, s_data=1).pack())
                 yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            for _ in range(len(_bytes)):
+            for i in range(len(_bytes)):
                 self.assertEqual((yield i2c.i2c_worker._state.fields.fsm_state), I2CState.RUN_I2C)
                 while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                     yield
@@ -561,21 +564,19 @@ class TestI2C(unittest.TestCase):
             i = 0
             while (yield i2c.i2c_worker._fifo_r.fields.fifo_entries) > 0:
                 data = yield from i2c.i2c_worker._fifo.read()
-                self.assertEqual(data, _bytes[i])
+                byte, ack = _bytes[i]
+                self.assertEqual(data, I2CQueueEntry(data=byte, ack=ack).pack())
                 i += 1
                 yield
 
-        data = [0x55, 0x55, 0x96, 0x96, 0x42, 0x42, 0xAA, 0xAA, 0xFF, 0xFF, 0x00, 0x00]
-        expected_output = []
-        for i in range(len(data)):
-            expected_output.append(data[i] | (i & 1) << 8)
-            data[i] = (data[i], (i & 1))
+        bytes = [0x55, 0x55, 0x96, 0x96, 0x42, 0x42, 0xAA, 0xAA, 0xFF, 0xFF, 0x00, 0x00]
+        data = generate_i2c_test_data(len(bytes), bytes)
 
         pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
-            [generator(i2c_master, expected_output), self.clk_pullup(pads),
+            [generator(i2c_master, data), self.clk_pullup(pads),
              self.check_clk(pads), self.send_data(pads, data)],
         )
 
@@ -585,7 +586,8 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c.i2c_worker._fifo_r.fields.fifo_depth), 128)
             self.assertEqual((yield i2c.i2c_worker._fifo_r.fields.fifo_entries), 0)
             for byte in _bytes:
-                yield from i2c.i2c_worker._fifo.write(byte | 1 << 17)
+                data, ack = byte
+                yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(data=data, ack=ack, s_data=1).pack())
                 yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -608,25 +610,18 @@ class TestI2C(unittest.TestCase):
             i = 0
             while (yield i2c.i2c_worker._fifo_r.fields.fifo_entries) > 0:
                 data = yield from i2c.i2c_worker._fifo.read()
-                self.assertEqual(data, _bytes[i])
+                byte, ack = _bytes[i]
+                self.assertEqual(data, I2CQueueEntry(data=byte, ack=ack).pack())
                 i += 1
                 yield
 
-        data = []
-        for _ in range(32):
-            for val in [0x55, 0xAA, 0xFF, 0x00]:
-                data.append(val)
-        expected_output = []
-        for i in range(len(data)):
-            expected_output.append((data[i], i & 1))
-            data[i] |= (i & 1) << 8  # Allow for response
-
+        data = generate_i2c_test_data(128)
         pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
             i2c_master,
             [generator(i2c_master, data), loopback(pads),
-             self.check_clk(pads), self.check_data(pads, expected_output)],
+             self.check_clk(pads), self.check_data(pads, data)],
         )
 
     def test_i2c_master_worker_read_fifo_over_fill(self):
@@ -634,8 +629,9 @@ class TestI2C(unittest.TestCase):
         def fill(i2c, _bytes):
             i = 0
             while i < len(_bytes):
+                data, ack = _bytes[i]
                 if (yield i2c.i2c_worker._fifo_w.fields.fifo_entries) < 128:
-                    yield from i2c.i2c_worker._fifo.write(_bytes[i] | 1 << 17)
+                    yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(data=data, ack=ack, s_data=1).pack())
                     i += 1
                 yield
 
@@ -660,13 +656,7 @@ class TestI2C(unittest.TestCase):
             self.assertEqual((yield i2c.i2c_worker._fifo_r.fields.fifo_entries), 128)
             self.assertEqual((yield i2c.i2c_worker._fifo_w.fields.fifo_entries), 4)
 
-        data = []
-        for _ in range(33):
-            for val in [0x55, 0xAA, 0xFF, 0x00]:
-                data.append(val)
-        for i in range(len(data)):
-            data[i] |= (i & 1) << 8  # Allow for response
-
+        data = generate_i2c_test_data(132)
         pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
@@ -677,9 +667,9 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_read_fifo_clr(self):
         @passive
         def fill(i2c, _bytes):
-            for byte in _bytes:
+            for data, ack in _bytes:
                 if (yield i2c.i2c_worker._fifo_w.fields.fifo_entries) < 128:
-                    yield from i2c.i2c_worker._fifo.write(byte | 1 << 17)
+                    yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(data=data, ack=ack, s_data=1).pack())
                 yield
 
         def generator(i2c):
@@ -689,7 +679,7 @@ class TestI2C(unittest.TestCase):
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
                 yield
-            for _ in range(128):
+            for i in range(128):
                 while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.RUN_I2C):
                     yield
                 for _ in range(9):
@@ -715,15 +705,7 @@ class TestI2C(unittest.TestCase):
                 yield
             self.assertEqual((yield i2c.i2c_worker._fifo_r.fields.fifo_entries), 0)
 
-        data = []
-        for _ in range(32):
-            for val in [0x55, 0xAA, 0xFF, 0x00]:
-                data.append(val)
-        expected_output = []
-        for i in range(len(data)):
-            expected_output.append(data[i] << 1 | (i & 1))
-            data[i] |= (i & 1) << 8  # Allow for response
-
+        data = generate_i2c_test_data(128)
         pads = get_i2c_pads()
         i2c_master = I2CMaster(pads=pads, sys_freq=100e6, bus_freq=400e3)
         run_simulation(
@@ -734,7 +716,7 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_data_stop(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 17 | 1 << 18)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_data=1, s_stop=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -769,8 +751,8 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_data_then_stop(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 17)
-            yield from i2c.i2c_worker._fifo.write(1 << 18)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_data=1).pack())
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_stop=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -808,8 +790,8 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_data_nack_then_stop(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 8 | 1 << 17)
-            yield from i2c.i2c_worker._fifo.write(1 << 18)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(ack=1, s_data=1).pack())
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_stop=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -850,8 +832,8 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_data_then_start(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 17)
-            yield from i2c.i2c_worker._fifo.write(1 << 16)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_data=1).pack())
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_start=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -895,8 +877,8 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_data_nack_then_start(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 8 | 1 << 17)
-            yield from i2c.i2c_worker._fifo.write(1 << 16)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(ack=1, s_data=1).pack())
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(s_start=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
@@ -937,7 +919,7 @@ class TestI2C(unittest.TestCase):
     def test_i2c_master_worker_data_nack_abort(self):
         def generator(i2c):
             yield from i2c._sel.write(1)
-            yield from i2c.i2c_worker._fifo.write(1 << 8 | 1 << 17 | 1 << 20)
+            yield from i2c.i2c_worker._fifo.write(I2CQueueEntry(ack=1, s_data=1, abort_on_nack=1).pack())
             yield
             yield from i2c.i2c_worker._start.write(1)
             while ((yield i2c.i2c_worker._state.fields.fsm_state) == I2CState.IDLE):
