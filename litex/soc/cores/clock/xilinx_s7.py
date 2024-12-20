@@ -46,10 +46,10 @@ class S7PLL(XilinxClocking):
             i_CLKFBIN       = pll_fb,
             o_CLKFBOUT      = pll_fb,
         )
-        for n, (clk, f, p, m) in sorted(self.clkouts.items()):
-            self.params["p_CLKOUT{}_DIVIDE".format(n)] = config["clkout{}_divide".format(n)]
-            self.params["p_CLKOUT{}_PHASE".format(n)] = config["clkout{}_phase".format(n)]
-            self.params["o_CLKOUT{}".format(n)] = clk
+        for n, (clk, _, _, _, _) in sorted(self.clkouts.items()):
+            self.params[f"p_CLKOUT{n}_DIVIDE"] = config[f"clkout{n}_divide"]
+            self.params[f"p_CLKOUT{n}_PHASE"] = config[f"clkout{n}_phase"]
+            self.params[f"o_CLKOUT{n}"] = clk
         self.specials += Instance("PLLE2_ADV", **self.params)
 
 
@@ -94,13 +94,13 @@ class S7MMCM(XilinxClocking):
             i_CLKFBIN         = mmcm_fb,
             o_CLKFBOUT        = mmcm_fb,
         )
-        for n, (clk, f, p, m) in sorted(self.clkouts.items()):
+        for n, (clk, _, _, _, _) in sorted(self.clkouts.items()):
             if n == 0:
-                self.params["p_CLKOUT{}_DIVIDE_F".format(n)] = config["clkout{}_divide".format(n)]
+                self.params[f"p_CLKOUT{n}_DIVIDE_F"] = config[f"clkout{n}_divide"]
             else:
-                self.params["p_CLKOUT{}_DIVIDE".format(n)] = config["clkout{}_divide".format(n)]
-            self.params["p_CLKOUT{}_PHASE".format(n)] = config["clkout{}_phase".format(n)]
-            self.params["o_CLKOUT{}".format(n)]       = clk
+                self.params[f"p_CLKOUT{n}_DIVIDE"] = config[f"clkout{n}_divide"]
+            self.params[f"p_CLKOUT{n}_PHASE"] = config[f"clkout{n}_phase"]
+            self.params[f"o_CLKOUT{n}"]       = clk
         self.specials += Instance("MMCME2_ADV", **self.params)
 
 

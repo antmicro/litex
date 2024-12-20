@@ -44,11 +44,12 @@ class XilinxClocking(Module, AutoCSR):
 
     def create_clkout(self, cd, freq, phase=0, buf="bufg", margin=1e-2,
                       with_reset=True, ce=None, bypass=False, name="",
-                      platform=None, div=1, clock_out=None, external_rst=None, rst_bufg=False):
+                      platform=None, div=1, clock_out=None, external_rst=None, rst_bufg=False,
+                      duty_cycle=0.50):
         assert self.nclkouts < self.nclkouts_max
         clkout = Signal()
         if clock_out is None:
-            self.clkouts[self.nclkouts] = (clkout, freq, phase, margin)
+            self.clkouts[self.nclkouts] = (clkout, freq, phase, margin, duty_cycle)
         else:
             clkout = self.clkouts[clock_out][0]
         if with_reset:
@@ -107,38 +108,46 @@ class XilinxClocking(Module, AutoCSR):
         config = {}
         for divclk_divide in range(*self.divclk_divide_range):
             config["divclk_divide"] = divclk_divide
+            mult_rang = range(*self.clkfbout_mult_frange[:2])
+            divisor = 1
+            if len(self.clkfbout_mult_frange) == 3:
+                divisor = self.clkfbout_mult_frange[2]
             for clkfbout_mult in reversed(range(*self.clkfbout_mult_frange)):
                 all_valid = True
-                vco_freq = self.clkin_freq*clkfbout_mult/divclk_divide
+                vco_freq = self.clkin_freq*(clkfbout_mult/divisor)/divclk_divide
                 (vco_freq_min, vco_freq_max) = self.vco_freq_range
                 if (vco_freq >= vco_freq_min*(1 + self.vco_margin) and
                     vco_freq <= vco_freq_max*(1 - self.vco_margin)):
-                    for n, (clk, f, p, m) in sorted(self.clkouts.items()):
-                        valid = False
+                    for n, (_, freq, phase, margin, duty) in sorted(self.clkouts.items()):
                         d_ranges = [self.clkout_divide_range]
-                        if getattr(self, "clkout{}_divide_range".format(n), None) is not None:
-                            d_ranges += [getattr(self, "clkout{}_divide_range".format(n))]
+                        if getattr(self, f"clkout{n}_divide_range", None) is not None:
+                            d_ranges += [getattr(self, f"clkout{n}_divide_range")]
                         for d_range in d_ranges:
-                            for d in clkdiv_range(*d_range):
-                                clk_freq = vco_freq/d
-                                if abs(clk_freq - f) <= f*m:
-                                    config["clkout{}_freq".format(n)]   = clk_freq
-                                    config["clkout{}_divide".format(n)] = d
-                                    config["clkout{}_phase".format(n)]  = p
-                                    valid = True
+                            for div in clkdiv_range(*d_range):
+                                clk_freq = vco_freq/div
+                                if abs(clk_freq - freq) <= freq*margin:
+                                    config[f"clkout{n}_freq"] = clk_freq
+                                    config[f"clkout{n}_divide"] = div
+                                    config[f"clkout{n}_phase"] = phase
+                                    config[f"clkout{n}_duty_cycle"] = duty
                                     break
-                                if valid:
-                                    break
-                        if not valid:
+                            else:
+                                continue
+                            break
+                        else:
                             all_valid = False
                 else:
                     all_valid = False
                 if all_valid:
                     config["vco"]           = vco_freq
                     config["clkfbout_mult"] = clkfbout_mult
+                    config["clkfbout_mult_divisor"] = divisor
                     compute_config_log(self.logger, config)
                     return config
-        raise ValueError("No PLL config found")
+        err_message = f"Input frequency {self.clkin_freq}"
+        for _, (clk, freq, phase, _, duty) in self.clkouts.items():
+            err_message += f"\n Output: {clk} -> frequency {freq}, phase {phase}, duty {duty}"
+        raise ValueError(f"No PLL config found for:\n{err_message}")
 
     def expose_drp(self):
         self.drp_reset  = CSR()
@@ -185,4 +194,5 @@ class XilinxClocking(Module, AutoCSR):
 
     def do_finalize(self):
         assert hasattr(self, "clkin")
-        self.add_reset_delay(cycles=8) # Prevents interlock when reset driven from sys_clk.
+        if not getattr(self, "no_reset_delay", False):
+            self.add_reset_delay(cycles=8) # Prevents interlock when reset driven from sys_clk.

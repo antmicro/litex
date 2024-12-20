@@ -51,11 +51,11 @@ class S6PLL(XilinxClocking):
             i_CLKFBIN        = pll_fb,
             o_CLKFBOUT       = pll_fb,
         )
-        for n, (clk, f, p, m) in sorted(self.clkouts.items()):
-            self.params["p_CLKOUT{}_DIVIDE".format(n)]     = config["clkout{}_divide".format(n)]
-            self.params["p_CLKOUT{}_PHASE".format(n)]      = float(config["clkout{}_phase".format(n)])
-            self.params["p_CLKOUT{}_DUTY_CYCLE".format(n)] = 0.5
-            self.params["o_CLKOUT{}".format(n)]            = clk
+        for n, (clk, _, _, _, _) in sorted(self.clkouts.items()):
+            self.params[f"p_CLKOUT{n}_DIVIDE"]     = config[f"clkout{n}_divide"]
+            self.params[f"p_CLKOUT{n}_PHASE"]      = float(config[f"clkout{n}_phase"])
+            self.params[f"p_CLKOUT{n}_DUTY_CYCLE"] = 0.5
+            self.params[f"o_CLKOUT{n}"]            = clk
         self.specials += Instance("PLL_ADV", **self.params)
 
 
@@ -85,7 +85,7 @@ class S6DCM(XilinxClocking):
     def do_finalize(self):
         XilinxClocking.do_finalize(self)
         config = self.compute_config()
-        clk, f, p, m = sorted(self.clkouts.items())[0][1]
+        clk, _, _, _, _ = sorted(self.clkouts.items())[0][1]
         self.params.update(
             p_CLKFX_MULTIPLY  = config["clkfbout_mult"],
             p_CLKFX_DIVIDE    = config["clkout0_divide"] * config["divclk_divide"],

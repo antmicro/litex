@@ -2,24 +2,25 @@
 # This file is part of LiteX.
 #
 # Copyright (c) 2018-2020 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2024 Antmicro <mdudek@antmicro.com>
 # SPDX-License-Identifier: BSD-2-Clause
+
 
 from litex.soc.cores.clock.common import *
 from litex.soc.cores.clock.xilinx_common import *
 
 # Xilinx / Ultrascale Plus -------------------------------------------------------------------------
 
-# TODO:
-# - use Ultrascale Plus primitives instead of 7-Series' ones. (Vivado recognize and convert them).
-
 class USPPLL(XilinxClocking):
-    nclkouts_max = 6
+    nclkouts_max = 2
 
-    def __init__(self, speedgrade=-1):
+    def __init__(self, speedgrade=-1, no_reset_delay=False):
         self.logger = logging.getLogger("USPPLL")
-        self.logger.info("Creating USPPLL, {}.".format(colorer("speedgrade {}".format(speedgrade))))
+        self.logger.info(f"Creating USPPLL, {f'speedgrade {speedgrade}'}.")
+        self.no_reset_delay= no_reset_delay
         XilinxClocking.__init__(self)
-        self.divclk_divide_range = (1, 56+1)
+        self.divclk_divide_range = (1, 15+1)
+        self.clkfbout_mult_frange = (2, 21+1)
         self.clkin_freq_range = {
             -1: (70e6,  800e6),
             -2: (70e6,  933e6),
@@ -30,6 +31,30 @@ class USPPLL(XilinxClocking):
             -2: (750e6, 1500e6),
             -3: (750e6, 1500e6),
         }[speedgrade]
+        self.phy_mode = None
+        self.pll_phy_en = None
+        self.pll_phy_clk = None
+        self.alignment_required = False
+
+    def create_clkout_phy(
+        self,
+        phy_mode,
+        freq,
+        pll_phy_en=None,
+        pll_phy_clk=None,
+        alignment_required=True
+    ):
+        self.phy_mode = phy_mode
+        self.pll_phy_en = pll_phy_en
+        self.pll_phy_clk = pll_phy_clk
+        if self.pll_phy_en is None:
+            self.pll_phy_en = Signal()
+        if self.pll_phy_clk is None:
+            self.pll_phy_clk = Signal()
+        self.alignment_required = alignment_required
+        # Create PHY output and mark it -1, this should remove conflicts with
+        # other clock outputs
+        self.clkouts[-1]=(self.pll_phy_clk, freq, 0, 1e-2, 0.50)
 
     def do_finalize(self):
         XilinxClocking.do_finalize(self)
@@ -43,19 +68,37 @@ class USPPLL(XilinxClocking):
             o_LOCKED       = self.locked,
 
             # VCO.
-            p_REF_JITTER1   = 0.01,
-            p_CLKIN1_PERIOD = 1e9/self.clkin_freq,
+            p_REF_JITTER    = 0.01,
+            p_CLKIN_PERIOD  = 1e9/self.clkin_freq,
             p_CLKFBOUT_MULT = config["clkfbout_mult"],
             p_DIVCLK_DIVIDE = config["divclk_divide"],
-            i_CLKIN1        = self.clkin,
+            i_CLKIN         = self.clkin,
             i_CLKFBIN       = pll_fb,
             o_CLKFBOUT      = pll_fb,
         )
-        for n, (clk, f, p, m) in sorted(self.clkouts.items()):
-            self.params["p_CLKOUT{}_DIVIDE".format(n)] = config["clkout{}_divide".format(n)]
-            self.params["p_CLKOUT{}_PHASE".format(n)]  = config["clkout{}_phase".format(n)]
-            self.params["o_CLKOUT{}".format(n)]        = clk
-        self.specials += Instance("PLLE2_ADV", **self.params)
+        for n, (clk, _, _, _, _) in sorted(self.clkouts.items()):
+            if n == -1:
+                continue
+            self.params[f"p_CLKOUT{n}_DIVIDE"] = config[f"clkout{n}_divide"]
+            self.params[f"p_CLKOUT{n}_PHASE"] = config[f"clkout{n}_phase"]
+            self.params[f"p_CLKOUT{n}_DUTY_CYCLE"] = config[f"clkout{n}_duty_cycle"]
+            self.params[f"o_CLKOUT{n}"] = clk
+        if self.phy_mode is not None:
+            self.params["p_COMPENSATION"] = "PHY_ALIGN"
+            self.params["p_CLKOUTPHY_MODE"] = self.phy_mode
+            self.params["o_CLKOUTPHY"] = self.pll_phy_clk
+            self.params["i_CLKOUTPHYEN"] = self.pll_phy_en
+            if (self.alignment_required and
+                (
+                    config["clkfbout_mult"] not in [1, 2, 4, 8] or
+                    config["divclk_divide"] not in [1, 2, 4, 8]
+                )
+            ):
+                raise AssertionError("CLKOUTPHY alignment is required, but either of "
+                                     "clkfbout_mult or divclk_divide is not equal to "
+                                     "1, 2, 4, or 8")
+
+        self.specials += Instance("PLLE4_ADV", **self.params)
 
 
 class USPMMCM(XilinxClocking):
@@ -63,9 +106,10 @@ class USPMMCM(XilinxClocking):
 
     def __init__(self, speedgrade=-1):
         self.logger = logging.getLogger("USPMMCM")
-        self.logger.info("Creating USPMMCM, {}.".format(colorer("speedgrade {}".format(speedgrade))))
+        self.logger.info(f"Creating USPMMCM, {f'speedgrade {speedgrade}'}.")
         XilinxClocking.__init__(self)
         self.divclk_divide_range = (1, 106+1)
+        self.clkfbout_mult_frange = (2*8, (128+1)*8, 8)
         self.clkin_freq_range = {
             -1: (10e6,  800e6),
             -2: (10e6,  933e6),
@@ -81,6 +125,9 @@ class USPMMCM(XilinxClocking):
         XilinxClocking.do_finalize(self)
         config = self.compute_config()
         mmcm_fb = Signal()
+        _mult_int = config["clkfbout_mult"] // config["clkfbout_mult_divisor"]
+        _mult_frac = 125*(config["clkfbout_mult"] % config["clkfbout_mult_divisor"])
+
         self.params.update(
             # Global.
             p_BANDWIDTH = "OPTIMIZED",
@@ -91,20 +138,21 @@ class USPMMCM(XilinxClocking):
             # VCO.
             p_REF_JITTER1     = 0.01,
             p_CLKIN1_PERIOD   = 1e9/self.clkin_freq,
-            p_CLKFBOUT_MULT_F = config["clkfbout_mult"],
+            p_CLKFBOUT_MULT_F = float(f"{_mult_int}.{_mult_frac}"),
             p_DIVCLK_DIVIDE   = config["divclk_divide"],
             i_CLKIN1          = self.clkin,
             i_CLKFBIN         = mmcm_fb,
             o_CLKFBOUT        = mmcm_fb,
         )
-        for n, (clk, f, p, m) in sorted(self.clkouts.items()):
+        for n, (clk, _, _, _, _) in sorted(self.clkouts.items()):
             if n == 0:
-                self.params["p_CLKOUT{}_DIVIDE_F".format(n)] = config["clkout{}_divide".format(n)]
+                self.params[f"p_CLKOUT{n}_DIVIDE_F"] = config[f"clkout{n}_divide"]
             else:
-                self.params["p_CLKOUT{}_DIVIDE".format(n)] = config["clkout{}_divide".format(n)]
-            self.params["p_CLKOUT{}_PHASE".format(n)] = config["clkout{}_phase".format(n)]
-            self.params["o_CLKOUT{}".format(n)]       = clk
-        self.specials += Instance("MMCME2_ADV", **self.params)
+                self.params[f"p_CLKOUT{n}_DIVIDE"] = config[f"clkout{n}_divide"]
+            self.params[f"p_CLKOUT{n}_PHASE"] = config[f"clkout{n}_phase"]
+            self.params[f"p_CLKOUT{n}_DUTY_CYCLE"] = config[f"clkout{n}_duty_cycle"]
+            self.params[f"o_CLKOUT{n}"] = clk
+        self.specials += Instance("MMCME4_ADV", **self.params)
 
 
 class USPIDELAYCTRL(Module):
