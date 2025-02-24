@@ -174,11 +174,11 @@ __attribute__((__used__)) int main(int i, char **c)
 
         sdr_ok = 1;
 
-#if defined(CSR_ETHMAC_BASE) || defined(MAIN_RAM_BASE) || defined(CSR_SPIFLASH_CORE_BASE)
-    printf("--========== \e[1mInitialization\e[0m ============--\n");
 #ifdef EARLY_INIT
 	early_init();
 #endif /* EARLY_INIT */
+#if defined(CSR_ETHMAC_BASE) || defined(MAIN_RAM_BASE) || defined(CSR_SPIFLASH_CORE_BASE)
+    printf("--========== \e[1mInitialization\e[0m ============--\n");
 #ifdef CSR_ETHMAC_BASE
 	eth_init();
 #endif

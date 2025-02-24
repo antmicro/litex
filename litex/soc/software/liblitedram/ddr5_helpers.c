@@ -2134,6 +2134,18 @@ void rcd_set_dimm_operating_speed(int channel, int rank, int target_speed) {
     uint8_t coarse, fine;
     int offset_speed, bin_size;
 
+    // Special case, -2 means: enable test mode
+    if (target_speed == -2) {
+        coarse = 0x80;
+
+        ok &= sdram_rcd_write(rcd, 0, 0, 0, 5, &coarse, 1, false);
+        busy_wait_us(10);
+
+        if (!ok)
+            printf("There was a problem with setting test mode in the RCD\n");
+
+        return;
+    }
     // Special case, -1 means: enable PLL bypass mode
     if (target_speed == -1) {
         coarse = 0x0f;

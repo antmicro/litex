@@ -1908,12 +1908,20 @@ static void rcd_init(training_ctx_t *const ctx ) {
     rcd_set_dca_rate(0, 0, ctx->rate);
     if (ctx->rate != DDR)
         ctx->ca.check = dca_check_if_works_sdr;
+#if CSR_DDRPHY_EN_VTC_ADDR
+    rcd_set_dimm_operating_speed(0, 0, -2);
+#else
     rcd_set_dimm_operating_speed(0, 0, 2801);
+#endif // CSR_DDRPHY_EN_VTC_ADDR
     rcd_set_termination_and_vref(0);
 #ifndef SKIP_RESET_SEQUENCE
     reset_sequence(ctx->ranks);
 #endif // SKIP_RESET_SEQUENCE
-    rcd_set_dimm_operating_speed_band(0, 0, 2801);
+#if CSR_DDRPHY_EN_VTC_ADDR
+    rcd_set_dimm_operating_speed(0, 0, -2);
+#else
+    rcd_set_dimm_operating_speed(0, 0, 2801);
+#endif // CSR_DDRPHY_EN_VTC_ADDR
     busy_wait_us(50);
     rcd_forward_all_dram_cmds(0, 0, false); // FIXME: this should forward for all RCDs
     ctx->manufacturer = read_module_rcd_manufacturer(0);
@@ -1999,6 +2007,11 @@ void sdram_ddr5_flow(void) {
     rcd_dram_ctx.die_width = die_width;
     rcd_dram_ctx.ranks     = read_module_ranks(0); // FIXME: handle multiple sticks and SPDs
     rcd_dram_ctx.channels  = read_module_channels(0); // FIXME: handle multiple sticks and SPDs
+
+#if CSR_DDRPHY_EN_VTC_ADDR
+    /* Disable Voltage/Temperature compensation */
+    ddrphy_en_vtc_write(0);
+#endif // CSR_DDRPHY_EN_VTC_ADDR
 
     reset_all_phy_regs(host_dram_ctx.channels, host_dram_ctx.ranks,
         host_dram_ctx.all_ca_count, host_dram_ctx.modules, host_dram_ctx.die_width);
@@ -2136,6 +2149,11 @@ void sdram_ddr5_flow(void) {
     if (!sdram_ddr5_write_training(base_ctx)) {
         return;
     }
+
+#if CSR_DDRPHY_EN_VTC_ADDR
+    /* Enable Voltage/Temperature compensation */
+    ddrphy_en_vtc_write(1);
+#endif // CSR_DDRPHY_EN_VTC_ADDR
 }
 
 #endif // defined(CSR_SDRAM_BASE) && defined(SDRAM_PHY_DDR5)
