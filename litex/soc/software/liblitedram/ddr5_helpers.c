@@ -497,6 +497,12 @@ static void phy_select(int channel, int select, int width) {
         mask = 3;
         select *= 2;
     }
+#if CSR_DDRPHY_EN_VTC_ADDR
+    /* Disable Voltage/Temperature compensation */
+    ddrphy_en_vtc_write(0);
+    busy_wait_us(10);
+#endif // CSR_DDRPHY_EN_VTC_ADDR
+
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         ddrphy_CSRModule_B_dly_sel_write(mask<<select);
@@ -519,6 +525,12 @@ static void phy_deselect(int channel, int select, int width) {
 #else
     ddrphy_CSRModule_dly_sel_write(0);
 #endif
+
+#if CSR_DDRPHY_EN_VTC_ADDR
+    /* Enable Voltage/Temperature compensation */
+    busy_wait_us(10);
+    ddrphy_en_vtc_write(1);
+#endif // CSR_DDRPHY_EN_VTC_ADDR
     busy_wait_us(1);
 }
 
