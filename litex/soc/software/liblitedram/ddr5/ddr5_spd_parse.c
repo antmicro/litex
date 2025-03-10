@@ -24,8 +24,6 @@ enum module_type read_module_type(uint8_t spd) {
 }
 
 uint8_t read_module_width(uint8_t spd) {
-    // TODO: change to actual spd data, when PHY will handle variable widths
-    return SDRAM_PHY_DQ_DQS_RATIO;
     uint8_t buf;
 
     // Module width is stored in SPD[6][7:5]

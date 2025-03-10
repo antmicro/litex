@@ -497,11 +497,11 @@ static void phy_select(int channel, int select, int width) {
         mask = 3;
         select *= 2;
     }
-#if CSR_DDRPHY_EN_VTC_ADDR
+#ifdef SDRAM_PHY_USPCOMPODDR5PHY
     /* Disable Voltage/Temperature compensation */
     ddrphy_en_vtc_write(0);
     busy_wait_us(10);
-#endif // CSR_DDRPHY_EN_VTC_ADDR
+#endif // SDRAM_PHY_USPCOMPODDR5PHY
 
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -526,11 +526,11 @@ static void phy_deselect(int channel, int select, int width) {
     ddrphy_CSRModule_dly_sel_write(0);
 #endif
 
-#if CSR_DDRPHY_EN_VTC_ADDR
+#ifdef SDRAM_PHY_USPCOMPODDR5PHY
     /* Enable Voltage/Temperature compensation */
     busy_wait_us(10);
     ddrphy_en_vtc_write(1);
-#endif // CSR_DDRPHY_EN_VTC_ADDR
+#endif // SDRAM_PHY_USPCOMPODDR5PHY
     busy_wait_us(1);
 }
 

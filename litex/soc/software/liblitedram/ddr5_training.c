@@ -1998,11 +1998,15 @@ void sdram_ddr5_flow(void) {
     int die_width = SDRAM_PHY_DQ_DQS_RATIO; //FIXME: change to SPD value when PHY works `read_module_width(0);`
     if (is_rdimm) {
         die_width = 4;
+#ifdef SDRAM_PHY_USPCOMPODDR5PHY
+        die_width = read_module_width(0);
+#endif //SDRAM_PHY_USPCOMPODDR5PHY
         base_ctx = &host_rcd_ctx;
     }
     host_dram_ctx.die_width = die_width;
     host_rcd_ctx.die_width = die_width;
     rcd_dram_ctx.die_width = die_width;
+    rcd_dram_ctx.modules   = SDRAM_PHY_MODULES/CHANNELS/(die_width/4);
     rcd_dram_ctx.ranks     = read_module_ranks(0); // FIXME: handle multiple sticks and SPDs
     rcd_dram_ctx.channels  = read_module_channels(0); // FIXME: handle multiple sticks and SPDs
 
