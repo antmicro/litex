@@ -136,7 +136,11 @@ static void CS_scan_single(
     ctx->cs.rst_dly(channel, rank, 0);
 }
 
+static void CA_scan_single(training_ctx_t *const ctx, int32_t channel, int32_t rank, int32_t address, int shift_back);
+
 static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank) {
+    int i, cs_case;
+    int left_side, right_side;
     int shift = ctx->cs.invert[channel];
     bool subtract = false;
     clear_helper_arr();
@@ -150,17 +154,56 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank) {
     ctx->cs.enter_training_mode(channel, rank);
     printf("\nInitial scan|");
     CS_scan_single(ctx, channel, rank, shift);
-
-    if(ctx->training_type == HOST_RCD &&
-      one_in_helper_arr(ctx->max_delay_taps) == -1 &&
-      one_stride_helper_arr(ctx->max_delay_taps) < (ctx->max_delay_taps/8)) {
+    printf("|\n");
+    /*
+     * Possible outcomes after first scan:
+     * 1. There are no delays that worked => change polarization
+     * 2. At least 1 delay worked => check CA lines
+     * */
+    if (one_in_helper_arr(ctx->max_delay_taps) == 0) {
         ctx->cs.invert[channel] = 1;
         shift = 1;
-        clear_helper_arr();
         helper_modules_without_shift = 0;
         helper_modules_seen = 0;
-        printf("\nChanging polarization |");
+        printf("\nChanging polarization");
         CS_scan_single(ctx, channel, rank, shift);
+        printf("|\n");
+    }
+
+    // Exit CS training
+    ctx->cs.exit_training_mode(channel, rank);
+
+    /*
+     * Possible outcomes after first scan:
+     * 1. CS is lagging CA => remove CS delay, shift CK to find correct value.
+     * 2. CS is in phase with CA and first delay is 0 => delay CK to find limit.
+     * 3. CS is in phase with CA and first delay is greater then 0 => keep existing values.
+     * 4. CS is leading CA => find next working delay island.
+     * */
+    left_side = UNSET_DELAY;
+    right_side = UNSET_DELAY;
+    find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
+    clear_helper_arr();
+    printf("Testing CA for CS delay %d:", right_side);
+    ctx->cs.rst_dly(channel, rank, 0);
+    for (i=0; i < right_side; i++) {
+        ctx->cs.inc_dly(channel, rank, 0);
+    }
+    // Check CS/CA relation
+    ctx->ca.rst_dly(channel, rank, 0);
+    // Enter CA training
+    ctx->ca.enter_training_mode(channel, rank);
+    CA_scan_single(ctx, channel, rank, 0, 0);
+    printf("|\n");
+    // Exit CA training early
+    ctx->ca.exit_training_mode(channel, rank);
+    left_side = UNSET_DELAY;
+    right_side = UNSET_DELAY;
+    find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
+    clear_helper_arr();
+    printf("%d %d\n", right_side, left_side);
+    if (right_side != UNSET_DELAY) {
+        cs_case = 2;
     }
 
     switch (one_in_helper_arr(ctx->max_delay_taps)) {
@@ -192,8 +235,6 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank) {
     ctx->cs.exit_training_mode(channel, rank);
     return subtract;
 }
-
-static void CA_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, int32_t address);
 
 static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *success) {
     int left_side, right_side;
@@ -240,30 +281,30 @@ static void CS_training(training_ctx_t *const ctx, int32_t channel, uint8_t *suc
         ctx->cs.delays[channel][_rank][1] = left_side;
 
         // Check CS using CA 0
-        CA_scan(ctx, channel, _rank, 0);
-        left_side = UNSET_DELAY;
-        right_side = UNSET_DELAY;
-        find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
-        right_side -= ctx->max_delay_taps;
-        left_side -= ctx->max_delay_taps;
-        if (left_side < 0) {
-            right_side = ctx->cs.delays[channel][_rank][0] + ctx->max_delay_taps;
-            left_side = ctx->cs.delays[channel][_rank][1] + ctx->max_delay_taps;
+        //CA_scan(ctx, channel, _rank, 0);
+        //left_side = UNSET_DELAY;
+        //right_side = UNSET_DELAY;
+        //find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
+        //right_side -= ctx->max_delay_taps;
+        //left_side -= ctx->max_delay_taps;
+        //if (left_side < 0) {
+        //    right_side = ctx->cs.delays[channel][_rank][0] + ctx->max_delay_taps;
+        //    left_side = ctx->cs.delays[channel][_rank][1] + ctx->max_delay_taps;
 
-            printf("CS eye captures previous CLK, move CS to the right\n");
-            printf("Rank delays: %2d:%2d\n", right_side, left_side);
-            coarse = (right_side + left_side) / 2;
-            coarse = MAX(0, coarse);
-            printf("Coarse adjustment:%"PRId32"\n", coarse);
-            ctx->cs.coarse_delays[channel][_rank] = coarse;
+        //    printf("CS eye captures previous CLK, move CS to the right\n");
+        //    printf("Rank delays: %2d:%2d\n", right_side, left_side);
+        //    coarse = (right_side + left_side) / 2;
+        //    coarse = MAX(0, coarse);
+        //    printf("Coarse adjustment:%"PRId32"\n", coarse);
+        //    ctx->cs.coarse_delays[channel][_rank] = coarse;
 
-            ctx->cs.rst_dly(channel, _rank, 0);
-            for (csdly = 0; csdly < coarse; ++csdly)
-                ctx->cs.inc_dly(channel, _rank, 0);
+        //    ctx->cs.rst_dly(channel, _rank, 0);
+        //    for (csdly = 0; csdly < coarse; ++csdly)
+        //        ctx->cs.inc_dly(channel, _rank, 0);
 
-            ctx->cs.delays[channel][_rank][0] = right_side;
-            ctx->cs.delays[channel][_rank][1] = left_side;
-        }
+        //    ctx->cs.delays[channel][_rank][0] = right_side;
+        //    ctx->cs.delays[channel][_rank][1] = left_side;
+        //}
     }
 }
 
