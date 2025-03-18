@@ -66,14 +66,28 @@ static int reduce_cs(uint32_t cs, int modules) {
     return !!ok;
 }
 
-static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int32_t rank,
-    int shift_0101) {
+static void CS_scan_single(
+    const training_ctx_t *const ctx,
+    int32_t channel,
+    int32_t rank,
+    int shift_0101
+) {
     int csdly;
     uint32_t works, works_, helper;
+    int compress;
+    char compressed;
 
+    compress = 0;
+    compressed = 0;
+    if (ctx->max_delay_taps > 64) {
+        compress = 1;
+    }
     for (csdly = 0; csdly < ctx->max_delay_taps; csdly++) {
         works = works_ = 0;
         works = ctx->cs.check(channel, rank, 0, shift_0101, ctx->modules, ctx->die_width);
+#ifdef CA_DEBUG_DDR5
+        printf("Works: %lx", works);
+#endif
         if (!seen_working) {
             helper_modules_without_shift = 0;
             helper_modules_seen = 0;
@@ -90,16 +104,28 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
         helper_modules_seen |= works;
         if (ctx->training_type != HOST_RCD) {
             works_ = ctx->cs.check(channel, rank, 0, !shift_0101, ctx->modules, ctx->die_width);
+#ifdef CA_DEBUG_DDR5
+            printf(":%lx", works_);
+#endif
             helper = works_ & ~helper_modules_without_shift;
             // check that works_ is not part of helper_modules_without_shift set
             works_ = helper == works_ ? works_ : 0;
             helper_modules_seen |= works_;
         }
-        works = works & works_ ? 0 : works | works_;
+        works = (works & works_) ? 0 : works | works_;
 #ifdef CA_DEBUG_DDR5
+        printf(":%lx\n", works);
         printf("CS dly value: %d:", get_cs_dly(channel, rank, 0));
 #endif
-        printf("%d", reduce_cs(works, ctx->modules));
+        if (compress) {
+            compressed = compressed | (reduce_cs(works, ctx->modules) << (csdly & 3));
+            if ((csdly & 3) == 3) {
+                printf("%hhx", compressed);
+                compressed = 0;
+            }
+        } else {
+            printf("%d", reduce_cs(works, ctx->modules));
+        }
 #ifdef CA_DEBUG_DDR5
         printf("\n");
 #endif
@@ -277,11 +303,27 @@ static void CA_check_lines(training_ctx_t *const ctx, int32_t channel, int rank)
 
 static void CA_scan_single(training_ctx_t *const ctx, int32_t channel, int32_t rank, int32_t address, int shift_back) {
     int works, cadly;
+    int compress;
+    char compressed;
 
+    compress = 0;
+    compressed = 0;
+    if (ctx->max_delay_taps > 64) {
+        compress = 1;
+    }
     ctx->ca.rst_dly(channel, rank, address);
+
     for (cadly = 0; cadly < ctx->max_delay_taps; cadly++) {
         works = ctx->ca.check(channel, rank, address, shift_back);
-        printf("%d", !!works);
+        if (compress) {
+            compressed = compressed | (!!works << (cadly & 3));
+            if ((cadly & 3) == 3) {
+                printf("%hhx", compressed);
+                compressed = 0;
+            }
+        } else {
+            printf("%d", !!works);
+        }
         set_helper_arr_value_and_advance(works);
         ctx->ca.inc_dly(channel, rank, address);
     }
@@ -637,9 +679,9 @@ static void sdram_ddr5_module_enumerate(int rank, int width, int channels, int m
         for (module = 0; module < modules; module++) {
             printf("\t\tmodule:%2d\n", module);
 #ifndef CA_INFO_DDR5
-            setup_enumerate(channel, rank, module, width, 0);
+            setup_enumerate(channel, rank, module, width, modules, 0);
 #else
-            setup_enumerate(channel, rank, module, width, 1);
+            setup_enumerate(channel, rank, module, width, modules, 1);
 #endif // CA_INFO_DDR5
         }
     }
@@ -657,16 +699,16 @@ static bool sdram_ddr5_check_enumerate(int rank, int width, int channels, int mo
         send_mrw(channel, rank, MODULE_BROADCAST, 2, 1|use_internal_write_timing|single_cycle_MPC);
         printf("\tBase line:");
 #ifndef CA_INFO_DDR5
-        ok &= check_enumerate(channel, rank, -1, width, 0);
+        ok &= check_enumerate(channel, rank, -1, width, modules, 0);
 #else
-        ok &= check_enumerate(channel, rank, -1, width, 1);
+        ok &= check_enumerate(channel, rank, -1, width, modules, 1);
 #endif // CA_INFO_DDR5
         for (module = 0; module < modules; module++) {
             printf("\t\tmodule:%2d", module);
 #ifndef CA_INFO_DDR5
-            ok &= check_enumerate(channel, rank, module, width, 0);
+            ok &= check_enumerate(channel, rank, module, width, modules, 0);
 #else
-            ok &= check_enumerate(channel, rank, module, width, 1);
+            ok &= check_enumerate(channel, rank, module, width, modules, 1);
 #endif // CA_INFO_DDR5
         }
         send_mrw(channel, rank, MODULE_BROADCAST, 2, 0|use_internal_write_timing|single_cycle_MPC);
@@ -2007,6 +2049,7 @@ void sdram_ddr5_flow(void) {
     host_rcd_ctx.die_width = die_width;
     rcd_dram_ctx.die_width = die_width;
     rcd_dram_ctx.modules   = SDRAM_PHY_MODULES/CHANNELS/(die_width/4);
+    printf("%d", rcd_dram_ctx.modules);
     rcd_dram_ctx.ranks     = read_module_ranks(0); // FIXME: handle multiple sticks and SPDs
     rcd_dram_ctx.channels  = read_module_channels(0); // FIXME: handle multiple sticks and SPDs
 

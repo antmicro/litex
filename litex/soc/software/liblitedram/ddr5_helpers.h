@@ -78,6 +78,7 @@ typedef void (*inc_func)(int, int, int);
 
 void ck_rst(int channel, int rank, int address);
 void ck_inc(int channel, int rank, int address);
+void ck_dec(int channel, int rank, int address);
 
 void cs_rst(int channel, int rank, int address);
 void cs_inc(int channel, int rank, int address);
@@ -131,8 +132,8 @@ uint16_t get_wr_dm_dly(int channel, int module, int width);
 
 int captured_preamble(int channel, int module, int width);
 uint8_t recover_mrr_value(int channel, int module, int width);
-void setup_enumerate(int channel, int rank, int module, int width, int verbose);
-bool check_enumerate(int channel, int rank, int module, int width, int verbose);
+void setup_enumerate(int channel, int rank, int module, int width, int modules, int verbose);
+bool check_enumerate(int channel, int rank, int module, int width, int modules, int verbose);
 void send_mpc(int channel, int rank, int cmd, int wrdata_active);
 void send_mrw_rcd(int channel, int rank, int reg, int value);
 void send_mrw_no_mpc(int channel, int rank, int reg, int value);
@@ -189,6 +190,7 @@ void exit_dcstm(int channel, int rank);
 uint32_t dcs_check_if_works(int channel, int rank, int address, int shift_0101, int modules, int width);
 
 void qck_inc(int channel, int rank, int address);
+void qck_dec(int channel, int rank, int address);
 void qck_rst(int channel, int rank, int address);
 
 void qcs_inc(int channel, int rank, int address);

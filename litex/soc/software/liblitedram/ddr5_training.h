@@ -28,6 +28,7 @@ typedef struct {
     struct {
         action_callback_t rst_dly;
         action_callback_t inc_dly;
+        action_callback_t dec_dly;
     } ck;
     struct {
         int delays[CHANNELS][2][2];
@@ -100,6 +101,7 @@ typedef struct {
     .ck = {                                   \
         .rst_dly = ck_rst,                    \
         .inc_dly = ck_inc,                    \
+        .dec_dly = ck_dec,                    \
     },                                        \
     .cs = {                                   \
         .enter_training_mode = enter_cstm,    \
@@ -138,6 +140,7 @@ typedef struct {
     .ck = {                                  \
         .rst_dly = ck_rst,                   \
         .inc_dly = ck_inc,                   \
+        .dec_dly = ck_dec,                   \
     },                                       \
     .cs = {                                  \
         .enter_training_mode = enter_dcstm,  \
@@ -177,6 +180,7 @@ typedef struct {
     .ck = {                                 \
         .rst_dly = qck_rst,                 \
         .inc_dly = qck_inc,                 \
+        .dec_dly = qck_dec,                 \
     },                                      \
     .cs = {                                 \
         .enter_training_mode = enter_qcstm, \

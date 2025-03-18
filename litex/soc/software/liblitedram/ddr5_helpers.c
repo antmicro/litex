@@ -500,7 +500,7 @@ static void phy_select(int channel, int select, int width) {
 #ifdef SDRAM_PHY_USPCOMPODDR5PHY
     /* Disable Voltage/Temperature compensation */
     ddrphy_en_vtc_write(0);
-    busy_wait_us(10);
+    busy_wait_us(1);
 #endif // SDRAM_PHY_USPCOMPODDR5PHY
 
 #ifdef SDRAM_PHY_SUBCHANNELS
@@ -528,7 +528,7 @@ static void phy_deselect(int channel, int select, int width) {
 
 #ifdef SDRAM_PHY_USPCOMPODDR5PHY
     /* Enable Voltage/Temperature compensation */
-    busy_wait_us(10);
+    busy_wait_us(1);
     ddrphy_en_vtc_write(1);
 #endif // SDRAM_PHY_USPCOMPODDR5PHY
     busy_wait_us(1);
@@ -564,58 +564,69 @@ static void phy_dq_deselect(int channel, int select, int width) {
 #endif // SDRAM_DELAY_PER_DQ
 }
 
-static void idly_rst_internal(int channel) {
+static void csdly_update_internal(int channel) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (channel) {
+        ddrphy_CSRModule_B_csdly_update_write(1);
+    } else {
+        ddrphy_CSRModule_A_csdly_update_write(1);
+    }
+#else
+        ddrphy_CSRModule_csdly_update_write(1);
+#endif //SDRAM_PHY_SUBCHANNELS
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+}
+
+static void cadly_update_internal(int channel) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (channel) {
+        ddrphy_CSRModule_B_cadly_update_write(1);
+    } else {
+        ddrphy_CSRModule_A_cadly_update_write(1);
+    }
+#else
+    ddrphy_CSRModule_cadly_update_write(1);
+#endif //SDRAM_PHY_SUBCHANNELS
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+}
+
+static void pardly_update_internal(int channel) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if (channel)
+        ddrphy_CSRModule_B_pardly_update_write(1);
+    else
+        ddrphy_CSRModule_A_pardly_update_write(1);
+#endif //SDRAM_PHY_SUBCHANNELS
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+}
+
+static void idly_update_internal(int channel) {
 #ifdef SDRAM_INPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        ddrphy_CSRModule_B_rdly_dqs_rst_write(1);
+        ddrphy_CSRModule_B_rdly_dqs_update_write(1);
     } else {
-        ddrphy_CSRModule_A_rdly_dqs_rst_write(1);
+        ddrphy_CSRModule_A_rdly_dqs_update_write(1);
     }
 #else
-    ddrphy_CSRModule_rdly_dqs_rst_write(1);
+    ddrphy_CSRModule_rdly_dqs_update_write(1);
 #endif
 #endif // SDRAM_INPUT_DELAY_CAPABLE
 }
 
-static void idly_inc_internal(int channel) {
+static void idly_dq_update_internal(int channel) {
 #ifdef SDRAM_INPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        ddrphy_CSRModule_B_rdly_dqs_inc_write(1);
+        ddrphy_CSRModule_B_rdly_dq_update_write(1);
     } else {
-        ddrphy_CSRModule_A_rdly_dqs_inc_write(1);
+        ddrphy_CSRModule_A_rdly_dq_update_write(1);
     }
 #else
-    ddrphy_CSRModule_rdly_dqs_inc_write(1);
-#endif
-#endif // SDRAM_INPUT_DELAY_CAPABLE
-}
-
-static void idly_dq_rst_internal(int channel) {
-#ifdef SDRAM_INPUT_DELAY_CAPABLE
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if(channel) {
-        ddrphy_CSRModule_B_rdly_dq_rst_write(1);
-    } else {
-        ddrphy_CSRModule_A_rdly_dq_rst_write(1);
-    }
-#else
-    ddrphy_CSRModule_rdly_dq_rst_write(1);
-#endif
-#endif // SDRAM_INPUT_DELAY_CAPABLE
-}
-
-static void idly_dq_inc_internal(int channel) {
-#ifdef SDRAM_INPUT_DELAY_CAPABLE
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if(channel) {
-        ddrphy_CSRModule_B_rdly_dq_inc_write(1);
-    } else {
-        ddrphy_CSRModule_A_rdly_dq_inc_write(1);
-    }
-#else
-    ddrphy_CSRModule_rdly_dq_inc_write(1);
+    ddrphy_CSRModule_rdly_dq_update_write(1);
 #endif
 #endif // SDRAM_INPUT_DELAY_CAPABLE
 }
@@ -644,88 +655,70 @@ static void rd_inc_internal(int channel) {
 #endif
 }
 
-static void odly_dqs_rst_internal(int channel) {
+static void odly_dqs_update_internal(int channel) {
 #ifdef SDRAM_OUTPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        ddrphy_CSRModule_B_wdly_dqs_rst_write(1);
+        ddrphy_CSRModule_B_wdly_dqs_update_write(1);
     } else {
-        ddrphy_CSRModule_A_wdly_dqs_rst_write(1);
+        ddrphy_CSRModule_A_wdly_dqs_update_write(1);
     }
 #else
-    ddrphy_CSRModule_wdly_dqs_rst_write(1);
+    ddrphy_CSRModule_wdly_dqs_update_write(1);
 #endif
 #endif // SDRAM_OUTPUT_DELAY_CAPABLE
 }
 
-static void odly_dqs_inc_internal(int channel) {
+static void odly_dm_update_internal(int channel) {
 #ifdef SDRAM_OUTPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        ddrphy_CSRModule_B_wdly_dqs_inc_write(1);
+        ddrphy_CSRModule_B_wdly_dm_update_write(1);
     } else {
-        ddrphy_CSRModule_A_wdly_dqs_inc_write(1);
+        ddrphy_CSRModule_A_wdly_dm_update_write(1);
     }
 #else
-    ddrphy_CSRModule_wdly_dqs_inc_write(1);
+    ddrphy_CSRModule_wdly_dm_update_write(1);
 #endif
 #endif // SDRAM_OUTPUT_DELAY_CAPABLE
 }
 
-static void odly_dm_rst_internal(int channel) {
+static void odly_dq_update_internal(int channel) {
 #ifdef SDRAM_OUTPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        ddrphy_CSRModule_B_wdly_dm_rst_write(1);
+        ddrphy_CSRModule_B_wdly_dq_update_write(1);
     } else {
-        ddrphy_CSRModule_A_wdly_dm_rst_write(1);
+        ddrphy_CSRModule_A_wdly_dq_update_write(1);
     }
 #else
-    ddrphy_CSRModule_wdly_dm_rst_write(1);
+    ddrphy_CSRModule_wdly_dq_update_write(1);
 #endif
 #endif // SDRAM_OUTPUT_DELAY_CAPABLE
 }
 
-static void odly_dm_inc_internal(int channel) {
-#ifdef SDRAM_OUTPUT_DELAY_CAPABLE
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if(channel) {
-        ddrphy_CSRModule_B_wdly_dm_inc_write(1);
-    } else {
-        ddrphy_CSRModule_A_wdly_dm_inc_write(1);
-    }
+static uint16_t get_ck_dly_internal_rdimm(int channel) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+    return ddrphy_CSRModule_ckdly_read();
 #else
-    ddrphy_CSRModule_wdly_dm_inc_write(1);
-#endif
-#endif // SDRAM_OUTPUT_DELAY_CAPABLE
+    return 0;
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
-static void odly_dq_rst_internal(int channel) {
-#ifdef SDRAM_OUTPUT_DELAY_CAPABLE
+static uint16_t get_ck_dly_internal(int channel) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
-        ddrphy_CSRModule_B_wdly_dq_rst_write(1);
+        return ddrphy_CSRModule_B_csdly_read();
     } else {
-        ddrphy_CSRModule_A_wdly_dq_rst_write(1);
+        return ddrphy_CSRModule_A_csdly_read();
     }
 #else
-    ddrphy_CSRModule_wdly_dq_rst_write(1);
+    return ddrphy_CSRModule_csdly_read();
 #endif
-#endif // SDRAM_OUTPUT_DELAY_CAPABLE
-}
-
-static void odly_dq_inc_internal(int channel) {
-#ifdef SDRAM_OUTPUT_DELAY_CAPABLE
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if(channel) {
-        ddrphy_CSRModule_B_wdly_dq_inc_write(1);
-    } else {
-        ddrphy_CSRModule_A_wdly_dq_inc_write(1);
-    }
 #else
-    ddrphy_CSRModule_wdly_dq_inc_write(1);
-#endif
-#endif // SDRAM_OUTPUT_DELAY_CAPABLE
+    return 0;
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
 static uint16_t get_cs_dly_internal(int channel) {
@@ -1126,18 +1119,40 @@ int compare(int channel, int rank, int module, int width, int data0, int data1, 
     return 1;
 }
 
+static void load_min_taps_internal(void) {
+    if (ddrphy_CSRModule_adly_ctrl_read() != 1) {
+        ddrphy_CSRModule_adly_ctrl_write(1<<0);
+        busy_wait_us(1);
+    }
+}
+
+static void load_max_taps_internal(void) {
+    if (ddrphy_CSRModule_adly_ctrl_read() != 3) {
+        ddrphy_CSRModule_adly_ctrl_write(1<<1|1<<0);
+        busy_wait_us(1);
+    }
+}
+
+static void inc_taps_internal(void) {
+    if (ddrphy_CSRModule_adly_ctrl_read() != 2) {
+        ddrphy_CSRModule_adly_ctrl_write(1<<1);
+        busy_wait_us(1);
+    }
+}
+
+static void dec_taps_internal(void) {
+    if (ddrphy_CSRModule_adly_ctrl_read() != 0) {
+        ddrphy_CSRModule_adly_ctrl_write(0);
+        busy_wait_us(1);
+    }
+}
+
 void cs_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, rank, 0);
     /* Reset CS delay */
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if (channel)
-        ddrphy_CSRModule_B_csdly_rst_write(1);
-    else
-        ddrphy_CSRModule_A_csdly_rst_write(1);
-#else
-        ddrphy_CSRModule_csdly_rst_write(1);
-#endif //SDRAM_PHY_SUBCHANNELS
+    load_min_taps_internal();
+    csdly_update_internal(channel);
     phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
@@ -1146,16 +1161,26 @@ void cs_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, rank, 0);
     /* Increment CS delay */
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if (channel)
-        ddrphy_CSRModule_B_csdly_inc_write(1);
-    else
-        ddrphy_CSRModule_A_csdly_inc_write(1);
-#else
-    ddrphy_CSRModule_csdly_inc_write(1);
-#endif //SDRAM_PHY_SUBCHANNELS
+    inc_taps_internal();
+    csdly_update_internal(channel);
     phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+}
+
+uint16_t get_ck_dly_rdimm(int channel, int rank, int address) {
+    uint16_t temp;
+    phy_select(channel,rank, 0);
+    temp = get_ck_dly_internal_rdimm(channel);
+    phy_deselect(channel, rank, 0);
+    return temp;
+}
+
+uint16_t get_ck_dly(int channel, int rank, int address) {
+    uint16_t temp;
+    phy_select(channel,rank, 0);
+    temp = get_ck_dly_internal(channel);
+    phy_deselect(channel, rank, 0);
+    return temp;
 }
 
 uint16_t get_cs_dly(int channel, int rank, int address) {
@@ -1170,14 +1195,8 @@ void ca_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, address, 0);
     /* Reset CA delay */
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if (channel)
-        ddrphy_CSRModule_B_cadly_rst_write(1);
-    else
-        ddrphy_CSRModule_A_cadly_rst_write(1);
-#else
-    ddrphy_CSRModule_cadly_rst_write(1);
-#endif //SDRAM_PHY_SUBCHANNELS
+    load_min_taps_internal();
+    cadly_update_internal(channel);
     phy_deselect(channel, address, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
@@ -1186,14 +1205,8 @@ void ca_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, address, 0);
     /* Increment CA delay */
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if (channel)
-        ddrphy_CSRModule_B_cadly_inc_write(1);
-    else
-        ddrphy_CSRModule_A_cadly_inc_write(1);
-#else
-    ddrphy_CSRModule_cadly_inc_write(1);
-#endif //SDRAM_PHY_SUBCHANNELS
+    inc_taps_internal();
+    cadly_update_internal(channel);
     phy_deselect(channel, address, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
@@ -1210,12 +1223,8 @@ void par_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, rank, 0);
     /* Reset PAR delay */
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if (channel)
-        ddrphy_CSRModule_B_pardly_rst_write(1);
-    else
-        ddrphy_CSRModule_A_pardly_rst_write(1);
-#endif //SDRAM_PHY_SUBCHANNELS
+    load_min_taps_internal();
+    pardly_update_internal(channel);
     phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
@@ -1223,13 +1232,9 @@ void par_rst(int channel, int rank, int address) {
 void par_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, rank, 0);
-    /* Reset PAR delay */
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if (channel)
-        ddrphy_CSRModule_B_pardly_inc_write(1);
-    else
-        ddrphy_CSRModule_A_pardly_inc_write(1);
-#endif //SDRAM_PHY_SUBCHANNELS
+    /* Increment PAR delay */
+    inc_taps_internal();
+    pardly_update_internal(channel);
     phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
@@ -1238,7 +1243,8 @@ void ck_rst(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, rank, 0);
     /* Reset CK delay */
-    ddrphy_CSRModule_ckdly_rst_write(1);
+    load_min_taps_internal();
+    ddrphy_CSRModule_ckdly_update_write(1);
     phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
@@ -1247,7 +1253,18 @@ void ck_inc(int channel, int rank, int address) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     phy_select(channel, rank, 0);
     /* Increment CK delay */
-    ddrphy_CSRModule_ckdly_inc_write(1);
+    inc_taps_internal();
+    ddrphy_CSRModule_ckdly_update_write(1);
+    phy_deselect(channel, rank, 0);
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+}
+
+void ck_dec(int channel, int rank, int address) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+    phy_select(channel, rank, 0);
+    /* Decrement CK delay */
+    dec_taps_internal();
+    ddrphy_CSRModule_ckdly_update_write(1);
     phy_deselect(channel, rank, 0);
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
@@ -1266,30 +1283,34 @@ void rd_inc(int channel, int module, int width) {
 
 void idly_rst(int channel, int module, int width) {
     phy_select(channel, module, width);
-    idly_rst_internal(channel);
+    /* Load max delay */
+    load_max_taps_internal();
+    idly_update_internal(channel);
 #ifdef SDRAM_DELAY_PER_DQ
     for(int i=0; i < width; ++i) {
         phy_dq_select(channel, i, width);
-        idly_dq_rst_internal(channel);
+        idly_dq_update_internal(channel);
         phy_dq_deselect(channel, i, width);
     }
 #else
-    idly_dq_rst_internal(channel);
+    idly_dq_update_internal(channel);
 #endif // SDRAM_DELAY_PER_DQ
     phy_deselect(channel, module, width);
 }
 
 void idly_inc(int channel, int module, int width) {
     phy_select(channel, module, width);
-    idly_inc_internal(channel);
+    /* Decrement taps */
+    dec_taps_internal();
+    idly_update_internal(channel);
 #ifdef SDRAM_DELAY_PER_DQ
     for(int i=0; i < width; ++i) {
         phy_dq_select(channel, i, width);
-        idly_dq_inc_internal(channel);
+        idly_dq_update_internal(channel);
         phy_dq_deselect(channel, i, width);
     }
 #else
-    idly_dq_inc_internal(channel);
+    idly_dq_update_internal(channel);
 #endif // SDRAM_DELAY_PER_DQ
     phy_deselect(channel, module, width);
 }
@@ -1297,7 +1318,9 @@ void idly_inc(int channel, int module, int width) {
 void idly_dq_rst(int channel, int module, int width, int dq_line) {
     phy_dq_select(channel, dq_line, width);
     phy_select(channel, module, width);
-    idly_dq_rst_internal(channel);
+    /* Load max delay */
+    load_max_taps_internal();
+    idly_dq_update_internal(channel);
     phy_deselect(channel, module, width);
     phy_dq_deselect(channel, dq_line, width);
 }
@@ -1305,7 +1328,9 @@ void idly_dq_rst(int channel, int module, int width, int dq_line) {
 void idly_dq_inc(int channel, int module, int width, int dq_line) {
     phy_dq_select(channel, dq_line, width);
     phy_select(channel, module, width);
-    idly_dq_inc_internal(channel);
+    /* Decrement taps */
+    dec_taps_internal();
+    idly_dq_update_internal(channel);
     phy_deselect(channel, module, width);
     phy_dq_deselect(channel, dq_line, width);
 }
@@ -1362,13 +1387,15 @@ void wr_dqs_inc(int channel, int module, int width) {
 
 void odly_dqs_rst(int channel, int module, int width) {
     phy_select(channel, module, width);
-    odly_dqs_rst_internal(channel);
+    load_min_taps_internal();
+    odly_dqs_update_internal(channel);
     phy_deselect(channel, module, width);
 }
 
 void odly_dqs_inc(int channel, int module, int width) {
     phy_select(channel, module, width);
-    odly_dqs_inc_internal(channel);
+    inc_taps_internal();
+    odly_dqs_update_internal(channel);
     phy_deselect(channel, module, width);
 }
 
@@ -1397,40 +1424,44 @@ void wr_dq_inc(int channel, int module, int width) {
 
 void odly_dm_rst(int channel, int module, int width) {
     phy_select(channel, module, width);
-    odly_dm_rst_internal(channel);
+    load_min_taps_internal();
+    odly_dm_update_internal(channel);
     phy_deselect(channel, module, width);
 }
 
 void odly_dm_inc(int channel, int module, int width) {
     phy_select(channel, module, width);
-    odly_dm_inc_internal(channel);
+    inc_taps_internal();
+    odly_dm_update_internal(channel);
     phy_deselect(channel, module, width);
 }
 
 void odly_dq_rst(int channel, int module, int width) {
     phy_select(channel, module, width);
+    load_min_taps_internal();
 #ifdef SDRAM_DELAY_PER_DQ
     for(int i=0; i < width; ++i) {
         phy_dq_select(channel, i, width);
-        odly_dq_rst_internal(channel);
+        odly_dq_update_internal(channel);
         phy_dq_deselect(channel, i, width);
     }
 #else
-    odly_dq_rst_internal(channel);
+    odly_dq_update_internal(channel);
 #endif
     phy_deselect(channel, module, width);
 }
 
 void odly_dq_inc(int channel, int module, int width) {
     phy_select(channel, module, width);
+    inc_taps_internal();
 #ifdef SDRAM_DELAY_PER_DQ
     for(int i=0; i < width; ++i) {
         phy_dq_select(channel, i, width);
-        odly_dq_inc_internal(channel);
+        odly_dq_update_internal(channel);
         phy_dq_deselect(channel, i, width);
     }
 #else
-    odly_dq_inc_internal(channel);
+    odly_dq_update_internal(channel);
 #endif
     phy_deselect(channel, module, width);
 }
@@ -1438,7 +1469,8 @@ void odly_dq_inc(int channel, int module, int width) {
 void odly_per_dq_rst(int channel, int module, int width, int dq) {
     phy_select(channel, module, width);
     phy_dq_select(channel, dq, width);
-    odly_dq_rst_internal(channel);
+    load_min_taps_internal();
+    odly_dq_update_internal(channel);
     phy_dq_deselect(channel, dq, width);
     phy_deselect(channel, module, width);
 }
@@ -1446,7 +1478,8 @@ void odly_per_dq_rst(int channel, int module, int width, int dq) {
 void odly_per_dq_inc(int channel, int module, int width, int dq) {
     phy_select(channel, module, width);
     phy_dq_select(channel, dq, width);
-    odly_dq_inc_internal(channel);
+    inc_taps_internal();
+    odly_dq_update_internal(channel);
     phy_dq_deselect(channel, dq, width);
     phy_deselect(channel, module, width);
 }
@@ -1497,7 +1530,7 @@ uint8_t recover_mrr_value(int channel, int module, int width) {
     return ret;
 }
 
-bool check_enumerate(int channel, int rank, int module, int width, int verbose) {
+bool check_enumerate(int channel, int rank, int module, int width, int modules, int verbose) {
     int module_;
     int good = 1;
     send_mrw(channel, rank, MODULE_BROADCAST, 26, 0xFF);
@@ -1532,7 +1565,8 @@ bool check_enumerate(int channel, int rank, int module, int width, int verbose) 
     printf("\t");
     if (!verbose) {
         if (module != -1) {
-            for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++)
+            printf("module: %d\n", module);
+            for (module_ = 0; module_ < modules; module_++)
                 good &= !capture_and_reduce_module(channel, module, width, module_ != module);
             printf("%s\n", good ? "pass" : "fail");
         }
@@ -1557,10 +1591,10 @@ bool check_enumerate(int channel, int rank, int module, int width, int verbose) 
     return good;
 }
 
-void setup_enumerate(int channel, int rank, int module, int width, int verbose) {
+void setup_enumerate(int channel, int rank, int module, int width, int modules, int verbose) {
     int module_, i;
     char *pattern = width == 8 ? "%04"PRIx16 : "%02"PRIx16;
-    for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
+    for (module_ = 0; module_ < modules; module_++) {
         for (i = 0; i < 8; ++i)
             set_data_module_phase(channel, module_, width, i, 0xffff);
     }
@@ -1570,7 +1604,7 @@ void setup_enumerate(int channel, int rank, int module, int width, int verbose) 
         printf("Channel: %d, rank: %d\n", channel, rank);
         for(i = 0; i < 8; ++i) {
             printf("Phase:%d|", i);
-            for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
+            for (module_ = 0; module_ < modules; module_++) {
                 printf(pattern, get_wdata_module_phase(channel, module_, width, i));
             }
             printf("\n");
@@ -1591,7 +1625,7 @@ void setup_enumerate(int channel, int rank, int module, int width, int verbose) 
     cmd_injector(channel, 0xf,  0, 0, 0, 0, 0, 0);
     store_continuous(channel);
 
-    for (module_ = 0; module_ < SDRAM_PHY_MODULES/CHANNELS; module_++) {
+    for (module_ = 0; module_ < modules; module_++) {
         for (i = 0; i < 8; ++i)
             set_data_module_phase(channel, module_, width, i, 0xffff);
     }
@@ -1960,13 +1994,16 @@ void exit_catm(int channel, int rank) {
 
 
 static void ca_sample_prep(int channel, int rank, int address, int l2h, int phase_shift) {
-    cmd_injector(channel, 0xf,              0,       (!l2h)<<address, 0, 0, 1, 0);
+    cmd_injector(channel, 0xf, 0, (!l2h)<<address, 0, 0, 1, 0);
 
     if (phase_shift == 0) {
-        cmd_injector(channel, 0x1,              1<<rank,    l2h<<address, 0, 0, 1, 0);
-    } else {
-        cmd_injector(channel, 0x1,              0,          l2h<<address, 0, 0, 1, 0);
+        cmd_injector(channel, 0x1, 1<<rank, l2h<<address, 0, 0, 1, 0);
+    } else if (phase_shift > 0) {
+        cmd_injector(channel, 0x1, 0, l2h<<address, 0, 0, 1, 0);
         cmd_injector(channel, 0x1<<phase_shift, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
+    } else {
+        cmd_injector(channel, 0x1<<(-phase_shift), 0, l2h<<address, 0, 0, 1, 0);
+        cmd_injector(channel, 0x1, 1<<rank, (!l2h)<<address, 0, 0, 1, 0);
     }
     store_continuous(channel);
     busy_wait_us(1);
@@ -2489,7 +2526,7 @@ static int alert_or_reduce(void) {
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    busy_wait_us(10);
+    busy_wait_us(1);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
     busy_wait_us(10);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
@@ -2500,7 +2537,7 @@ static int alert_and_reduce(void) {
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    busy_wait_us(10);
+    busy_wait_us(1);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
     busy_wait_us(10);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
@@ -2613,6 +2650,26 @@ void qck_inc(int channel, int rank, int address) {
     uint8_t delay;
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x10, rw_data, false);
     delay = (rw_data[2] + 1) & 0x3f;
+
+    uint8_t rw_number = 0x12;
+    uint8_t rw_value = delay | (1 << 7); // enable delays
+
+    for (int i = 0; i< 4; ++i) {
+        ok &= sdram_rcd_write(rcd, 0, channel, 0, rw_number, &rw_value, 1, false);
+        busy_wait_us(10);
+        if (!ok)
+            printf("There was a problem with incrementing Q%cCK output delay\n", 'A' + i);
+        rw_number++;
+    }
+}
+
+void qck_dec(int channel, int rank, int address) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[5];
+    uint8_t delay;
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x10, rw_data, false);
+    delay = (rw_data[2] - 1) & 0x3f;
 
     uint8_t rw_number = 0x12;
     uint8_t rw_value = delay | (1 << 7); // enable delays
@@ -2907,6 +2964,9 @@ void enter_dcatm(int channel, int rank) {
 
     if (!ok) {
         printf("There was a problem with entering Host->RCD CA training (DCATM)\n");
+        for (int i=0; i<4; ++i) {
+            printf("%hhx:%hhx\n", w_data[i], r_data[i]);
+        }
         busy_wait(10);
     }
 }
