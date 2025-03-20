@@ -28,6 +28,12 @@ void set_helper_arr_value_and_advance(uint32_t value) {
     helper_arr[helper_arr_it++] = value;
 }
 
+void clear_stride_helper_arr(int length) {
+    for (int it = 0; it < length; ++it) {
+        helper_arr[it] = 0;
+    }
+}
+
 int one_in_helper_arr(int max) {
     if (helper_arr[0]) return -1;
     for (int it = 1; it < max; ++it) {
@@ -41,6 +47,12 @@ int one_stride_helper_arr(int max) {
        if (!helper_arr[it]) return it;
     }
     return max;
+}
+
+void clear_and_find_eye_in_helper_arr(int *left, int *right, int max) {
+    *right = UNSET_DELAY;
+    *left = UNSET_DELAY;
+    find_eye_in_helper_arr(left, right, max);
 }
 
 void find_eye_in_helper_arr(int *left, int *right, int max) {

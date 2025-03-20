@@ -33,6 +33,12 @@ void set_helper_arr_value_and_advance(uint32_t value);
 int one_in_helper_arr(int max);
 
 /**
+ * clear_stride_helper_arr
+ * Clears first `length` positions in the helper array
+ */
+void clear_stride_helper_arr(int length);
+
+/**
  * one_stride_helper_arr
  * Iterates over helper array from 0 up to `max`.
  * Returns:
@@ -41,6 +47,12 @@ int one_in_helper_arr(int max);
  *  max if array is full of non zero values
  */
 int one_stride_helper_arr(int max);
+
+/**
+ * clear_and_find_eye_in_helper_arr
+ * Sets `left` and `right` to UNSET_DELAY and runs `find_eye_in_helper_arr`
+ */
+void clear_and_find_eye_in_helper_arr(int *left, int *right, int max);
 
 /**
  * find_eye_in_helper_arr

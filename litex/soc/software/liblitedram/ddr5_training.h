@@ -19,6 +19,7 @@
 #define MAX_WRITE_CYCLE_DELAY (MAX_READ_CYCLE_DELAY - 2)
 
 typedef void (*action_callback_t)(int channel, int rank, int address);
+typedef uint32_t (*status_callback_t)(int channel, int rank, int address);
 typedef void (*training_mode_callback_t)(int channel, int rank);
 
 typedef uint32_t (*delay_checker_cs_t)(int channel, int rank, int address, int shift_0101, int modules, int width);
@@ -29,26 +30,24 @@ typedef struct {
         action_callback_t rst_dly;
         action_callback_t inc_dly;
         action_callback_t dec_dly;
+        status_callback_t get_dly;
     } ck;
     struct {
         int delays[CHANNELS][2][2];
-        int coarse_delays[CHANNELS][2];
-        int final_delays[CHANNELS][2];
 
         training_mode_callback_t enter_training_mode;
         training_mode_callback_t exit_training_mode;
 
         action_callback_t rst_dly;
         action_callback_t inc_dly;
+        status_callback_t get_dly;
 
         delay_checker_cs_t check;
-        uint8_t invert[CHANNELS];
     } cs;
     struct {
         int line_count;
 
         int delays[CHANNELS][14][2];
-        int final_delays[CHANNELS][14];
         // If per-rank timings are available, the arrays above should be [CHANNELS][SDRAM_PHY_RANKS][14][2]
         // to cover clock/ca delays per rank
 
@@ -57,6 +56,7 @@ typedef struct {
 
         action_callback_t rst_dly;
         action_callback_t inc_dly;
+        status_callback_t get_dly;
 
         delay_checker_ca_t check;
 
@@ -64,7 +64,6 @@ typedef struct {
     } ca;
     struct {
         int delays[CHANNELS][2];
-        int final_delays[CHANNELS];
 
         action_callback_t rst_dly;
         action_callback_t inc_dly;
@@ -102,12 +101,14 @@ typedef struct {
         .rst_dly = ck_rst,                    \
         .inc_dly = ck_inc,                    \
         .dec_dly = ck_dec,                    \
+        .get_dly = get_ck_dly,                \
     },                                        \
     .cs = {                                   \
         .enter_training_mode = enter_cstm,    \
         .exit_training_mode  = exit_cstm,     \
         .rst_dly = cs_rst,                    \
         .inc_dly = cs_inc,                    \
+        .get_dly = get_cs_dly,                \
         .check = cs_check_if_works,           \
     },                                        \
     .ca = {                                   \
@@ -116,6 +117,7 @@ typedef struct {
         .exit_training_mode  = exit_catm,     \
         .inc_dly = ca_inc,                    \
         .rst_dly = ca_rst,                    \
+        .get_dly = get_ca_dly,                \
         .check = ca_check_if_works,           \
         .has_line13 = check_ca_13th_line,     \
     },                                        \
@@ -141,12 +143,14 @@ typedef struct {
         .rst_dly = ck_rst,                   \
         .inc_dly = ck_inc,                   \
         .dec_dly = ck_dec,                   \
+        .get_dly = get_ck_dly_rdimm,         \
     },                                       \
     .cs = {                                  \
         .enter_training_mode = enter_dcstm,  \
         .exit_training_mode  = exit_dcstm,   \
         .rst_dly = cs_rst,                   \
         .inc_dly = cs_inc,                   \
+        .get_dly = get_cs_dly,               \
         .check = dcs_check_if_works,         \
     },                                       \
     .ca = {                                  \
@@ -155,6 +159,7 @@ typedef struct {
         .exit_training_mode  = exit_dcatm,   \
         .inc_dly = ca_inc,                   \
         .rst_dly = ca_rst,                   \
+        .get_dly = get_ca_dly,               \
         .check = dca_check_if_works_ddr,     \
         .has_line13 = NULL,                  \
     },                                       \
@@ -181,12 +186,14 @@ typedef struct {
         .rst_dly = qck_rst,                 \
         .inc_dly = qck_inc,                 \
         .dec_dly = qck_dec,                 \
+        .get_dly = get_qck_dly,             \
     },                                      \
     .cs = {                                 \
         .enter_training_mode = enter_qcstm, \
         .exit_training_mode  = exit_qcstm,  \
         .rst_dly = qcs_rst,                 \
         .inc_dly = qcs_inc,                 \
+        .get_dly = get_qcs_dly,             \
         .check = qcs_check_if_works,        \
     },                                      \
     .ca = {                                 \
@@ -195,6 +202,7 @@ typedef struct {
         .exit_training_mode  = exit_qcatm,  \
         .inc_dly = qca_inc,                 \
         .rst_dly = qca_rst,                 \
+        .get_dly = get_qca_dly,             \
         .check = qca_check_if_works,        \
         .has_line13 = NULL,                 \
     },                                      \

@@ -79,14 +79,16 @@ typedef void (*inc_func)(int, int, int);
 void ck_rst(int channel, int rank, int address);
 void ck_inc(int channel, int rank, int address);
 void ck_dec(int channel, int rank, int address);
+uint32_t get_ck_dly_rdimm(int channel, int rank, int address);
+uint32_t get_ck_dly(int channel, int rank, int address);
 
 void cs_rst(int channel, int rank, int address);
 void cs_inc(int channel, int rank, int address);
-uint16_t get_cs_dly(int channel, int rank, int address);
+uint32_t get_cs_dly(int channel, int rank, int address);
 
 void ca_rst(int channel, int rank, int address);
 void ca_inc(int channel, int rank, int address);
-uint16_t get_ca_dly(int channel, int rank, int address);
+uint32_t get_ca_dly(int channel, int rank, int address);
 
 void par_rst(int channel, int rank, int address);
 void par_inc(int channel, int rank, int address);
@@ -106,17 +108,17 @@ void idly_inc(int channel, int module, int width);
 void idly_dq_rst(int channel, int module, int dq_line, int width);
 void idly_dq_inc(int channel, int module, int dq_line, int width);
 
-uint16_t get_rd_dq_dly(int channel, int module, int width);
-uint16_t get_rd_dqs_dly(int channel, int module, int width);
-uint16_t get_rd_dq_ck_dly(int channel, int module, int width);
-uint16_t get_rd_preamble_ck_dly(int channel, int module, int width);
+uint32_t get_rd_dq_dly(int channel, int module, int width);
+uint32_t get_rd_dqs_dly(int channel, int module, int width);
+uint32_t get_rd_dq_ck_dly(int channel, int module, int width);
+uint32_t get_rd_preamble_ck_dly(int channel, int module, int width);
 
 void wr_dqs_rst(int channel, int module, int width);
 void wr_dqs_inc(int channel, int module, int width);
 void odly_dqs_rst(int channel, int module, int width);
 void odly_dqs_inc(int channel, int module, int width);
 
-uint16_t get_wr_dqs_dly(int channel, int module, int width);
+uint32_t get_wr_dqs_dly(int channel, int module, int width);
 
 void wr_dq_rst(int channel, int module, int width);
 void wr_dq_inc(int channel, int module, int width);
@@ -127,8 +129,8 @@ void odly_dq_inc(int channel, int module, int width);
 void odly_per_dq_rst(int channel, int module, int width, int dq);
 void odly_per_dq_inc(int channel, int module, int width, int dq);
 
-uint16_t get_wr_dq_dly(int channel, int module, int width);
-uint16_t get_wr_dm_dly(int channel, int module, int width);
+uint32_t get_wr_dq_dly(int channel, int module, int width);
+uint32_t get_wr_dm_dly(int channel, int module, int width);
 
 int captured_preamble(int channel, int module, int width);
 uint8_t recover_mrr_value(int channel, int module, int width);
@@ -192,9 +194,12 @@ uint32_t dcs_check_if_works(int channel, int rank, int address, int shift_0101, 
 void qck_inc(int channel, int rank, int address);
 void qck_dec(int channel, int rank, int address);
 void qck_rst(int channel, int rank, int address);
+uint32_t get_qck_dly(int channel, int rank, int address);
 
 void qcs_inc(int channel, int rank, int address);
 void qcs_rst(int channel, int rank, int address);
+uint32_t get_qcs_dly(int channel, int rank, int address);
+
 void enter_qcstm(int channel, int rank);
 void enter_qcstm_RAMBUS_QUIRK(int channel, int rank);
 void exit_qcstm(int channel, int rank);
@@ -209,6 +214,7 @@ int dca_check_if_works_sdr(int channel, int rank, int address, int shift_back);
 
 void qca_inc(int channel, int rank, int address);
 void qca_rst(int channel, int rank, int address);
+uint32_t get_qca_dly(int channel, int rank, int address);
 void enter_qcatm(int channel, int rank);
 void exit_qcatm(int channel, int rank);
 int qca_check_if_works(int channel, int rank, int _address, int shift_back);

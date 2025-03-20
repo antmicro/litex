@@ -497,11 +497,6 @@ static void phy_select(int channel, int select, int width) {
         mask = 3;
         select *= 2;
     }
-#ifdef SDRAM_PHY_USPCOMPODDR5PHY
-    /* Disable Voltage/Temperature compensation */
-    ddrphy_en_vtc_write(0);
-    busy_wait_us(1);
-#endif // SDRAM_PHY_USPCOMPODDR5PHY
 
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -526,11 +521,6 @@ static void phy_deselect(int channel, int select, int width) {
     ddrphy_CSRModule_dly_sel_write(0);
 #endif
 
-#ifdef SDRAM_PHY_USPCOMPODDR5PHY
-    /* Enable Voltage/Temperature compensation */
-    busy_wait_us(1);
-    ddrphy_en_vtc_write(1);
-#endif // SDRAM_PHY_USPCOMPODDR5PHY
     busy_wait_us(1);
 }
 
@@ -697,7 +687,7 @@ static void odly_dq_update_internal(int channel) {
 #endif // SDRAM_OUTPUT_DELAY_CAPABLE
 }
 
-static uint16_t get_ck_dly_internal_rdimm(int channel) {
+static uint32_t get_ck_dly_internal_rdimm(int channel) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
     return ddrphy_CSRModule_ckdly_read();
 #else
@@ -705,7 +695,23 @@ static uint16_t get_ck_dly_internal_rdimm(int channel) {
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
-static uint16_t get_ck_dly_internal(int channel) {
+static uint32_t get_ck_dly_internal(int channel) {
+#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+#ifdef SDRAM_PHY_SUBCHANNELS
+    if(channel) {
+        return ddrphy_CSRModule_B_ckdly_read();
+    } else {
+        return ddrphy_CSRModule_A_ckdly_read();
+    }
+#else
+    return ddrphy_CSRModule_ckdly_read();
+#endif
+#else
+    return 0;
+#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
+}
+
+static uint32_t get_cs_dly_internal(int channel) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -721,23 +727,7 @@ static uint16_t get_ck_dly_internal(int channel) {
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
-static uint16_t get_cs_dly_internal(int channel) {
-#ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-#ifdef SDRAM_PHY_SUBCHANNELS
-    if(channel) {
-        return ddrphy_CSRModule_B_csdly_read();
-    } else {
-        return ddrphy_CSRModule_A_csdly_read();
-    }
-#else
-    return ddrphy_CSRModule_csdly_read();
-#endif
-#else
-    return 0;
-#endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
-}
-
-static uint16_t get_ca_dly_internal(int channel) {
+static uint32_t get_ca_dly_internal(int channel) {
 #ifdef SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -753,7 +743,7 @@ static uint16_t get_ca_dly_internal(int channel) {
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
-static uint16_t get_rd_dq_dly_internal(int channel) {
+static uint32_t get_rd_dq_dly_internal(int channel) {
 #ifdef SDRAM_INPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -769,7 +759,7 @@ static uint16_t get_rd_dq_dly_internal(int channel) {
 #endif // SDRAM_INPUT_DELAY_CAPABLE
 }
 
-static uint16_t get_rd_dqs_dly_internal(int channel) {
+static uint32_t get_rd_dqs_dly_internal(int channel) {
 #ifdef SDRAM_INPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -785,7 +775,7 @@ static uint16_t get_rd_dqs_dly_internal(int channel) {
 #endif // SDRAM_INPUT_DELAY_CAPABLE
 }
 
-static uint16_t get_rd_dq_ck_dly_internal(int channel) {
+static uint32_t get_rd_dq_ck_dly_internal(int channel) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         return ddrphy_CSRModule_B_ck_rddly_read();
@@ -797,7 +787,7 @@ static uint16_t get_rd_dq_ck_dly_internal(int channel) {
 #endif
 }
 
-static uint16_t get_rd_preamble_ck_dly_internal(int channel) {
+static uint32_t get_rd_preamble_ck_dly_internal(int channel) {
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
         return ddrphy_CSRModule_B_ck_rddly_preamble_read();
@@ -809,7 +799,7 @@ static uint16_t get_rd_preamble_ck_dly_internal(int channel) {
 #endif
 }
 
-static uint16_t get_wr_dm_dly_internal(int channel) {
+static uint32_t get_wr_dm_dly_internal(int channel) {
 #ifdef SDRAM_OUTPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -825,7 +815,7 @@ static uint16_t get_wr_dm_dly_internal(int channel) {
 #endif // SDRAM_OUTPUT_DELAY_CAPABLE
 }
 
-static uint16_t get_wr_dq_dly_internal(int channel) {
+static uint32_t get_wr_dq_dly_internal(int channel) {
 #ifdef SDRAM_OUTPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -841,7 +831,7 @@ static uint16_t get_wr_dq_dly_internal(int channel) {
 #endif // SDRAM_OUTPUT_DELAY_CAPABLE
 }
 
-static uint16_t get_wr_dqs_dly_internal(int channel) {
+static uint32_t get_wr_dqs_dly_internal(int channel) {
 #ifdef SDRAM_OUTPUT_DELAY_CAPABLE
 #ifdef SDRAM_PHY_SUBCHANNELS
     if(channel) {
@@ -1167,7 +1157,7 @@ void cs_inc(int channel, int rank, int address) {
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
-uint16_t get_ck_dly_rdimm(int channel, int rank, int address) {
+uint32_t get_ck_dly_rdimm(int channel, int rank, int address) {
     uint16_t temp;
     phy_select(channel,rank, 0);
     temp = get_ck_dly_internal_rdimm(channel);
@@ -1175,7 +1165,7 @@ uint16_t get_ck_dly_rdimm(int channel, int rank, int address) {
     return temp;
 }
 
-uint16_t get_ck_dly(int channel, int rank, int address) {
+uint32_t get_ck_dly(int channel, int rank, int address) {
     uint16_t temp;
     phy_select(channel,rank, 0);
     temp = get_ck_dly_internal(channel);
@@ -1183,7 +1173,7 @@ uint16_t get_ck_dly(int channel, int rank, int address) {
     return temp;
 }
 
-uint16_t get_cs_dly(int channel, int rank, int address) {
+uint32_t get_cs_dly(int channel, int rank, int address) {
     uint16_t temp;
     phy_select(channel,rank, 0);
     temp = get_cs_dly_internal(channel);
@@ -1211,7 +1201,7 @@ void ca_inc(int channel, int rank, int address) {
 #endif // SDRAM_PHY_ADDRESS_DELAY_CAPABLE
 }
 
-uint16_t get_ca_dly(int channel, int rank, int address) {
+uint32_t get_ca_dly(int channel, int rank, int address) {
     uint16_t temp;
     phy_select(channel, address, 0);
     temp = get_ca_dly_internal(channel);
@@ -1335,7 +1325,7 @@ void idly_dq_inc(int channel, int module, int width, int dq_line) {
     phy_dq_deselect(channel, dq_line, width);
 }
 
-uint16_t get_rd_dq_dly(int channel, int module, int width) {
+uint32_t get_rd_dq_dly(int channel, int module, int width) {
     uint16_t temp;
     phy_select(channel, module, width);
     temp = get_rd_dq_dly_internal(channel);
@@ -1343,7 +1333,7 @@ uint16_t get_rd_dq_dly(int channel, int module, int width) {
     return temp;
 }
 
-uint16_t get_rd_dqs_dly(int channel, int module, int width) {
+uint32_t get_rd_dqs_dly(int channel, int module, int width) {
     uint16_t temp;
     if (width == 8) {
         module *= 2;
@@ -1354,7 +1344,7 @@ uint16_t get_rd_dqs_dly(int channel, int module, int width) {
     return temp;
 }
 
-uint16_t get_rd_dq_ck_dly(int channel, int module, int width) {
+uint32_t get_rd_dq_ck_dly(int channel, int module, int width) {
     uint16_t temp;
     phy_select(channel, module, width);
     temp = get_rd_dq_ck_dly_internal(channel);
@@ -1362,7 +1352,7 @@ uint16_t get_rd_dq_ck_dly(int channel, int module, int width) {
     return temp;
 }
 
-uint16_t get_rd_preamble_ck_dly(int channel, int module, int width) {
+uint32_t get_rd_preamble_ck_dly(int channel, int module, int width) {
     uint16_t temp;
     if (width == 8) {
         module *= 2;
@@ -1399,7 +1389,7 @@ void odly_dqs_inc(int channel, int module, int width) {
     phy_deselect(channel, module, width);
 }
 
-uint16_t get_wr_dqs_dly(int channel, int module, int width) {
+uint32_t get_wr_dqs_dly(int channel, int module, int width) {
     uint16_t temp;
     if (width == 8) {
         module *= 2;
@@ -1484,7 +1474,7 @@ void odly_per_dq_inc(int channel, int module, int width, int dq) {
     phy_deselect(channel, module, width);
 }
 
-uint16_t get_wr_dq_dly(int channel, int module, int width) {
+uint32_t get_wr_dq_dly(int channel, int module, int width) {
     uint16_t temp;
     if (width == 8) {
         module *= 2;
@@ -1495,7 +1485,7 @@ uint16_t get_wr_dq_dly(int channel, int module, int width) {
     return temp;
 }
 
-uint16_t get_wr_dm_dly(int channel, int module, int width) {
+uint32_t get_wr_dm_dly(int channel, int module, int width) {
     uint16_t temp;
     if (width == 8) {
         module *= 2;
@@ -1563,16 +1553,14 @@ bool check_enumerate(int channel, int rank, int module, int width, int modules, 
     send_mrw(channel, rank, MODULE_BROADCAST, 25, 0x00);
 
     printf("\t");
-    if (!verbose) {
-        if (module != -1) {
-            printf("module: %d\n", module);
-            for (module_ = 0; module_ < modules; module_++)
-                good &= !capture_and_reduce_module(channel, module, width, module_ != module);
-            printf("%s\n", good ? "pass" : "fail");
-        }
-        else
-            printf("%s\n", !!capture_and_reduce_result(channel, 1) ? "pass" : "fail");
-    } else {
+    if (module != -1) {
+        for (module_ = 0; module_ < modules; module_++)
+            good &= !capture_and_reduce_module(channel, module, width, module_ != module);
+        printf("%s\n", good ? "pass" : "fail");
+    }
+    else
+        printf("%s\n", !!capture_and_reduce_result(channel, 1) ? "pass" : "fail");
+    if (verbose) {
         uint8_t data[DFII_CMDINJECTOR_DATA_BYTES];
         int i;
 #ifdef SDRAM_PHY_SUBCHANNELS
@@ -2526,7 +2514,7 @@ static int alert_or_reduce(void) {
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x0); // start with 0 and reduce with OR
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    busy_wait_us(1);
+    busy_wait_us(2);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
     busy_wait_us(10);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
@@ -2537,7 +2525,7 @@ static int alert_and_reduce(void) {
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
     ddrphy_CSRModule_alert_reduce_write(0x3); // start with 1 and reduce with AND
     ddrphy_CSRModule_reset_alert_write(1);    // apply above settings
-    busy_wait_us(1);
+    busy_wait_us(2);
     ddrphy_CSRModule_sample_alert_write(1);   // enable sampling
     busy_wait_us(10);
     ddrphy_CSRModule_sample_alert_write(0);   // disable sampling
@@ -2699,6 +2687,18 @@ void qck_rst(int channel, int rank, int address) {
     }
 }
 
+uint32_t get_qck_dly(int channel, int rank, int address) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[5];
+    uint32_t delay = 0;
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x10, rw_data, false);
+    delay = (rw_data[2] & 0xff) | ((rw_data[3] & 0xff) << 8);
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x14, rw_data, false);
+    delay |= ((rw_data[0] & 0xff) << 16) | ((rw_data[1] & 0xff) << 24);
+    return delay;
+}
+
 /*-----------------------------------------------------------------------*/
 /* RCD->DRAM CS Training (QCSTM) Helpers                                 */
 /*-----------------------------------------------------------------------*/
@@ -2752,6 +2752,20 @@ void qcs_rst(int channel, int rank, int address) {
             printf("There was a problem with resetting Q%cCS%c_n output delay\n", 'A' + i, '0' + (rank & 1));
         rw_number += 2;
     }
+}
+
+uint32_t get_qcs_dly(int channel, int rank, int address) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[5];
+    uint32_t delay;
+    uint8_t rw_number_base = (rank & 1) ? 0x18 : 0x14;
+    uint8_t rw_idx = (rank & 1) ? 0 : 3;
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, rw_number_base, rw_data, false);
+    delay = rw_data[rw_idx] & 0x7f;
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x18, rw_data, false);
+    delay |= (rw_data[(rw_idx+2)%4] & 0x7f) << 8;
+    return delay;
 }
 
 /**
@@ -2983,6 +2997,9 @@ void exit_dcatm(int channel, int rank) {
     uint8_t rcd = get_rcd_id(rank);
     uint8_t w_data[5];
     uint8_t r_data[5];
+    // Clear CA bus
+    cmd_injector(channel, 0xf, 0, 0, 0, 0, 0, 0);
+    store_continuous(channel);
 
     // we need to modify RW02
     ok &= sdram_rcd_read(rcd, 0, 0, 0, 0, w_data, false);
@@ -3228,6 +3245,18 @@ void qca_rst(int channel, int rank, int address) {
             printf("There was a problem with resetting Q%cCA output delay\n", 'A' + channel);
         rw_number += 1;
     }
+}
+
+uint32_t get_qca_dly(int channel, int rank, int address) {
+    bool ok = true;
+    uint8_t rcd = get_rcd_id(rank);
+    uint8_t rw_data[5];
+    uint32_t delay;
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x18, rw_data, false);
+    delay = (rw_data[3]) & 0x3f;
+    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x1C, rw_data, false);
+    delay |= ((rw_data[0]) & 0x3f) << 8;
+    return delay;
 }
 
 /**
