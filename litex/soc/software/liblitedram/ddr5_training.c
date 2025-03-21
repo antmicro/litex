@@ -133,8 +133,10 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
     ctx->cs.rst_dly(channel, rank, 0);
 }
 
-static void CS_CK_single_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank, int shift_0101, int verbosity) {
-    int ckdly, last_dly;
+static void CS_CK_single_scan(const training_ctx_t *const ctx, int32_t channel, int32_t rank, int verbosity) {
+    // This function assumes that ck and cs delay taps are almost equal,
+    // so f(ck_dly(0), cs_dly(0)) == f(ck_dly(n), cs_dly(n))
+    int ckdly, it, shift_0101, last_dly;
     uint32_t works;
     int compress;
     char compressed;
@@ -144,28 +146,76 @@ static void CS_CK_single_scan(const training_ctx_t *const ctx, int32_t channel, 
     if (ctx->max_delay_taps > 64) {
         compress = 1;
     }
-    works = CS_single_test(ctx, channel, rank, shift_0101, verbosity);
-    for (ckdly = 1; ckdly < ctx->max_delay_taps; ++ckdly) {
+    shift_0101 = 0;
+    ckdly = 0;
+    while (ckdly < (ctx->max_delay_taps-1)) {
+        ckdly = ckdly + 4;
+        if (ckdly >= ctx->max_delay_taps) {
+            ckdly = ctx->max_delay_taps-1;
+        }
+        for (it = ckdly - ctx->ck.get_dly(channel, rank, 0); it > 0 ; --it) {
+            ctx->ck.inc_dly(channel, rank, 0);
+        }
+        for (it = ckdly - ctx->cs.get_dly(channel, rank, 0); it > 0 ; --it) {
+            ctx->cs.inc_dly(channel, rank, 0);
+        }
+        ctx->cs.enter_training_mode(channel, rank);
+        for (shift_0101 = 0; shift_0101 < 3; ++shift_0101) {
+            if (shift_0101 == 3) {
+                ctx->cs.rst_dly(channel, rank, 0);
+                break;
+            }
+            helper_modules_without_shift = 0;
+            helper_modules_seen = 0;
+            works = CS_single_test(ctx, channel, rank, shift_0101, verbosity);
+            if (verbosity > 2) {
+                printf("Check shift:%d", shift_0101);
+                printf("CK dly value: %lx:", ctx->ck.get_dly(channel, rank, 0));
+                printf("CS dly value: %lx:", ctx->cs.get_dly(channel, rank, 0));
+                printf(":%lx\n", works);
+            }
+            if (reduce_cs(works, ctx->modules)) {
+                ctx->cs.rst_dly(channel, rank, 0);
+                works = CS_single_test(ctx, channel, rank, shift_0101, verbosity);
+                if (verbosity > 2) {
+                    printf("Check shift:%d with no CS delay", shift_0101);
+                    printf("CK dly value: %lx:", ctx->ck.get_dly(channel, rank, 0));
+                    printf("CS dly value: %lx:", ctx->cs.get_dly(channel, rank, 0));
+                    printf(":%lx\n", works);
+                }
+                break;
+            }
+        }
+        if (!reduce_cs(works, ctx->modules) || shift_0101 == 3) {
+            break;
+        }
+        // Exit CS training mode before changing clock
+        ctx->cs.exit_training_mode(channel, rank);
+    }
+    // Still in CS training mode
+    for (it = ckdly; it > 0 && shift_0101 != 2; --it) {
+        ctx->cs.inc_dly(channel, rank, 0);
         works = CS_single_test(ctx, channel, rank, shift_0101, verbosity);
         if (verbosity > 2) {
+            printf("CK dly value: %lx:", ctx->ck.get_dly(channel, rank, 0));
+            printf("CS dly value: %lx:", ctx->cs.get_dly(channel, rank, 0));
             printf(":%lx\n", works);
         }
-        ctx->ck.inc_dly(channel, rank, 0);
-        if (!reduce_cs(works, ctx->modules)) {
-            last_dly = ckdly;
+        if (reduce_cs(works, ctx->modules)) {
             break;
         }
     }
-    for (;ckdly > 0; --ckdly) {
-        ctx->ck.dec_dly(channel, rank, 0);
-        if (verbosity > 2) {
-            printf("CK dly value: %lx\n", ctx->ck.get_dly(channel, rank, 0));
-        }
+    // Finally exit from CS training mode
+    ctx->cs.exit_training_mode(channel, rank);
+    // Should only happen if CS/CK edge are tap variance appart
+    if (shift_0101 == 2) {
+        last_dly = 1;
+    } else {
+        last_dly = it;
     }
-    if (verbosity > 2) {
-        printf("CK dly value: %lx\n", ctx->ck.get_dly(channel, rank, 0));
-    }
-    for (ckdly = 1; ckdly < ctx->max_delay_taps; ++ckdly) {
+    printf("last_dly value: %d\n", last_dly);
+    ctx->ck.rst_dly(channel, rank, 0);
+    for (ckdly = 0; ckdly < ctx->max_delay_taps; ++ckdly) {
         works = 0;
         if (ckdly + last_dly > ctx->max_delay_taps) {
             works = 1;
@@ -181,9 +231,6 @@ static void CS_CK_single_scan(const training_ctx_t *const ctx, int32_t channel, 
                 printf("%d", !!works);
             }
         }
-        if (verbosity > 2) {
-            printf("\n");
-        }
         set_helper_arr_value_and_advance(works);
     }
 }
@@ -191,11 +238,11 @@ static void CS_CK_single_scan(const training_ctx_t *const ctx, int32_t channel, 
 static void CA_scan_single(training_ctx_t *const ctx, int32_t channel, int32_t rank, int32_t address, int shift_back);
 
 static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank) {
-    int i, _case;
+    int i, _case, _length;
     int cs_left_side, cs_right_side;
     int tmp_left_side, tmp_right_side;
     int shift_first_dly[2], shift_midpoint_dly[2], shift_last_dly[2];
-    int shift = 0;
+    int _shift;
     clear_helper_arr();
 
     // Enter CS training
@@ -226,14 +273,15 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank) {
      * 4. CS is leading CA => find next working delay island.
      * */
     _case = 0;
-    for (shift = 0; shift < 2; ++shift) {
-        if (shift_first_dly[shift] == UNSET_DELAY) {
-            printf("\nSkipping shift:%d, no eye found!", shift);
+    _length = 0;
+    for (_shift = 0; _shift < 2; ++_shift) {
+        if (shift_first_dly[_shift] == UNSET_DELAY) {
+            printf("\nSkipping _shift:%d, no eye found!", _shift);
             continue;
         }
-        printf("\nTesting CA for CS shift:%d, midpoint delay %d|", shift, shift_midpoint_dly[shift]);
+        printf("\nTesting CA for CS shift:%d, midpoint delay %d|", _shift, shift_midpoint_dly[_shift]);
         ctx->cs.rst_dly(channel, rank, 0);
-        for (i = 0; i < shift_midpoint_dly[shift]; ++i) {
+        for (i = 0; i < shift_midpoint_dly[_shift]; ++i) {
             ctx->cs.inc_dly(channel, rank, 0);
         }
         // Enter CA training
@@ -243,19 +291,22 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank) {
         CA_scan_single(ctx, channel, rank, 0, 0);
         // Exit CA training early
         ctx->ca.exit_training_mode(channel, rank);
-        printf("|\n");
-        if (one_in_helper_arr(ctx->max_delay_taps) != 0 && shift_first_dly[shift] == 0) {
+        printf("|");
+        if (one_in_helper_arr(ctx->max_delay_taps) != 0 && shift_first_dly[_shift] == 0) {
             _case = 2;
-        } else if (one_in_helper_arr(ctx->max_delay_taps) != 0 && shift_first_dly[shift] != 0) {
+        } else if (one_in_helper_arr(ctx->max_delay_taps) != 0 && shift_first_dly[_shift] != 0) {
             _case = 3;
         }
+        clear_and_find_eye_in_helper_arr(&tmp_left_side, &tmp_right_side, ctx->max_delay_taps);
         clear_helper_arr();
-        if (_case == 2 || _case == 3) {
-            cs_right_side = shift_first_dly[shift];
-            cs_left_side = shift_last_dly[shift];
-            break;
+
+        if ((_case == 2 || _case == 3) && _length < (tmp_left_side - tmp_right_side)) {
+            cs_right_side = shift_first_dly[_shift];
+            cs_left_side = shift_last_dly[_shift];
+            _length = (tmp_left_side - tmp_right_side);
         }
     }
+    printf("\n");
     ctx->cs.rst_dly(channel, rank, 0);
 
     // Case 3 - keep found values
@@ -272,25 +323,24 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank) {
 
     // Case 2 - search for CK delay value
     if (_case == 2) {
-        ctx->cs.enter_training_mode(channel, rank);
         helper_modules_without_shift = 0;
         helper_modules_seen = 0;
         clear_helper_arr();
-        // Clock can't be delayd more than n-1 taps, so -n is an impossible value
-        set_helper_arr_value_and_advance(0);
-        CS_CK_single_scan(ctx, channel, rank, shift, 1);
+        CS_CK_single_scan(ctx, channel, rank, 1);
         clear_and_find_eye_in_helper_arr(&tmp_left_side, &tmp_right_side, ctx->max_delay_taps);
         // Remove delays that resulted in "valid" CS but end before max_delay_taps
         while (tmp_left_side != ctx->max_delay_taps && tmp_right_side != UNSET_DELAY) {
             clear_stride_helper_arr(tmp_left_side);
             clear_and_find_eye_in_helper_arr(&tmp_left_side, &tmp_right_side, ctx->max_delay_taps);
         }
-        printf("|");
-        helper_modules_without_shift = 0;
-        helper_modules_seen = 0;
-        CS_scan_single(ctx, channel, rank, shift, 1);
+        for (i = 0; i < ctx->max_delay_taps; ++i) {
+            if (i >= cs_right_side && i < cs_left_side) {
+                set_helper_arr_value_and_advance(1);
+            } else {
+                set_helper_arr_value_and_advance(0);
+            }
+        }
         printf("|\n");
-        ctx->cs.exit_training_mode(channel, rank);
         return true;
     }
 
@@ -363,7 +413,9 @@ static void CK_CS_alignment(training_ctx_t *const ctx, int channel) {
             min_ckdly = MIN(min_ckdly, ctx->cs.delays[_channel][_rank][0]);
         }
     }
-    min_ckdly = (-min_ckdly) + (ctx->max_delay_taps/32);
+    if (min_ckdly < 0) {
+        min_ckdly = (-min_ckdly) + (ctx->max_delay_taps/32);
+    }
     printf("New clock delay:%2d\n", min_ckdly);
     for (; min_ckdly > 0; --min_ckdly) {
         ctx->ck.inc_dly(channel, 0, 0);
@@ -575,7 +627,7 @@ static void CA_training(training_ctx_t *const ctx, int channel) {
     }
 }
 
-void sdram_ddr5_ca_cs_prep(training_ctx_t *const ctx) {
+static void sdram_ddr5_ca_cs_prep(training_ctx_t *const ctx) {
     if (ctx->rate == DDR && ctx->training_type != RCD_DRAM)
         disable_dfi_2n_mode();
     CA_setup_array(ctx);

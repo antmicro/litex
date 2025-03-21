@@ -2691,12 +2691,18 @@ uint32_t get_qck_dly(int channel, int rank, int address) {
     bool ok = true;
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
-    uint32_t delay = 0;
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x10, rw_data, false);
-    delay = (rw_data[2] & 0xff) | ((rw_data[3] & 0xff) << 8);
+    if (address < 2) {
+        ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x10, rw_data, false);
+        if (address == 0) {
+            return rw_data[2] & 0x3f;
+        }
+        return rw_data[3] & 0x3f;
+    }
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x14, rw_data, false);
-    delay |= ((rw_data[0] & 0xff) << 16) | ((rw_data[1] & 0xff) << 24);
-    return delay;
+    if (address == 2) {
+        return rw_data[0] & 0x3f;
+    }
+    return rw_data[1] & 0x3f;
 }
 
 /*-----------------------------------------------------------------------*/
@@ -2758,14 +2764,14 @@ uint32_t get_qcs_dly(int channel, int rank, int address) {
     bool ok = true;
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
-    uint32_t delay;
     uint8_t rw_number_base = (rank & 1) ? 0x18 : 0x14;
     uint8_t rw_idx = (rank & 1) ? 0 : 3;
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, rw_number_base, rw_data, false);
-    delay = rw_data[rw_idx] & 0x7f;
+    if (address == 0) {
+        ok &= sdram_rcd_read(rcd, 0, channel, 0, rw_number_base, rw_data, false);
+        return rw_data[rw_idx] & 0x7f;
+    }
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x18, rw_data, false);
-    delay |= (rw_data[(rw_idx+2)%4] & 0x7f) << 8;
-    return delay;
+    return (rw_data[(rw_idx+2)%4] & 0x7f);
 }
 
 /**
@@ -3251,12 +3257,12 @@ uint32_t get_qca_dly(int channel, int rank, int address) {
     bool ok = true;
     uint8_t rcd = get_rcd_id(rank);
     uint8_t rw_data[5];
-    uint32_t delay;
-    ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x18, rw_data, false);
-    delay = (rw_data[3]) & 0x3f;
+    if (address == 0) {
+        ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x18, rw_data, false);
+        return (rw_data[3]) & 0x3f;
+    }
     ok &= sdram_rcd_read(rcd, 0, channel, 0, 0x1C, rw_data, false);
-    delay |= ((rw_data[0]) & 0x3f) << 8;
-    return delay;
+    return ((rw_data[0]) & 0x3f);
 }
 
 /**
