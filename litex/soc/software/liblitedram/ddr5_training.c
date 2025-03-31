@@ -14,7 +14,7 @@
 
 //#define INFO_DDR5
 //#define DEBUG_DDR5
-#define CA_INFO_DDR5
+//#define CA_INFO_DDR5
 //#define CA_DEBUG_DDR5
 //#define READ_INFO_DDR5
 //#define READ_DEBUG_DDR5
@@ -255,8 +255,8 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, in
         ctx->cs.rst_dly(channel, rank, 0);
         if (i == 1 && ctx->training_type != HOST_RCD) {
             // Talking directly to DRAM
-            set_helper_arr_value_and_advance(0);
-            for (j = 0; j < shift_last_dly[0] + 2; ++j) {
+            for (j = 0; j < shift_last_dly[0] + 1; ++j) {
+                set_helper_arr_value_and_advance(0);
                 ctx->cs.inc_dly(channel, rank, 0);
             }
         }
