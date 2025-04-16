@@ -64,6 +64,7 @@ int or_sample_module(int channel, int module, int width);
 int and_sample_module(int channel, int module, int width);
 
 void read_registers(int channel, int rank, int module, int width);
+void read_rcd_registers_sideband(int rcd);
 
 int check_ca_13th_line(int32_t channel, int32_t rank);
 
@@ -96,7 +97,7 @@ void par_inc(int channel, int rank, int address);
 void get_dimm_dq_remapping(int channel, int modules, int width);
 uint8_t lfsr_next(uint8_t input);
 int compare_serial(int channel, int rank, int module, int width,
-                   uint16_t data, int inv, int print);
+                   uint16_t data, uint16_t inv, int print);
 int compare(int channel, int rank, int module, int width,
             int data0, int data1,
             int inv, int select, int print);

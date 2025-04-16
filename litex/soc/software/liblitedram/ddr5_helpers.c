@@ -452,6 +452,23 @@ void read_registers(int channel, int rank, int module, int width) {
     }
 }
 
+void read_rcd_registers_sideband(int rcd) {
+    int i, j, channel;
+    uint8_t rw_data[2][5];
+    for (i = 0; i < 96; i=i+4) {
+        for (channel = 0; channel < 2; ++channel) {
+            sdram_rcd_read(rcd, 0, channel, 0, i, rw_data[channel], false);
+        }
+        for (j = 0; j < 4; ++j) {
+            printf("\tMR:%3d|", i+j);
+            for (channel = 0; channel < 2; ++channel) {
+                printf("%02"PRIX8"|", rw_data[channel][j]);
+            }
+            printf("\n");
+        }
+    }
+}
+
 /**
  * ca_check_if_has_line13
  *
@@ -977,8 +994,9 @@ void get_dimm_dq_remapping(int channel, int modules, int width) {
         for (module = 0; module < modules; ++module) {
             temp = get_data_module_phase(channel, module, width, 0);
             for (line = 0; line < width; ++line) {
-                if (!(temp & (1<<line)))
+                if (!(temp & (1<<line))) {
                     set_dq_remapping(channel, module*width+it, line);
+                }
             }
         }
     }
@@ -1008,7 +1026,7 @@ uint8_t lfsr_next(uint8_t input) {
     return temp;
 }
 
-int compare_serial(int channel, int rank, int module, int width, uint16_t data, int inv, int print) {
+int compare_serial(int channel, int rank, int module, int width, uint16_t data, uint16_t inv, int print) {
     uint16_t module_data;
     uint16_t expected_data[8];
     uint16_t phase, _temp, _mask, _error;

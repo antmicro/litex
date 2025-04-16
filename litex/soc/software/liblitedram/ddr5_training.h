@@ -79,7 +79,8 @@ typedef struct {
     int channels;
     int all_ca_count;
     int die_width;
-    int max_delay_taps;
+    int max_delay_taps_ca;
+    int max_delay_taps_dq;
     int modules;
     bool CS_CA_successful;
     bool RDIMM;
@@ -129,7 +130,8 @@ typedef struct {
     .die_width = SDRAM_PHY_DQ_DQS_RATIO,      \
     .rate = DDR,                              \
     .CS_CA_successful = true,                 \
-    .max_delay_taps = SDRAM_PHY_DELAYS,       \
+    .max_delay_taps_ca = SDRAM_PHY_DELAYS,    \
+    .max_delay_taps_dq = SDRAM_PHY_DELAYS,    \
     .modules = SDRAM_PHY_MODULES/CHANNELS,    \
     .RDIMM = false,                           \
     .manufacturer = 0,                        \
@@ -175,7 +177,8 @@ typedef struct {
     .die_width = -1,                         \
     .rate = DDR,                             \
     .CS_CA_successful = true,                \
-    .max_delay_taps = SDRAM_PHY_DELAYS,      \
+    .max_delay_taps_ca = SDRAM_PHY_DELAYS,   \
+    .max_delay_taps_dq = SDRAM_PHY_DELAYS,   \
     .modules = 1,                            \
     .RDIMM = true,                           \
     .manufacturer = 0,                       \
@@ -214,7 +217,8 @@ typedef struct {
     .die_width = -1,                        \
     .rate = DDR,                            \
     .CS_CA_successful = true,               \
-    .max_delay_taps = 64,                   \
+    .max_delay_taps_ca = 64,                \
+    .max_delay_taps_dq = SDRAM_PHY_DELAYS,  \
     .modules = SDRAM_PHY_MODULES/CHANNELS,  \
     .RDIMM = true,                          \
     .manufacturer = 0,                      \

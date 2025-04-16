@@ -104,10 +104,10 @@ static void CS_scan_single(const training_ctx_t *const ctx, int32_t channel, int
 
     compress = 0;
     compressed = 0;
-    if (ctx->max_delay_taps > 64) {
+    if (ctx->max_delay_taps_ca > 64) {
         compress = 1;
     }
-    for (csdly = ctx->cs.get_dly(channel, rank, 0); csdly < ctx->max_delay_taps; csdly++) {
+    for (csdly = ctx->cs.get_dly(channel, rank, 0); csdly < ctx->max_delay_taps_ca; csdly++) {
         works = CS_single_test(ctx, channel, rank, shift_0101, verbosity);
         if (verbosity > 2) {
             printf(":%lx\n", works);
@@ -143,16 +143,16 @@ static void CS_CK_single_scan(const training_ctx_t *const ctx, int32_t channel, 
 
     compress = 0;
     compressed = 0;
-    if (ctx->max_delay_taps > 64) {
+    if (ctx->max_delay_taps_ca > 64) {
         compress = 1;
     }
     shift_0101 = 0;
     ckdly = 0;
-    while (ckdly < (ctx->max_delay_taps-1)) {
+    while (ckdly < (ctx->max_delay_taps_ca-1)) {
         ctx->cs.rst_dly(channel, rank, 0);
         ckdly = ckdly + 4;
-        if (ckdly >= ctx->max_delay_taps) {
-            ckdly = ctx->max_delay_taps-1;
+        if (ckdly >= ctx->max_delay_taps_ca) {
+            ckdly = ctx->max_delay_taps_ca-1;
         }
         for (it = ckdly - ctx->ck.get_dly(channel, rank, 0); it > 0 ; --it) {
             ctx->ck.inc_dly(channel, rank, 0);
@@ -216,9 +216,9 @@ static void CS_CK_single_scan(const training_ctx_t *const ctx, int32_t channel, 
     }
     printf("last_dly value: %d\n", last_dly);
     ctx->ck.rst_dly(channel, rank, 0);
-    for (ckdly = 0; ckdly < ctx->max_delay_taps; ++ckdly) {
+    for (ckdly = 0; ckdly < ctx->max_delay_taps_ca; ++ckdly) {
         works = 0;
-        if (ckdly + last_dly > ctx->max_delay_taps) {
+        if (ckdly + last_dly > ctx->max_delay_taps_ca) {
             works = 1;
         }
         if (verbosity > 0) {
@@ -262,7 +262,7 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, in
         }
         printf("\nTesting shift:%d|", i);
         CS_scan_single(ctx, channel, rank, i, 0);
-        clear_and_find_eye_in_helper_arr(&cs_left_side, &cs_right_side, ctx->max_delay_taps);
+        clear_and_find_eye_in_helper_arr(&cs_left_side, &cs_right_side, ctx->max_delay_taps_ca);
         printf("eye span: %d %d", cs_right_side, cs_left_side);
         printf("|");
         clear_helper_arr();
@@ -301,11 +301,11 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, in
         ctx->ca.exit_training_mode(channel, rank);
         printf("|");
 
-        clear_and_find_eye_in_helper_arr(&tmp_left_side, &tmp_right_side, ctx->max_delay_taps);
+        clear_and_find_eye_in_helper_arr(&tmp_left_side, &tmp_right_side, ctx->max_delay_taps_ca);
         if (_length < (tmp_left_side - tmp_right_side)) {
-            if (one_in_helper_arr(ctx->max_delay_taps) != 0 && shift_first_dly[_shift] == 0) {
+            if (one_in_helper_arr(ctx->max_delay_taps_ca) != 0 && shift_first_dly[_shift] == 0) {
                 _case = 2;
-            } else if (one_in_helper_arr(ctx->max_delay_taps) != 0 && shift_first_dly[_shift] != 0) {
+            } else if (one_in_helper_arr(ctx->max_delay_taps_ca) != 0 && shift_first_dly[_shift] != 0) {
                 _case = 3;
             }
             cs_right_side = shift_first_dly[_shift];
@@ -322,7 +322,7 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, in
 
     // Case 3 - keep found values
     if (_case == 3) {
-        for (i = 0; i < ctx->max_delay_taps; ++i) {
+        for (i = 0; i < ctx->max_delay_taps_ca; ++i) {
             if (i >= cs_right_side && i < cs_left_side) {
                 set_helper_arr_value_and_advance(1);
             } else {
@@ -338,13 +338,13 @@ static bool CS_scan(training_ctx_t *const ctx, int32_t channel, int32_t rank, in
         helper_modules_seen = 0;
         clear_helper_arr();
         CS_CK_single_scan(ctx, channel, rank, 1);
-        clear_and_find_eye_in_helper_arr(&tmp_left_side, &tmp_right_side, ctx->max_delay_taps);
+        clear_and_find_eye_in_helper_arr(&tmp_left_side, &tmp_right_side, ctx->max_delay_taps_ca);
         // Remove delays that resulted in "valid" CS but end before max_delay_taps
-        while (tmp_left_side != ctx->max_delay_taps && tmp_right_side != UNSET_DELAY) {
+        while (tmp_left_side != ctx->max_delay_taps_ca && tmp_right_side != UNSET_DELAY) {
             clear_stride_helper_arr(tmp_left_side);
-            clear_and_find_eye_in_helper_arr(&tmp_left_side, &tmp_right_side, ctx->max_delay_taps);
+            clear_and_find_eye_in_helper_arr(&tmp_left_side, &tmp_right_side, ctx->max_delay_taps_ca);
         }
-        for (i = 0; i < ctx->max_delay_taps; ++i) {
+        for (i = 0; i < ctx->max_delay_taps_ca; ++i) {
             if (i >= cs_right_side && i < cs_left_side) {
                 set_helper_arr_value_and_advance(1);
             } else {
@@ -375,7 +375,7 @@ static void CS_chan_scan(training_ctx_t *const ctx, int32_t channel, uint8_t *su
         // paths should be identical
         if (ctx->training_type != HOST_RCD || (_rank&1) == 0) {
             subtract = CS_scan(ctx, channel, _rank, degrade_case2_to_3);
-            find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
+            find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps_ca);
 
             if (left_side == UNSET_DELAY || right_side == UNSET_DELAY) {
                 printf("CS:%2d Eye width:0 Failed\n", _rank);
@@ -383,8 +383,8 @@ static void CS_chan_scan(training_ctx_t *const ctx, int32_t channel, uint8_t *su
                 return;
             }
             if (subtract) {
-                right_side -= ctx->max_delay_taps;
-                left_side -= ctx->max_delay_taps;
+                right_side -= ctx->max_delay_taps_ca;
+                left_side -= ctx->max_delay_taps_ca;
             }
         } else {
             right_side = ctx->cs.delays[channel][_rank^1][0];
@@ -425,7 +425,7 @@ static void CK_CS_alignment(training_ctx_t *const ctx, int channel) {
         }
     }
     if (min_ckdly < 0) {
-        min_ckdly = (-min_ckdly) + (ctx->max_delay_taps/32);
+        min_ckdly = (-min_ckdly) + (ctx->max_delay_taps_ca/32);
     }
     printf("New clock delay:%2d\n", min_ckdly);
     for (; min_ckdly > 0; --min_ckdly) {
@@ -485,8 +485,8 @@ static void CA_setup_array(training_ctx_t *const ctx) {
     int channel, address;
     for (channel = 0; channel < ctx->channels; ++channel) {
         for (address = 0; address < 14; ++address) {
-           ctx->ca.delays[channel][address][0] = -ctx->max_delay_taps;
-           ctx->ca.delays[channel][address][1] = ctx->max_delay_taps;
+           ctx->ca.delays[channel][address][0] = -ctx->max_delay_taps_ca;
+           ctx->ca.delays[channel][address][1] = ctx->max_delay_taps_ca;
         }
     }
 }
@@ -517,12 +517,12 @@ static void CA_scan_single(training_ctx_t *const ctx, int32_t channel, int32_t r
 
     compress = 0;
     compressed = 0;
-    if (ctx->max_delay_taps > 64) {
+    if (ctx->max_delay_taps_ca > 64) {
         compress = 1;
     }
     ctx->ca.rst_dly(channel, rank, address);
 
-    for (cadly = 0; cadly < ctx->max_delay_taps; cadly++) {
+    for (cadly = 0; cadly < ctx->max_delay_taps_ca; cadly++) {
         works = ctx->ca.check(channel, rank, address, shift_back);
         if (compress) {
             compressed = compressed | (!!works << (cadly & 3));
@@ -569,7 +569,7 @@ static void CA_chan_training(training_ctx_t *const ctx , int32_t channel) {
         printf("Rank:%2"PRId32"\n", _rank);
         for (address = 0; address < ctx->ca.line_count; address++) {
             CA_scan(ctx, channel, _rank, address);
-            clear_and_find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps);
+            clear_and_find_eye_in_helper_arr(&left_side, &right_side, ctx->max_delay_taps_ca);
 
 #ifndef KEEP_GOING_ON_DRAM_ERROR
             // Check if we found the eye
@@ -580,11 +580,11 @@ static void CA_chan_training(training_ctx_t *const ctx , int32_t channel) {
                 return;
             }
 #endif // KEEP_GOING_ON_DRAM_ERROR
-            // First ctx->max_delay_taps taps are in previous cs_n,
-            // so we need to always subtract ctx->max_delay_taps from
+            // First ctx->max_delay_taps_ca taps are in previous cs_n,
+            // so we need to always subtract ctx->max_delay_taps_ca from
             // answare
-            //right_side -= ctx->max_delay_taps;
-            //left_side -= ctx->max_delay_taps;
+            //right_side -= ctx->max_delay_taps_ca;
+            //left_side -= ctx->max_delay_taps_ca;
             printf("CA[%"PRId32"] %d:%d\n", address, right_side, left_side);
 
             if (right_side > ctx->ca.delays[channel][address][0])
@@ -1138,12 +1138,13 @@ bool sdram_ddr5_read_training(training_ctx_t *const ctx) {
     int channel, rank;
     bool good = true;
     for (channel = 0; channel < ctx->channels; channel++) {
+        printf("%d\n", ctx->modules);
         get_dimm_dq_remapping(channel, ctx->modules, ctx->die_width);
         printf("Subchannel:%c Read training\n", (char)('A'+channel));
         for (rank = 0; rank < ctx->ranks; rank++) {
             printf("Training rank%2d\n", rank);
             good &= rank_read_training(channel, rank,
-                ctx->modules, ctx->die_width, ctx->max_delay_taps);
+                ctx->modules, ctx->die_width, ctx->max_delay_taps_dq);
 #ifndef KEEP_GOING_ON_DRAM_ERROR
             if (!good)
                 return good;
@@ -1391,7 +1392,7 @@ static int write_leveling(training_ctx_t *const ctx , int channel, int rank, int
 
     // After finding the transition cycle, we search for the eye's edge.
     int transition_delay = wltm_align_to_eye_edge(
-        channel, rank, module, ctx->die_width, ctx->max_delay_taps, &transition_cycle);
+        channel, rank, module, ctx->die_width, ctx->max_delay_taps_dq, &transition_cycle);
 
 #ifdef WRITE_INFO_DDR5
     printf("cycle:%2d delay:%2d\n", transition_cycle, transition_delay);
@@ -1405,10 +1406,10 @@ static int write_leveling(training_ctx_t *const ctx , int channel, int rank, int
     // after finishing Internal Write Leveling, we adjust by +1.25 tCK.
     // JESD79-5A 4.21.4, Table 110
     transition_cycle -= 1;
-    transition_delay += ctx->max_delay_taps/4;
-    if (transition_delay >= ctx->max_delay_taps) {
+    transition_delay += ctx->max_delay_taps_dq/4;
+    if (transition_delay >= ctx->max_delay_taps_dq) {
         transition_cycle += 1;
-        transition_delay -= ctx->max_delay_taps;
+        transition_delay -= ctx->max_delay_taps_dq;
     }
 
 #ifdef WRITE_INFO_DDR5
@@ -1435,17 +1436,17 @@ static int write_leveling(training_ctx_t *const ctx , int channel, int rank, int
     // This is the upper part of the third column of the Internal Write Leveling
     // flowchart (JESD79-5A Figure 92).
     transition_delay = wltm_align_to_eye_edge(
-        channel, rank, module, ctx->die_width, ctx->max_delay_taps, &transition_cycle);
+        channel, rank, module, ctx->die_width, ctx->max_delay_taps_dq, &transition_cycle);
 
     // Just like at the beginning of the Internal Write Leveling,
     // we need to adjust the DQS delay based on write preamble length.
     // We use 2 tCK write preamble, so we adjust by +1.25 tCK.
     // JESD79-5A 4.21.4, Table 110
     transition_cycle += 1;
-    transition_delay += ctx->max_delay_taps/4;
-    if (transition_delay >= ctx->max_delay_taps) {
+    transition_delay += ctx->max_delay_taps_dq/4;
+    if (transition_delay >= ctx->max_delay_taps_dq) {
         transition_cycle += 1;
-        transition_delay -= ctx->max_delay_taps;
+        transition_delay -= ctx->max_delay_taps_dq;
     }
 
     printf("Final timing values: cycles:%2d(adjusted %2d) delay:%2d\n",
@@ -1689,7 +1690,7 @@ static eye_t write_data_scan(training_ctx_t *const ctx , int channel, int rank, 
         }
 
         odly_dq_rst(channel, module, ctx->die_width);
-        for(int delay = 0; delay < ctx->max_delay_taps; ++delay){
+        for(int delay = 0; delay < ctx->max_delay_taps_dq; ++delay){
             if (_write_verbosity > 2)
                 printf("DQ dly:%"PRIu32"\n", get_wr_dq_dly(channel, module, ctx->die_width));
 
@@ -1711,10 +1712,10 @@ static eye_t write_data_scan(training_ctx_t *const ctx , int channel, int rank, 
                 printf("\n");
 
             if (works && eye.state == BEFORE) {
-                eye.start = cycle * ctx->max_delay_taps + delay;
+                eye.start = cycle * ctx->max_delay_taps_dq + delay;
                 eye.state  = INSIDE;
             } else if (!works && eye.state == INSIDE) {
-                eye.end = cycle * ctx->max_delay_taps + delay;
+                eye.end = cycle * ctx->max_delay_taps_dq + delay;
                 eye.state  = AFTER;
             }
 
@@ -1755,14 +1756,14 @@ static int moduel_dq_vref_scan(training_ctx_t *const ctx, int channel, int rank,
         eye_t eye = write_data_scan(ctx, channel, rank, module, wl_cycle, _write_verbosity);
         if (_write_verbosity)
             printf("|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
-                eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
-                eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
+                eye.start/ctx->max_delay_taps_dq, eye.start%ctx->max_delay_taps_dq,
+                eye.end/ctx->max_delay_taps_dq, eye.end%ctx->max_delay_taps_dq);
         eye.center = eye.end - eye.start;
 
         if (_write_verbosity)
             printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n", eye.center,
-                ((eye.start + eye.end)/2)/ctx->max_delay_taps,
-                ((eye.start + eye.end)/2)%ctx->max_delay_taps);
+                ((eye.start + eye.end)/2)/ctx->max_delay_taps_dq,
+                ((eye.start + eye.end)/2)%ctx->max_delay_taps_dq);
 
         for(_width = 0; _width < eye.center; ++_width) {
             if (eye_width_range[0][_width] == -1)
@@ -1792,7 +1793,7 @@ static bool moduel_dm_scan(training_ctx_t *const ctx, int channel, int rank, int
     printf("DM scan\nm:%2d DM|", module);
     odly_dm_rst(channel, module, ctx->die_width);
     eye_t eye_dm = DEFAULT_EYE;
-    for(delay = 0; delay < ctx->max_delay_taps && eye_dm.state != AFTER; ++delay) {
+    for(delay = 0; delay < ctx->max_delay_taps_dq && eye_dm.state != AFTER; ++delay) {
         if (_write_verbosity > 2)
             printf("DM dly:%"PRIu32"\n", get_wr_dm_dly(channel, module, ctx->die_width));
 
@@ -1811,7 +1812,7 @@ static bool moduel_dm_scan(training_ctx_t *const ctx, int channel, int rank, int
         if (!works && eye_dm.state == INSIDE) {
             eye_dm.end = delay;
             eye_dm.state  = AFTER;
-        } else if (delay == ctx->max_delay_taps-1 && eye_dm.state == INSIDE) {
+        } else if (delay == ctx->max_delay_taps_dq-1 && eye_dm.state == INSIDE) {
             eye_dm.end = delay + 1;
             eye_dm.state = AFTER;
         }
@@ -1861,13 +1862,13 @@ static int module_vref_scan(training_ctx_t *const ctx, int channel, int rank, in
     wr_dq_rst(channel, module, ctx->die_width);
     odly_dq_rst(channel, module, ctx->die_width);
     eye_t eye = write_data_scan(ctx, channel, rank, module, wl_cycle, 1);
-    middle_cycle = ((eye.start + eye.end)/2)/ctx->max_delay_taps;
-    middle_delay = ((eye.start + eye.end)/2)%ctx->max_delay_taps;
+    middle_cycle = ((eye.start + eye.end)/2)/ctx->max_delay_taps_dq;
+    middle_delay = ((eye.start + eye.end)/2)%ctx->max_delay_taps_dq;
     eye.center = eye.end - eye.start;
     printf("m%2d|start cycle:%2d, delay:%2d; end cycle:%2d, delay:%2d|",
         module,
-        eye.start/ctx->max_delay_taps, eye.start%ctx->max_delay_taps,
-        eye.end/ctx->max_delay_taps, eye.end%ctx->max_delay_taps);
+        eye.start/ctx->max_delay_taps_dq, eye.start%ctx->max_delay_taps_dq,
+        eye.end/ctx->max_delay_taps_dq, eye.end%ctx->max_delay_taps_dq);
     printf("eye_width:%2d; eye center: cycle:%2d,delay:%2d\n",
         eye.center, middle_cycle, middle_delay);
 
@@ -2015,8 +2016,9 @@ static void rcd_init(training_ctx_t *const ctx ) {
     busy_wait(2);
     for (channel = 0; channel < 2; ++channel) {
         rcd_dram_ctx.ck.rst_dly(channel, 0, 0);
-        for (rank =0; rank < 2; ++rank) {
+        for (rank = 0; rank < 2; ++rank) {
             rcd_dram_ctx.cs.rst_dly(channel, rank, 0);
+            rcd_dram_ctx.ca.rst_dly(channel, rank, 0);
         }
     }
 }
@@ -2049,6 +2051,8 @@ void sdram_ddr5_flow(void) {
         die_width = 4;
 #ifdef SDRAM_PHY_USPCOMPODDR5PHY
         die_width = read_module_width(0);
+        ddrphy_CSRModule_A_dq_dqs_ratio_write(die_width);
+        ddrphy_CSRModule_B_dq_dqs_ratio_write(die_width);
 #endif //SDRAM_PHY_USPCOMPODDR5PHY
         base_ctx = &host_rcd_ctx;
     }
@@ -2179,12 +2183,6 @@ void sdram_ddr5_flow(void) {
                 send_mpc(channel, rank, 0x50, 0);
                 send_mpc(channel, rank, 0x58, 0);
             }
-    }
-
-    if (is_rdimm) {
-        base_ctx = &host_dram_ctx;
-        host_dram_ctx.ranks = rcd_dram_ctx.ranks;
-        host_dram_ctx.RDIMM = rcd_dram_ctx.RDIMM;
     }
 
     base_ctx->ranks = 1; //FIXME: when PHY works with multiple ranks
