@@ -1572,8 +1572,6 @@ class LiteXSoC(SoC):
         sdram_size = 2**(module.geom_settings.bankbits +
                          module.geom_settings.rowbits +
                          module.geom_settings.colbits)*phy.settings.nranks*phy.settings.databits//8
-        if module.memtype == "LPDDR5":
-            sdram_size *= 16
         if size is not None:
             sdram_size = min(sdram_size, size)
 
