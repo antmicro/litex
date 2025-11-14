@@ -347,11 +347,8 @@ uint8_t sdram_mode_register_read(int channel, int pda, int reg) {
 // void cmd_injector(int channel, int phases, int cs, int command,
 //                  int wrdata_en, uint64_t wrdata_mask, int rddata_en, int single)
 uint8_t sdram_mode_register_read(int reg) {
-	printf("SDRAM mode register read %d\n", reg);
-	sdram_dfii_pi0_address_write(reg);
-	sdram_dfii_pi0_baddress_write(1);
-	command_p0(DFII_COMMAND_CS|DFII_COMMAND_WE|DFII_COMMAND_RDDATA);
-	return 0x00;
+    send_mrr(reg);
+    return recover_mrr_value(0, 8);
 }
 #endif
 

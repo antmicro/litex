@@ -433,7 +433,7 @@ static void sdram_mr_read_handler(int nb_params, char **params)
 	#else
 		printf("Value:%02x\n", sdram_mode_register_read(reg));
 	#endif
-	// sdram_software_control_off();
+	sdram_software_control_off();
 }
 define_command(sdram_mr_read, sdram_mr_read_handler, "Read SDRAM Mode Register", LITEDRAM_CMDS);
 #endif // defined(SDRAM_PHY_DDR5) || defined(SDRAM_PHY_LPDDR5)
